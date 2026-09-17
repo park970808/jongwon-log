@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>장원급제 · 훈련생 프로젝트 활동일지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --ink:#1A1814;
+  --paper:#FFFFFF;
+  --board:#E4E1D8;
+  --rule:#C9C4B6;
+  --rule-soft:#E0DCD1;
+  --seal:#A62C2B;
+  --muted:#6B6459;
+  --live:#2F6B5E;
+  --focus:#1F4FA8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--board);
+  color:var(--ink);
+  font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--seal)}
+
+/* ── layout ───────────────────────────── */
+.shell{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+.masthead{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  padding:26px 0 18px;border-bottom:2px solid var(--ink);margin-bottom:22px;flex-wrap:wrap;
+}
+.title-block h1{
+  font-family:'Gowun Batang',serif;font-weight:700;font-size:34px;line-height:1.1;margin:0;
+  letter-spacing:.02em;
+}
+.title-block p{margin:6px 0 0;color:var(--muted);font-size:13.5px}
+.seal{
+  width:78px;height:78px;flex:none;border-radius:50%;
+  border:2.5px solid var(--seal);color:var(--seal);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Gowun Batang',serif;transform:rotate(-7deg);
+  background:rgba(166,44,43,.05);
+}
+.seal b{font-size:24px;line-height:1;font-weight:700}
+.seal span{font-size:11px;margin-top:3px;letter-spacing:.14em}
+
+.bar{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  position:sticky;top:0;z-index:30;
+  background:var(--board);padding:10px 0 12px;border-bottom:1px solid var(--rule);
+  margin-bottom:26px;
+}
+.bar .grow{flex:1}
+select,.btn,.who{
+  background:var(--paper);border:1px solid var(--rule);border-radius:2px;
+  padding:8px 12px;cursor:pointer;
+}
+select{min-width:190px}
+.btn:hover,select:hover{border-color:var(--ink)}
+.btn-seal{background:var(--seal);border-color:var(--seal);color:#fff;font-weight:600}
+.btn-seal:hover{background:#8E2221;border-color:#8E2221}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.who{cursor:default;display:flex;align-items:center;gap:8px}
+.who i{width:8px;height:8px;border-radius:50%;background:var(--live);display:inline-block;font-style:normal}
+.status{font-size:13px;color:var(--muted);min-width:90px}
+.status.on{color:var(--live)}
+
+/* ── sections ─────────────────────────── */
+section{margin-bottom:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.sec-head h2{font-family:'Gowun Batang',serif;font-size:21px;margin:0;font-weight:700}
+.sec-head em{font-style:normal;color:var(--muted);font-size:13px}
+
+.sheet{background:var(--paper);border:1px solid var(--rule)}
+.row{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid var(--rule-soft)}
+.row:last-child{border-bottom:0}
+.row>.label{
+  padding:12px 14px;background:#F6F4EF;border-right:1px solid var(--rule-soft);
+  font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;
+}
+.row>.cell{padding:0;position:relative}
+.split{display:grid;grid-template-columns:1fr 1fr 1fr}
+.split>div{border-right:1px solid var(--rule-soft)}
+.split>div:last-child{border-right:0}
+.inline-label{font-size:12px;color:var(--muted);padding:9px 12px 0}
+
+textarea,input[type=text],input[type=date],input[type=number]{
+  width:100%;border:0;background:transparent;padding:11px 14px;outline:none;
+  resize:vertical;font-size:14.5px;
+}
+textarea:focus,input:focus{box-shadow:inset 0 0 0 2px rgba(31,79,168,.35)}
+textarea{min-height:64px;display:block;line-height:1.7}
+.tall{min-height:120px}
+
+.peer{
+  position:absolute;top:4px;right:8px;font-size:11px;color:var(--focus);
+  background:rgba(31,79,168,.08);border-radius:2px;padding:1px 6px;pointer-events:none;
+}
+
+/* 결시자 */
+.absent{display:flex;flex-wrap:wrap;gap:8px;padding:11px 14px}
+.chip{display:flex;align-items:center;gap:6px;border:1px solid var(--rule);border-radius:2px;padding:5px 10px;cursor:pointer;font-size:13.5px}
+.chip input{margin:0;accent-color:var(--seal)}
+.chip.on{border-color:var(--seal);color:var(--seal);background:rgba(166,44,43,.05)}
+
+/* PBL */
+.pbl{display:grid;grid-template-columns:120px 62px 1fr;border-bottom:1px solid var(--rule-soft)}
+.pbl:last-child{border-bottom:0}
+.pbl>b{padding:11px 14px;font-weight:600;font-size:13.5px;background:#F6F4EF;border-right:1px solid var(--rule-soft)}
+.pbl>span{padding:11px 10px;color:var(--muted);font-size:13px;border-right:1px solid var(--rule-soft);text-align:center}
+.pbl>div{position:relative}
+
+/* 훈련생 카드 */
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.mcard{background:var(--paper);border:1px solid var(--rule);position:relative}
+.mcard.mine{border-color:var(--seal);box-shadow:0 0 0 1px var(--seal)}
+.mhead{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--rule-soft)}
+.mhead>div{position:relative;border-right:1px solid var(--rule-soft)}
+.mhead>div:last-child{border-right:0}
+.mtag{position:absolute;top:-1px;left:-1px;background:var(--seal);color:#fff;font-size:11px;padding:2px 7px}
+.mcard.mine .mbody textarea{min-height:150px}
+
+/* 일지 */
+.log{display:grid;grid-template-columns:150px 1fr 220px 40px;border-bottom:1px solid var(--rule-soft)}
+.log:last-child{border-bottom:0}
+.log>div{border-right:1px solid var(--rule-soft);position:relative}
+.log>div:last-child{border-right:0}
+.log-head{background:#F6F4EF;font-size:13px;font-weight:600;color:var(--muted)}
+.log-head>div{padding:9px 14px}
+.del{border:0;background:transparent;color:var(--muted);width:100%;height:100%;cursor:pointer;font-size:16px}
+.del:hover{color:var(--seal)}
+.empty{padding:22px 14px;color:var(--muted);font-size:14px}
+
+/* gates */
+.gate{max-width:520px;margin:8vh auto;background:var(--paper);border:1px solid var(--rule);padding:30px}
+.gate h2{font-family:'Gowun Batang',serif;margin:0 0 6px;font-size:24px}
+.gate p{color:var(--muted);font-size:14px;margin:0 0 20px}
+.gate textarea,.gate input{border:1px solid var(--rule);margin-bottom:12px}
+.gate .btn{width:100%;text-align:center}
+.slots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.slot{border:1px solid var(--rule);padding:12px;text-align:left;background:var(--paper);cursor:pointer}
+.slot:hover{border-color:var(--ink)}
+.slot b{display:block;font-size:15px}
+.slot span{font-size:12px;color:var(--muted)}
+.hide{display:none!important}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px}
+@media (max-width:720px){
+  .row{grid-template-columns:1fr}
+  .row>.label{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .split,.pbl,.log{grid-template-columns:1fr}
+  .log>div{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .title-block h1{font-size:27px}
+}
+</style>
+</head>
+<body>
+
+<!-- ① Firebase 설정 -->
+<div id="gate-config" class="gate hide">
+  <h2>Firebase 연결</h2>
+  <p>Firebase 콘솔 → 프로젝트 설정 → 내 앱 → 구성(firebaseConfig) 객체를 그대로 붙여넣으세요. 한 번만 하면 이 브라우저에 저장됩니다.</p>
+  <textarea id="cfg-input" rows="9" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", "storageBucket": "...", "messagingSenderId": "...", "appId": "..." }'></textarea>
+  <button class="btn btn-seal" id="cfg-save">연결하기</button>
+  <p class="note" id="cfg-err"></p>
+</div>
+
+<!-- ② 내 자리 고르기 -->
+<div id="gate-slot" class="gate hide">
+  <h2>어느 자리인가요</h2>
+  <p>활동일지에서 본인이 쓸 칸을 고르세요. 이름은 들어가서 바로 바꿀 수 있습니다.</p>
+  <div class="slots" id="slot-list"></div>
+  <p class="note">기기마다 한 번만 고르면 다음부터 자동으로 들어옵니다.</p>
+</div>
+
+<!-- ③ 본문 -->
+<div id="app" class="shell hide">
+  <header class="masthead">
+    <div class="title-block">
+      <h1>장원급제</h1>
+      <p>훈련생 프로젝트 활동일지 · 매주 금요일 제출</p>
+    </div>
+    <div class="seal"><b id="seal-week">–</b><span>주차</span></div>
+  </header>
+
+  <div class="bar">
+    <select id="week-sel"></select>
+    <button class="btn" id="btn-prev-copy">지난 주 내용 가져오기</button>
+    <span class="status" id="save-status">불러오는 중</span>
+    <span class="grow"></span>
+    <span class="who"><i></i><span id="who-label">–</span></span>
+    <button class="btn" id="btn-switch">자리 바꾸기</button>
+    <button class="btn btn-seal" id="btn-export">한글 파일 내보내기</button>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>1. 팀 공통</h2><em>여섯 명이 같이 씁니다</em></div>
+    <div class="sheet">
+      <div class="row"><div class="label">프로젝트 주제</div><div class="cell" data-wrap="topic"><input type="text" data-f="topic" placeholder="예) 태양광 발전 플랜트 스마트 운영 시스템"></div></div>
+      <div class="row"><div class="label">주차 주요활동내용</div><div class="cell" data-wrap="weekly"><textarea data-f="weekly" class="tall" placeholder="1.&#10;2.&#10;3."></textarea></div></div>
+      <div class="row"><div class="label">프로젝트 결시자</div><div class="cell"><div class="absent" id="absent-box"></div></div></div>
+      <div class="row"><div class="label">기간 · 진행</div><div class="cell"><div class="split">
+        <div><div class="inline-label">총 수행기간</div><input type="text" data-f="period" placeholder="2026-09-01 ~ 2026-11-28"></div>
+        <div><div class="inline-label">진행시간 (/110H)</div><input type="text" data-f="hours" placeholder="44"></div>
+        <div><div class="inline-label">진행율 (%)</div><input type="text" data-f="progress" placeholder="40"></div>
+      </div></div></div>
+      <div class="row"><div class="label">팀운영 계획</div><div class="cell" data-wrap="plan"><textarea data-f="plan"></textarea></div></div>
+      <div class="row"><div class="label">팀 주요 회의내용</div><div class="cell" data-wrap="meeting"><textarea data-f="meeting" class="tall"></textarea></div></div>
+      <div class="row"><div class="label">차기 추진 예정</div><div class="cell" data-wrap="next"><textarea data-f="next"></textarea></div></div>
+      <div class="row"><div class="label">멘토 의견</div><div class="cell" data-wrap="mentor"><textarea data-f="mentor"></textarea></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>2. PBL 운영 일정</h2><em>단계별 수행내용</em></div>
+    <div class="sheet" id="pbl-box"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>3. 훈련생별 활동일지</h2><em>본인 칸만 채우면 됩니다</em></div>
+    <div class="members" id="members-box"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>4. 프로젝트 일지</h2><em>최대 23줄까지 한글 양식에 들어갑니다</em></div>
+    <div class="sheet"><div class="log log-head"><div>날짜</div><div>주요내용</div><div>특이사항</div><div></div></div></div>
+    <div class="sheet" id="log-box" style="border-top:0"></div>
+    <div style="margin-top:10px"><button class="btn" id="btn-add-log">줄 추가</button> <span class="note" id="log-count"></span></div>
+  </section>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot,
+  getDoc, getDocs, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ════════════════════════════════════════════════
+   설정 — 여기만 채우면 팀원 모두 바로 씁니다.
+   Firebase 콘솔 › 프로젝트 설정 › 내 앱 › 구성
+   ════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAe-KaHt0a6yrV7-BXSOqycusA0Kv2Gz0A",
+  authDomain: "jangwon-287b2.firebaseapp.com",
+  projectId: "jangwon-287b2",
+  storageBucket: "jangwon-287b2.firebasestorage.app",
+  messagingSenderId: "85352966138",
+  appId: "1:85352966138:web:37c613ead65a6fe881e643"
+};
+const TEAM_ID   = "jangwon";
+const MEMBERS   = 6;
+const TEMPLATE  = "./template.hwpx";
+const PBL_STEPS = [
+  ["팀편성","10%"],["계획(20%)","20%"],["피드백","30%"],["수행","40%"],["멘토링","50%"],
+  ["수행","60%"],["피드백","70%"],["수행","80%"],["결과제출","90%"],["피드백","100%"]
+];
+const SHARED_FIELDS = ["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
+
+/* ── 상태 ── */
+let db, auth, uid, slot, weekId;
+let shared = {}, members = {}, logs = {};
+let unsub = [], peers = {}, focusedField = null;
+const $ = s => document.querySelector(s);
+const el = (t,c) => { const e=document.createElement(t); if(c) e.className=c; return e; };
+
+/* ── 주차 계산 (월~금) ── */
+function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); return x; }
+function isoWeek(d){
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=(t.getUTCDay()+6)%7; t.setUTCDate(t.getUTCDate()-day+3);
+  const first=new Date(Date.UTC(t.getUTCFullYear(),0,4));
+  const fday=(first.getUTCDay()+6)%7; first.setUTCDate(first.getUTCDate()-fday+3);
+  return { year:t.getUTCFullYear(), week:1+Math.round((t-first)/(7*864e5)) };
+}
+const pad = n => String(n).padStart(2,"0");
+const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function weekList(){
+  const out=[], base=mondayOf(new Date());
+  for(let i=4;i>=-8;i--){
+    const mon=new Date(base); mon.setDate(mon.getDate()-i*7);
+    const fri=new Date(mon); fri.setDate(fri.getDate()+4);
+    const {year,week}=isoWeek(mon);
+    out.push({ id:`${year}-W${pad(week)}`, week,
+      label:`${week}주차 · ${mon.getMonth()+1}/${mon.getDate()}~${fri.getMonth()+1}/${fri.getDate()}${i===0?" (이번 주)":""}`,
+      monday:fmt(mon), friday:fmt(fri) });
+  }
+  return out;
+}
+let WEEKS = weekList();
+const weekMeta = id => WEEKS.find(w=>w.id===id) || WEEKS[0];
+
+/* ── 부팅 ── */
+function boot(){
+  const saved = FIREBASE_CONFIG || JSON.parse(localStorage.getItem("fb-config")||"null");
+  if(!saved){ $("#gate-config").classList.remove("hide"); return; }
+  try{
+    const app = initializeApp(saved);
+    auth = getAuth(app); db = getFirestore(app);
+  }catch(e){ localStorage.removeItem("fb-config"); $("#cfg-err").textContent="설정이 올바르지 않습니다. 다시 붙여넣어 주세요."; $("#gate-config").classList.remove("hide"); return; }
+  signInAnonymously(auth).catch(e=>alert("로그인 실패: "+e.message+"\n\nFirebase 콘솔에서 Authentication › 익명 로그인을 켜주세요."));
+  onAuthStateChanged(auth, u => { if(!u) return; uid=u.uid; afterAuth(); });
+}
+$("#cfg-save").onclick = () => {
+  try{
+    const c = JSON.parse($("#cfg-input").value.trim().replace(/^const\s+\w+\s*=\s*/,"").replace(/;\s*$/,"").replace(/(\w+):/g,'"$1":').replace(/"""/g,'"'));
+    if(!c.projectId) throw 0;
+    localStorage.setItem("fb-config", JSON.stringify(c));
+    location.reload();
+  }catch(e){ $("#cfg-err").textContent="JSON 형식이 아닙니다. 중괄호 { } 부분 전체를 붙여넣어 주세요."; }
+};
+
+function afterAuth(){
+  slot = localStorage.getItem("slot-"+TEAM_ID);
+  if(!slot){ showSlotGate(); return; }
+  start();
+}
+function showSlotGate(){
+  $("#app").classList.add("hide");
+  const box = $("#slot-list"); box.innerHTML="";
+  for(let i=1;i<=MEMBERS;i++){
+    const b = el("button","slot");
+    b.innerHTML = `<b>${i}번 자리</b><span id="slot-name-${i}">비어 있음</span>`;
+    b.onclick = () => { slot="m"+i; localStorage.setItem("slot-"+TEAM_ID, slot); $("#gate-slot").classList.add("hide"); start(); };
+    box.appendChild(b);
+  }
+  $("#gate-slot").classList.remove("hide");
+  getDocs(collection(db,"teams",TEAM_ID,"roster")).then(s=>s.forEach(d=>{
+    const n=$("#slot-name-"+d.id.slice(1)); if(n && d.data().name) n.textContent=d.data().name;
+  })).catch(()=>{});
+}
+$("#btn-switch").onclick = () => { localStorage.removeItem("slot-"+TEAM_ID); location.reload(); };
+
+/* ── 시작 ── */
+function start(){
+  $("#app").classList.remove("hide");
+  buildAbsent(); buildPbl(); buildMembers(); bindShared();
+  const sel = $("#week-sel");
+  WEEKS.forEach(w=>{ const o=el("option"); o.value=w.id; o.textContent=w.label; sel.appendChild(o); });
+  const current = WEEKS.find(w=>w.label.includes("이번 주")) || WEEKS[0];
+  sel.value = current.id;
+  sel.onchange = () => openWeek(sel.value);
+  openWeek(current.id);
+  setInterval(beat, 12000);
+}
+
+function openWeek(id){
+  unsub.forEach(u=>u()); unsub=[]; peers={};
+  weekId = id;
+  $("#seal-week").textContent = weekMeta(id).week;
+  const wref = doc(db,"teams",TEAM_ID,"weeks",weekId);
+
+  unsub.push(onSnapshot(wref, s => { shared = s.data()||{}; renderShared(); }, err));
+  unsub.push(onSnapshot(collection(wref,"members"), s => {
+    s.forEach(d=>members[d.id]=d.data()); renderMembers();
+  }, err));
+  unsub.push(onSnapshot(collection(wref,"logs"), s => {
+    logs={}; s.forEach(d=>logs[d.id]=d.data()); renderLogs();
+  }, err));
+  unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"), s => {
+    peers={}; const now=Date.now();
+    s.forEach(d=>{ const v=d.data(); if(d.id!==uid && v.at && now-v.at<30000) peers[d.id]=v; });
+    renderPeers();
+  }, err));
+  mark("연결됨", true);
+}
+const err = e => { console.error(e); mark("저장 안 됨 · 보안 규칙 확인", false); };
+
+/* ── 저장 ── */
+let timers = {};
+function mark(t, ok){ const s=$("#save-status"); s.textContent=t; s.classList.toggle("on", !!ok); }
+function save(path, value, delay=700){
+  clearTimeout(timers[path]);
+  mark("입력 중…", false);
+  timers[path] = setTimeout(async () => {
+    try{
+      const ref = doc(db,"teams",TEAM_ID,"weeks",weekId);
+      await setDoc(ref, { updatedAt: serverTimestamp() }, { merge:true });
+      await updateDoc(ref, { [path]: value });
+      mark("저장됨", true);
+    }catch(e){ err(e); }
+  }, delay);
+}
+async function saveMember(field, value){
+  clearTimeout(timers["m-"+field]);
+  mark("입력 중…", false);
+  timers["m-"+field] = setTimeout(async () => {
+    try{
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot), { [field]:value, updatedAt:serverTimestamp() }, { merge:true });
+      if(field==="name") await setDoc(doc(db,"teams",TEAM_ID,"roster",slot), { name:value }, { merge:true });
+      mark("저장됨", true);
+    }catch(e){ err(e); }
+  }, 700);
+}
+async function saveLog(id, field, value){
+  clearTimeout(timers["l-"+id+field]);
+  mark("입력 중…", false);
+  timers["l-"+id+field] = setTimeout(async () => {
+    try{ await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"logs",id), { [field]:value }, { merge:true }); mark("저장됨", true); }
+    catch(e){ err(e); }
+  }, 700);
+}
+
+/* ── 편집 중 표시 ── */
+async function beat(){
+  if(!uid || !weekId) return;
+  try{ await setDoc(doc(db,"teams",TEAM_ID,"presence",uid), {
+    name: (members[slot]||{}).name || slot.replace("m","")+"번", field: focusedField, week: weekId, at: Date.now()
+  }); }catch(e){}
+}
+function track(node, key){
+  node.addEventListener("focus", () => { focusedField=key; beat(); });
+  node.addEventListener("blur",  () => { focusedField=null; beat(); });
+}
+function renderPeers(){
+  document.querySelectorAll(".peer").forEach(p=>p.remove());
+  Object.values(peers).forEach(p => {
+    if(!p.field || p.week!==weekId) return;
+    const host = document.querySelector(`[data-key="${CSS.escape(p.field)}"]`);
+    if(!host) return;
+    const tag = el("span","peer"); tag.textContent = p.name+" 편집 중";
+    host.appendChild(tag);
+  });
+  const mine = (members[slot]||{}).name || slot.replace("m","")+"번 자리";
+  $("#who-label").textContent = mine + (Object.keys(peers).length ? ` · 접속 ${Object.keys(peers).length+1}명` : "");
+}
+
+/* ── 팀 공통 ── */
+function bindShared(){
+  SHARED_FIELDS.forEach(f => {
+    const node = document.querySelector(`[data-f="${f}"]`);
+    const wrap = node.closest(".cell") || node.parentElement;
+    wrap.dataset.key = "s:"+f;
+    track(node, "s:"+f);
+    node.addEventListener("input", () => save(f, node.value));
+  });
+}
+function renderShared(){
+  SHARED_FIELDS.forEach(f => {
+    const node = document.querySelector(`[data-f="${f}"]`);
+    if(document.activeElement===node) return;
+    node.value = shared[f] ?? "";
+  });
+  for(let i=1;i<=MEMBERS;i++){
+    const on = !!((shared.absent||{})["m"+i]);
+    const cb = $("#abs-"+i); if(cb){ cb.checked=on; cb.closest(".chip").classList.toggle("on", on); }
+  }
+  PBL_STEPS.forEach((_,i) => {
+    const node = $("#pbl-"+i);
+    if(node && document.activeElement!==node) node.value = (shared.pbl||{})["p"+i] ?? (i===9 ? "해커톤 평가 [외부 심사위원 5명]" : "");
+  });
+  for(let i=1;i<=MEMBERS;i++){
+    const lab = $("#abs-label-"+i);
+    if(lab) lab.textContent = (members["m"+i]||{}).name || i+"번";
+  }
+}
+function buildAbsent(){
+  const box = $("#absent-box");
+  for(let i=1;i<=MEMBERS;i++){
+    const l = el("label","chip");
+    l.innerHTML = `<input type="checkbox" id="abs-${i}"><span id="abs-label-${i}">${i}번</span>`;
+    l.querySelector("input").onchange = e => { l.classList.toggle("on", e.target.checked); save(`absent.m${i}`, e.target.checked, 0); };
+    box.appendChild(l);
+  }
+}
+function buildPbl(){
+  const box = $("#pbl-box");
+  PBL_STEPS.forEach(([name,pct],i)=>{
+    const r = el("div","pbl");
+    r.innerHTML = `<b>${name}</b><span>${pct}</span><div data-key="p:${i}"><textarea id="pbl-${i}" rows="1"></textarea></div>`;
+    box.appendChild(r);
+    const ta = r.querySelector("textarea");
+    track(ta, "p:"+i);
+    ta.addEventListener("input", () => save(`pbl.p${i}`, ta.value));
+  });
+}
+
+/* ── 훈련생별 ── */
+function buildMembers(){
+  const box = $("#members-box");
+  for(let i=1;i<=MEMBERS;i++){
+    const id = "m"+i, mine = id===slot;
+    const c = el("div","mcard"+(mine?" mine":""));
+    c.innerHTML = `
+      ${mine?'<span class="mtag">내 칸</span>':''}
+      <div class="mhead">
+        <div data-key="${id}:name"><div class="inline-label">이름</div><input type="text" id="${id}-name" ${mine?"":"readonly"}></div>
+        <div data-key="${id}:role"><div class="inline-label">역할</div><input type="text" id="${id}-role" ${mine?"":"readonly"}></div>
+      </div>
+      <div class="mbody" data-key="${id}:content"><textarea id="${id}-content" placeholder="${mine?'이번 주에 내가 한 일':''}" ${mine?"":"readonly"}></textarea></div>`;
+    box.appendChild(c);
+    if(mine){
+      ["name","role","content"].forEach(f=>{
+        const n = $("#"+id+"-"+f);
+        track(n, id+":"+f);
+        n.addEventListener("input", () => saveMember(f, n.value));
+      });
+    }
+  }
+}
+function renderMembers(){
+  for(let i=1;i<=MEMBERS;i++){
+    const id="m"+i, d=members[id]||{};
+    ["name","role","content"].forEach(f=>{
+      const n=$("#"+id+"-"+f);
+      if(n && document.activeElement!==n) n.value = d[f] ?? "";
+    });
+  }
+  renderShared();
+}
+
+/* ── 프로젝트 일지 ── */
+function sortedLogs(){
+  return Object.entries(logs).sort((a,b)=>(a[1].date||"9999")<(b[1].date||"9999")?-1:1);
+}
+function renderLogs(){
+  const box = $("#log-box"); box.innerHTML="";
+  const list = sortedLogs();
+  if(!list.length){ box.innerHTML='<div class="empty">아직 기록이 없습니다. 아래 ‘줄 추가’로 시작하세요.</div>'; }
+  list.forEach(([id,v])=>{
+    const r = el("div","log");
+    r.innerHTML = `
+      <div data-key="l:${id}:date"><input type="date" value="${v.date||""}"></div>
+      <div data-key="l:${id}:content"><textarea rows="1">${(v.content||"").replace(/</g,"&lt;")}</textarea></div>
+      <div data-key="l:${id}:note"><textarea rows="1">${(v.note||"").replace(/</g,"&lt;")}</textarea></div>
+      <div><button class="del" title="줄 삭제">×</button></div>`;
+    const [d,c,n] = r.querySelectorAll("input,textarea");
+    d.oninput=()=>saveLog(id,"date",d.value); c.oninput=()=>saveLog(id,"content",c.value); n.oninput=()=>saveLog(id,"note",n.value);
+    track(d,`l:${id}:date`); track(c,`l:${id}:content`); track(n,`l:${id}:note`);
+    r.querySelector(".del").onclick = async () => {
+      if(!confirm("이 줄을 지울까요?")) return;
+      await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"logs",id));
+    };
+    box.appendChild(r);
+  });
+  const n = list.length;
+  $("#log-count").textContent = n>23 ? `${n}줄 · 한글 양식에는 앞에서 23줄만 들어갑니다` : `${n}줄`;
+}
+$("#btn-add-log").onclick = async () => {
+  const id = "l"+Date.now();
+  const w = weekMeta(weekId);
+  await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"logs",id), { date:w.friday, content:"", note:"", at:Date.now() });
+};
+
+/* ── 지난 주 가져오기 ── */
+$("#btn-prev-copy").onclick = async () => {
+  const idx = WEEKS.findIndex(w=>w.id===weekId);
+  const prev = WEEKS[idx+1];
+  if(!prev) return alert("지난 주가 목록에 없습니다.");
+  if(!confirm(`${prev.label}의 주제·팀운영 계획·팀원 이름과 역할을 가져옵니다. 이번 주에 이미 쓴 같은 항목은 덮어씁니다.`)) return;
+  try{
+    const s = await getDoc(doc(db,"teams",TEAM_ID,"weeks",prev.id));
+    const d = s.data()||{};
+    const carry = {}; ["topic","period","plan"].forEach(f=>{ if(d[f]) carry[f]=d[f]; });
+    if(Object.keys(carry).length) await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId), carry, { merge:true });
+    const ms = await getDocs(collection(db,"teams",TEAM_ID,"weeks",prev.id,"members"));
+    for(const m of ms.docs){
+      const v=m.data();
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",m.id), { name:v.name||"", role:v.role||"" }, { merge:true });
+    }
+    mark("가져왔습니다", true);
+  }catch(e){ err(e); }
+};
+
+/* ════════════════════════════════════════════════
+   한글(.hwpx) 내보내기 — 원본 서식 그대로 채워넣기
+   ════════════════════════════════════════════════ */
+const HP = "http://www.hancom.co.kr/hwpml/2011/paragraph";
+const kids = (node, tag) => Array.from(node.children).filter(c => c.tagName === tag);
+
+function findCell(tbl, row, col){
+  for(const tr of kids(tbl,"hp:tr")){
+    for(const tc of kids(tr,"hp:tc")){
+      const a = kids(tc,"hp:cellAddr")[0];
+      if(a && a.getAttribute("rowAddr")==String(row) && a.getAttribute("colAddr")==String(col)) return tc;
+    }
+  }
+  return null;
+}
+function fillCell(xdoc, tbl, row, col, text){
+  const tc = findCell(tbl,row,col); if(!tc) return;
+  const sub = kids(tc,"hp:subList")[0]; if(!sub) return;
+  const ps = kids(sub,"hp:p"); if(!ps.length) return;
+  const base = ps[0];
+  const charRef = (base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef") || "0";
+  ps.slice(1).forEach(p => sub.removeChild(p));
+  const lines = String(text ?? "").split("\n");
+  lines.forEach((line, i) => {
+    const p = i===0 ? base : base.cloneNode(true);
+    Array.from(p.getElementsByTagName("hp:run")).forEach(r => r.parentNode.removeChild(r));
+    const run = xdoc.createElementNS(HP,"hp:run");
+    run.setAttribute("charPrIDRef", charRef);
+    if(line.length){
+      const t = xdoc.createElementNS(HP,"hp:t");
+      t.appendChild(xdoc.createTextNode(line));
+      run.appendChild(t);
+    }
+    p.insertBefore(run, p.firstChild);
+    if(i>0) sub.appendChild(p);
+  });
+}
+
+$("#btn-export").onclick = async () => {
+  const btn = $("#btn-export"); btn.disabled = true; btn.textContent = "만드는 중…";
+  try{
+    const buf = await (await fetch(TEMPLATE, {cache:"no-store"})).arrayBuffer();
+    const zip = await JSZip.loadAsync(buf);
+    const xml = await zip.file("Contents/section0.xml").async("string");
+    const xdoc = new DOMParser().parseFromString(xml, "application/xml");
+    const tbls = Array.from(xdoc.getElementsByTagName("hp:tbl"));
+    const [T1, TPBL, TMEM, TLOG] = tbls;
+    const w = weekMeta(weekId);
+
+    // 1. 팀 공통
+    fillCell(xdoc,T1,0,1,"장원급제");
+    fillCell(xdoc,T1,1,1, shared.topic||"");
+    fillCell(xdoc,T1,2,1, shared.weekly||"");
+    const absCols = [1,2,3,5,7,9];
+    absCols.forEach((c,i)=>{
+      const nm = (members["m"+(i+1)]||{}).name || String(i+1);
+      const on = !!((shared.absent||{})["m"+(i+1)]);
+      fillCell(xdoc,T1,3,c, `${on?"■":"□"} ${nm}`);
+    });
+    fillCell(xdoc,T1,4,1, shared.period||"");
+    fillCell(xdoc,T1,4,6, `${shared.hours||"    "} / 110H`);
+    fillCell(xdoc,T1,4,10, `${shared.progress||"    "} %`);
+    fillCell(xdoc,T1,6,1, shared.plan||"");
+    fillCell(xdoc,T1,7,1, shared.meeting||"");
+    fillCell(xdoc,T1,8,1, shared.next||"");
+    fillCell(xdoc,T1,9,1, shared.mentor||"");
+
+    // 2. PBL
+    PBL_STEPS.forEach((_,i)=>{
+      const v = (shared.pbl||{})["p"+i] ?? (i===9 ? "해커톤 평가 [외부 심사위원 5명]" : "");
+      fillCell(xdoc,TPBL,i+2,3, v);
+    });
+
+    // 3. 훈련생별
+    for(let i=0;i<MEMBERS;i++){
+      const m = members["m"+(i+1)]||{};
+      fillCell(xdoc,TMEM,i*2,0, "이름 : "+(m.name||""));
+      fillCell(xdoc,TMEM,i*2+1,0, "역할 : "+(m.role||""));
+      fillCell(xdoc,TMEM,i*2,1, m.content||"");
+    }
+
+    // 4. 프로젝트 일지
+    const list = sortedLogs().slice(0,23);
+    for(let r=1;r<=23;r++){
+      const v = list[r-1] ? list[r-1][1] : null;
+      fillCell(xdoc,TLOG,r,0, v?(v.date||""):"");
+      fillCell(xdoc,TLOG,r,1, v?(v.content||""):"");
+      fillCell(xdoc,TLOG,r,2, v?(v.note||""):"");
+    }
+
+    // 다시 압축 — mimetype은 무압축으로 맨 앞에
+    const out = new JSZip();
+    out.file("mimetype", await zip.file("mimetype").async("uint8array"), { compression:"STORE" });
+    const names = Object.keys(zip.files).filter(n => n!=="mimetype" && !zip.files[n].dir);
+    for(const n of names){
+      let data;
+      if(n==="Contents/section0.xml"){
+        data = new XMLSerializer().serializeToString(xdoc);
+        if(!data.startsWith("<?xml")) data = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + data;
+      }else{
+        data = await zip.file(n).async("uint8array");
+      }
+      out.file(n, data, { compression:"DEFLATE" });
+    }
+    const blob = await out.generateAsync({ type:"blob", mimeType:"application/hwp+zip" });
+    const a = el("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `01_훈련생_프로젝트_활동일지_장원급제_${w.friday.replace(/-/g,"")}.hwpx`;
+    a.click(); URL.revokeObjectURL(a.href);
+    mark("내보냈습니다", true);
+  }catch(e){
+    console.error(e);
+    alert("내보내기 실패: "+e.message+"\n\ntemplate.hwpx 파일이 index.html과 같은 폴더에 있는지 확인해 주세요.");
+  }finally{
+    btn.disabled=false; btn.textContent="한글 파일 내보내기";
+  }
+};
+
+boot();
+</script>
+</body>
+</html>
