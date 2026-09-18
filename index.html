@@ -83,6 +83,28 @@ table.pbl textarea.f{font-size:11.5px;padding:1px 4px;line-height:1.35}
 
 table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-weight:700;padding:5px}
 
+/* 사진 */
+.shots{display:flex;flex-wrap:wrap;gap:6px;padding:0 7px 7px}
+.shot{position:relative;width:96px;height:72px;border:1px solid #999;overflow:hidden;background:#F4F4F4}
+.shot img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.shot button{
+  position:absolute;top:1px;right:1px;width:17px;height:17px;line-height:15px;padding:0;
+  border:0;border-radius:2px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;display:none;
+}
+.shot:hover button{display:block}
+.addshot{
+  width:96px;height:72px;border:1px dashed #999;background:#FAFAFA;color:#666;font-size:12px;
+  cursor:pointer;font-family:Pretendard,sans-serif;
+}
+.addshot:hover{border-color:#1D5FD6;color:#1D5FD6}
+.addshot[disabled]{opacity:.5;cursor:wait}
+#lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:flex;
+  align-items:center;justify-content:center;cursor:zoom-out;
+}
+#lightbox img{max-width:92vw;max-height:92vh;box-shadow:0 0 30px rgba(0,0,0,.6)}
+
+
 .gate{max-width:520px;margin:9vh auto;background:#fff;border:1px solid #999;padding:30px;font-family:Pretendard,sans-serif}
 .gate h2{margin:0 0 6px;font-size:22px}
 .gate p{color:#555;font-size:13.5px;margin:0 0 18px}
@@ -175,10 +197,13 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
   </div></div>
 </div>
 
+<div id="lightbox" class="hide"><img alt=""></div>
+<input type="file" id="pick" accept="image/*" multiple class="hide">
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, collection, setDoc, updateDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
+import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 설정 ════════ */
@@ -197,7 +222,7 @@ const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId;
-let shared={},members={},logs={},unsub=[],peers={},focusedField=null,timers={};
+let shared={},members={},logs={},photos={},unsub=[],peers={},focusedField=null,timers={};
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
@@ -317,7 +342,8 @@ function buildMembers(){
     r1.innerHTML=`<td class="cell" data-key="${id}:name" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">이름 :</span><input class="f" id="${id}-name" type="text" ${mine?"":"readonly"}></div></td>
       <td class="cell" rowspan="2" style="vertical-align:top" data-key="${id}:content">
-        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea></td>`;
+        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea>
+        <div class="shots" id="${id}-shots"></div></td>`;
     r2.innerHTML=`<td class="cell" data-key="${id}:role" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">역할 :</span><input class="f" id="${id}-role" type="text" ${mine?"":"readonly"}></div></td>`;
     t.appendChild(r1); t.appendChild(r2);
@@ -354,12 +380,18 @@ function bindShared(){
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={};
+  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={};
   weekId=id;
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
   unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
   unsub.push(onSnapshot(collection(wref,"members"),s=>{s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
+  for(let i=1;i<=MEMBERS;i++){
+    const id="m"+i;
+    unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
+      photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
+    },fail));
+  }
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
     peers={}; const now=Date.now();
     s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
@@ -430,6 +462,64 @@ function renderLogs(){
     });
   }
 }
+/* ── 사진 ── */
+const MAX_SHOTS=8, MAX_BYTES=700000;
+function renderPhotos(id){
+  const box=$("#"+id+"-shots"); if(!box)return;
+  const mine=(id===slot);
+  const list=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+  box.innerHTML="";
+  list.forEach(([pid,p])=>{
+    const d=el("div","shot");
+    d.innerHTML=`<img src="${p.data}" alt="">${mine?'<button title="삭제">×</button>':''}`;
+    d.querySelector("img").onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=p.data; lb.classList.remove("hide"); };
+    if(mine) d.querySelector("button").onclick=async()=>{
+      if(!confirm("이 사진을 지울까요?")) return;
+      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",id,"photos",pid)); }catch(e){fail(e);}
+    };
+    box.appendChild(d);
+  });
+  if(mine && list.length<MAX_SHOTS){
+    const b=el("button","addshot");
+    b.textContent="+ 사진";
+    b.onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
+    box.appendChild(b);
+  }
+}
+async function shrink(file){
+  const img=await createImageBitmap(file);
+  let max=1400;
+  for(let pass=0;pass<4;pass++){
+    let w=img.width,h=img.height;
+    if(Math.max(w,h)>max){ const r=max/Math.max(w,h); w=Math.round(w*r); h=Math.round(h*r); }
+    const c=el("canvas"); c.width=w; c.height=h;
+    c.getContext("2d").drawImage(img,0,0,w,h);
+    for(let q=0.72;q>=0.4;q-=0.12){
+      const url=c.toDataURL("image/jpeg",q);
+      if(url.length<=MAX_BYTES) return url;
+    }
+    max=Math.round(max*0.7);
+  }
+  throw new Error("사진 용량이 너무 큽니다");
+}
+$("#pick").onchange=async e=>{
+  const files=Array.from(e.target.files||[]); if(!files.length)return;
+  const box=$("#"+slot+"-shots"), btn=box&&box.querySelector(".addshot");
+  if(btn){ btn.disabled=true; btn.textContent="올리는 중"; }
+  const room=MAX_SHOTS-Object.keys(photos[slot]||{}).length;
+  try{
+    for(const f of files.slice(0,room)){
+      const data=await shrink(f);
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
+        { data, name:f.name||"", at:Date.now() });
+    }
+    mark("저장됨",true);
+    if(files.length>room) alert(`한 사람당 ${MAX_SHOTS}장까지입니다.`);
+  }catch(err){ console.error(err); alert("사진 올리기 실패: "+err.message); mark("저장 안 됨",false); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent="+ 사진"; } }
+};
+$("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
+
 async function beat(){
   if(!uid||!weekId)return;
   try{ await setDoc(doc(db,"teams",TEAM_ID,"presence",uid),{
