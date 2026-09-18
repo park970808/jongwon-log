@@ -195,9 +195,6 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       <tr><td class="h">날짜</td><td class="h">주요내용</td><td class="h">특이사항</td></tr>
     </table>
 
-    <h3 class="doc-title next">첨부 사진 <span class="sub">— 팀 공유용, 한글 파일에는 들어가지 않습니다</span></h3>
-    <div class="shots" id="shots"></div>
-
   </div></div>
 </div>
 
@@ -346,7 +343,8 @@ function buildMembers(){
     r1.innerHTML=`<td class="cell" data-key="${id}:name" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">이름 :</span><input class="f" id="${id}-name" type="text" ${mine?"":"readonly"}></div></td>
       <td class="cell" rowspan="2" style="vertical-align:top" data-key="${id}:content">
-        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea></td>`;
+        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea>
+        <div class="shots" id="${id}-shots"></div></td>`;
     r2.innerHTML=`<td class="cell" data-key="${id}:role" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">역할 :</span><input class="f" id="${id}-role" type="text" ${mine?"":"readonly"}></div></td>`;
     t.appendChild(r1); t.appendChild(r2);
@@ -389,9 +387,12 @@ function openWeek(id){
   unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
   unsub.push(onSnapshot(collection(wref,"members"),s=>{s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
-  unsub.push(onSnapshot(collection(wref,"photos"),s=>{
-    photos={}; s.forEach(d=>photos[d.id]=d.data()); renderPhotos();
-  },fail));
+  for(let i=1;i<=MEMBERS;i++){
+    const id="m"+i;
+    unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
+      photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
+    },fail));
+  }
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
     peers={}; const now=Date.now();
     s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
@@ -463,36 +464,51 @@ function renderLogs(){
   }
 }
 /* ── 사진 ── */
-const MAX_SHOTS=24, MAX_BYTES=700000;
-function renderPhotos(){
-  const box=$("#shots"); if(!box)return;
-  const list=Object.entries(photos).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+const MAX_SHOTS=6, MAX_BYTES=700000;
+function renderPhotos(id){
+  const box=$("#"+id+"-shots"); if(!box)return;
+  const mine=(id===slot);
+  const list=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
   box.innerHTML="";
-  if(!list.length){ box.innerHTML='<div class="noshot">아직 올린 사진이 없습니다. 위쪽 사진 추가를 눌러 올리세요.</div>'; }
   list.forEach(([pid,p])=>{
-    const mine=(p.by===slot);
-    const who=(members[p.by]||{}).name || (p.by? p.by.replace("m","")+"번" : "");
     const d=el("div","shot");
-    d.innerHTML=`<img src="${p.data}" alt=""><span class="by">${who}</span>${mine?'<button title="삭제">×</button>':''}`;
+    d.innerHTML=`<img src="${p.data}" alt="">${mine?'<button title="삭제">×</button>':''}`;
     d.querySelector("img").onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=p.data; lb.classList.remove("hide"); };
     if(mine) d.querySelector("button").onclick=async()=>{
       if(!confirm("이 사진을 지울까요?")) return;
-      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"photos",pid)); }catch(e){fail(e);}
+      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",id,"photos",pid)); }catch(e){fail(e);}
     };
     box.appendChild(d);
   });
 }
+async function loadImage(file){
+  try{ return await createImageBitmap(file); }catch(e){}
+  const url=URL.createObjectURL(file);
+  try{
+    const img=new Image();
+    img.src=url;
+    if(img.decode) await img.decode();
+    else await new Promise((ok,no)=>{ img.onload=ok; img.onerror=no; });
+    if(!img.naturalWidth) throw new Error("empty");
+    return img;
+  }catch(e){
+    throw new Error("이 사진 형식을 브라우저가 열지 못합니다. HEIC 파일이면 JPG로 바꿔서 올려 주세요.");
+  }finally{ setTimeout(()=>URL.revokeObjectURL(url),10000); }
+}
 async function shrink(file){
-  const img=await createImageBitmap(file);
-  let max=1400;
+  const img=await loadImage(file);
+  const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  let max=1200;
   for(let pass=0;pass<4;pass++){
-    let w=img.width,h=img.height;
+    let w=iw,h=ih;
     if(Math.max(w,h)>max){ const r=max/Math.max(w,h); w=Math.round(w*r); h=Math.round(h*r); }
     const c=el("canvas"); c.width=w; c.height=h;
-    c.getContext("2d").drawImage(img,0,0,w,h);
+    const ctx=c.getContext("2d");
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
     for(let q=0.72;q>=0.4;q-=0.12){
       const url=c.toDataURL("image/jpeg",q);
-      if(url.length<=MAX_BYTES) return url;
+      if(url.length<=MAX_BYTES) return { data:url, w, h };
     }
     max=Math.round(max*0.7);
   }
@@ -501,18 +517,23 @@ async function shrink(file){
 $("#btn-photo").onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
 $("#pick").onchange=async e=>{
   const files=Array.from(e.target.files||[]); if(!files.length)return;
-  const btn=$("#btn-photo"); btn.disabled=true; btn.textContent="올리는 중…";
-  const room=MAX_SHOTS-Object.keys(photos).length;
-  try{
-    for(const f of files.slice(0,room)){
-      const data=await shrink(f);
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
-        { data, by:slot, name:f.name||"", at:Date.now() });
-    }
-    mark("저장됨",true);
-    if(files.length>room) alert(`한 주에 ${MAX_SHOTS}장까지 올릴 수 있습니다.`);
-  }catch(err){ console.error(err); alert("사진 올리기 실패: "+err.message); mark("저장 안 됨",false); }
-  finally{ btn.disabled=false; btn.textContent="사진 추가"; }
+  const btn=$("#btn-photo"); btn.disabled=true;
+  const room=MAX_SHOTS-Object.keys(photos[slot]||{}).length;
+  const picked=files.slice(0,Math.max(room,0));
+  const bad=[];
+  for(let i=0;i<picked.length;i++){
+    const f=picked[i];
+    btn.textContent=`올리는 중 ${i+1}/${picked.length}`;
+    try{
+      const img=await shrink(f);
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
+        { data:img.data, w:img.w, h:img.h, name:f.name||"", at:Date.now() });
+    }catch(err){ console.error(f.name,err); bad.push((f.name||"사진")+" — "+err.message); }
+  }
+  btn.disabled=false; btn.textContent="사진 추가";
+  mark(bad.length&&bad.length===picked.length?"저장 안 됨":"저장됨", !(bad.length&&bad.length===picked.length));
+  if(files.length>picked.length) alert(`본인 칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
+  if(bad.length) alert("올리지 못한 사진:\n\n"+bad.join("\n"));
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
@@ -577,6 +598,61 @@ function fillCell(xdoc,tbl,row,col,text){
     if(i>0) sub.appendChild(p);
   });
 }
+
+/* ── 사진을 한글 문서에 심기 ── */
+const HC="http://www.hancom.co.kr/hwpml/2011/core";
+const CELL_W=43954, PER_ROW=2, GAP=340, PX=75;   // 1px = 75 HWPUNIT(96dpi)
+function dataToBytes(url){
+  const b64=url.slice(url.indexOf(",")+1);
+  const bin=atob(b64);
+  const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+function picXml(itemId, pw, ph, curW, curH){
+  const orgW=pw*PX, orgH=ph*PX;
+  const sx=(curW/orgW).toFixed(6), sy=(curH/orgH).toFixed(6);
+  const id=Math.floor(Math.random()*2000000000);
+  return `<hp:pic xmlns:hp="${HP}" xmlns:hc="${HC}" id="${id}" zOrder="0" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="${id+1}" reverse="0">`
+    +`<hp:offset x="0" y="0"/><hp:orgSz width="${orgW}" height="${orgH}"/><hp:curSz width="${curW}" height="${curH}"/>`
+    +`<hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="${Math.round(curW/2)}" centerY="${Math.round(curH/2)}" rotateimage="1"/>`
+    +`<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>`
+    +`<hc:scaMatrix e1="${sx}" e2="0" e3="0" e4="0" e5="${sy}" e6="0"/>`
+    +`<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>`
+    +`<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="${orgW}" y="0"/><hc:pt2 x="${orgW}" y="${orgH}"/><hc:pt3 x="0" y="${orgH}"/></hp:imgRect>`
+    +`<hp:imgClip left="0" right="${orgW}" top="0" bottom="${orgH}"/>`
+    +`<hp:inMargin left="0" right="0" top="0" bottom="0"/>`
+    +`<hp:imgDim dimwidth="${orgW}" dimheight="${orgH}"/>`
+    +`<hc:img binaryItemIDRef="${itemId}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/><hp:effects/>`
+    +`<hp:sz width="${curW}" widthRelTo="ABSOLUTE" height="${curH}" heightRelTo="ABSOLUTE" protect="0"/>`
+    +`<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`
+    +`<hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic>`;
+}
+function addPics(xdoc, tbl, row, col, shots){
+  if(!shots.length) return;
+  const tc=findCell(tbl,row,col); if(!tc) return;
+  const sub=kids(tc,"hp:subList")[0]; if(!sub) return;
+  const ps=kids(sub,"hp:p"); if(!ps.length) return;
+  const base=ps[ps.length-1];
+  const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
+  const slotW=Math.floor((CELL_W-GAP*(PER_ROW-1))/PER_ROW);
+  for(let i=0;i<shots.length;i+=PER_ROW){
+    const p=base.cloneNode(true);
+    Array.from(p.getElementsByTagName("hp:run")).forEach(r=>r.parentNode.removeChild(r));
+    Array.from(p.getElementsByTagName("hp:linesegarray")).forEach(r=>r.parentNode.removeChild(r));
+    shots.slice(i,i+PER_ROW).forEach(sh=>{
+      let cw=slotW, chh=Math.round(slotW*sh.h/sh.w);
+      if(chh>26000){ chh=26000; cw=Math.round(26000*sh.w/sh.h); }
+      const run=xdoc.createElementNS(HP,"hp:run");
+      run.setAttribute("charPrIDRef",ref);
+      const frag=new DOMParser().parseFromString(picXml(sh.item,sh.w,sh.h,cw,chh),"application/xml");
+      run.appendChild(xdoc.importNode(frag.documentElement,true));
+      run.appendChild(xdoc.createElementNS(HP,"hp:t"));
+      p.appendChild(run);
+    });
+    sub.appendChild(p);
+  }
+}
 $("#btn-export").onclick=async()=>{
   const btn=$("#btn-export"); btn.disabled=true; btn.textContent="만드는 중…";
   try{
@@ -603,11 +679,28 @@ $("#btn-export").onclick=async()=>{
 
     PBL_STEPS.forEach((_,i)=>fillCell(xdoc,TPBL,i+2,3,(shared.pbl||{})["p"+i]??(PBL_DEFAULT[i]||"")));
 
+    const binFiles=[]; let imgNo=0;
     for(let i=0;i<MEMBERS;i++){
-      const m=members["m"+(i+1)]||{};
+      const id="m"+(i+1), m=members[id]||{};
       fillCell(xdoc,TMEM,i*2,0,"이름 : "+(m.name||""));
       fillCell(xdoc,TMEM,i*2+1,0,"역할 : "+(m.role||""));
       fillCell(xdoc,TMEM,i*2,1,m.content||"");
+      const shots=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([,p])=>p);
+      const ready=[];
+      for(const sh of shots){
+        if(!sh.data) continue;
+        let w=sh.w,h=sh.h;
+        if(!w||!h){
+          const im=new Image(); im.src=sh.data;
+          try{ if(im.decode) await im.decode(); }catch(e){}
+          w=im.naturalWidth||800; h=im.naturalHeight||600;
+        }
+        imgNo++;
+        const item="image"+imgNo;
+        binFiles.push({ item, path:"BinData/"+item+".jpg", bytes:dataToBytes(sh.data) });
+        ready.push({ item, w, h });
+      }
+      addPics(xdoc,TMEM,i*2,1,ready);
     }
     for(let r=1;r<=LOG_ROWS;r++){
       const d=logs["r"+r]||{};
@@ -623,9 +716,23 @@ $("#btn-export").onclick=async()=>{
       if(n==="Contents/section0.xml"){
         data=new XMLSerializer().serializeToString(xdoc);
         if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
+      }else if(n==="Contents/content.hpf" && binFiles.length){
+        const hpf=new DOMParser().parseFromString(await zip.file(n).async("string"),"application/xml");
+        const man=hpf.getElementsByTagName("opf:manifest")[0];
+        binFiles.forEach(b=>{
+          const it=hpf.createElementNS("http://www.idpf.org/2007/opf/","opf:item");
+          it.setAttribute("id",b.item);
+          it.setAttribute("href",b.path);
+          it.setAttribute("media-type","image/jpg");
+          it.setAttribute("isEmbeded","1");
+          man.appendChild(it);
+        });
+        data=new XMLSerializer().serializeToString(hpf);
+        if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
       }else data=await zip.file(n).async("uint8array");
       out.file(n,data,{compression:"DEFLATE"});
     }
+    binFiles.forEach(b=>out.file(b.path,b.bytes,{compression:"DEFLATE"}));
     const a=el("a");
     a.href=URL.createObjectURL(await out.generateAsync({type:"blob"}));
     a.download=`01_훈련생_프로젝트_활동일지_${TEAM_NAME}_${w.friday.replace(/-/g,"")}.hwpx`;
