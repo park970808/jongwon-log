@@ -84,20 +84,20 @@ table.pbl textarea.f{font-size:11.5px;padding:1px 4px;line-height:1.35}
 table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-weight:700;padding:5px}
 
 /* 사진 */
-.shots{display:flex;flex-wrap:wrap;gap:6px;padding:0 7px 7px}
-.shot{position:relative;width:96px;height:72px;border:1px solid #999;overflow:hidden;background:#F4F4F4}
+.shots{display:flex;flex-wrap:wrap;gap:8px}
+.noshot{font-size:12.5px;color:#777;padding:6px 2px}
+.doc-title .sub{font-size:11.5px;font-weight:400;color:#777}
+.shot{position:relative;width:126px;height:94px;border:1px solid #999;overflow:hidden;background:#F4F4F4}
+.shot .by{
+  position:absolute;left:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;
+  font-size:10.5px;padding:0 5px;font-family:Pretendard,sans-serif;
+}
 .shot img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
 .shot button{
   position:absolute;top:1px;right:1px;width:17px;height:17px;line-height:15px;padding:0;
   border:0;border-radius:2px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;display:none;
 }
 .shot:hover button{display:block}
-.addshot{
-  width:96px;height:72px;border:1px dashed #999;background:#FAFAFA;color:#666;font-size:12px;
-  cursor:pointer;font-family:Pretendard,sans-serif;
-}
-.addshot:hover{border-color:#1D5FD6;color:#1D5FD6}
-.addshot[disabled]{opacity:.5;cursor:wait}
 #lightbox{
   position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:flex;
   align-items:center;justify-content:center;cursor:zoom-out;
@@ -144,6 +144,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <span id="save-status">불러오는 중</span>
     <span class="grow"></span>
     <span id="who-label">–</span>
+    <button id="btn-photo">사진 추가</button>
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
   </div>
@@ -193,6 +194,9 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       <colgroup><col style="width:108px"><col><col style="width:200px"></colgroup>
       <tr><td class="h">날짜</td><td class="h">주요내용</td><td class="h">특이사항</td></tr>
     </table>
+
+    <h3 class="doc-title next">첨부 사진 <span class="sub">— 팀 공유용, 한글 파일에는 들어가지 않습니다</span></h3>
+    <div class="shots" id="shots"></div>
 
   </div></div>
 </div>
@@ -342,8 +346,7 @@ function buildMembers(){
     r1.innerHTML=`<td class="cell" data-key="${id}:name" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">이름 :</span><input class="f" id="${id}-name" type="text" ${mine?"":"readonly"}></div></td>
       <td class="cell" rowspan="2" style="vertical-align:top" data-key="${id}:content">
-        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea>
-        <div class="shots" id="${id}-shots"></div></td>`;
+        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea></td>`;
     r2.innerHTML=`<td class="cell" data-key="${id}:role" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">역할 :</span><input class="f" id="${id}-role" type="text" ${mine?"":"readonly"}></div></td>`;
     t.appendChild(r1); t.appendChild(r2);
@@ -386,12 +389,9 @@ function openWeek(id){
   unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
   unsub.push(onSnapshot(collection(wref,"members"),s=>{s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
-  for(let i=1;i<=MEMBERS;i++){
-    const id="m"+i;
-    unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
-      photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
-    },fail));
-  }
+  unsub.push(onSnapshot(collection(wref,"photos"),s=>{
+    photos={}; s.forEach(d=>photos[d.id]=d.data()); renderPhotos();
+  },fail));
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
     peers={}; const now=Date.now();
     s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
@@ -463,28 +463,24 @@ function renderLogs(){
   }
 }
 /* ── 사진 ── */
-const MAX_SHOTS=8, MAX_BYTES=700000;
-function renderPhotos(id){
-  const box=$("#"+id+"-shots"); if(!box)return;
-  const mine=(id===slot);
-  const list=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+const MAX_SHOTS=24, MAX_BYTES=700000;
+function renderPhotos(){
+  const box=$("#shots"); if(!box)return;
+  const list=Object.entries(photos).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
   box.innerHTML="";
+  if(!list.length){ box.innerHTML='<div class="noshot">아직 올린 사진이 없습니다. 위쪽 사진 추가를 눌러 올리세요.</div>'; }
   list.forEach(([pid,p])=>{
+    const mine=(p.by===slot);
+    const who=(members[p.by]||{}).name || (p.by? p.by.replace("m","")+"번" : "");
     const d=el("div","shot");
-    d.innerHTML=`<img src="${p.data}" alt="">${mine?'<button title="삭제">×</button>':''}`;
+    d.innerHTML=`<img src="${p.data}" alt=""><span class="by">${who}</span>${mine?'<button title="삭제">×</button>':''}`;
     d.querySelector("img").onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=p.data; lb.classList.remove("hide"); };
     if(mine) d.querySelector("button").onclick=async()=>{
       if(!confirm("이 사진을 지울까요?")) return;
-      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",id,"photos",pid)); }catch(e){fail(e);}
+      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"photos",pid)); }catch(e){fail(e);}
     };
     box.appendChild(d);
   });
-  if(mine && list.length<MAX_SHOTS){
-    const b=el("button","addshot");
-    b.textContent="+ 사진";
-    b.onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
-    box.appendChild(b);
-  }
 }
 async function shrink(file){
   const img=await createImageBitmap(file);
@@ -502,21 +498,21 @@ async function shrink(file){
   }
   throw new Error("사진 용량이 너무 큽니다");
 }
+$("#btn-photo").onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
 $("#pick").onchange=async e=>{
   const files=Array.from(e.target.files||[]); if(!files.length)return;
-  const box=$("#"+slot+"-shots"), btn=box&&box.querySelector(".addshot");
-  if(btn){ btn.disabled=true; btn.textContent="올리는 중"; }
-  const room=MAX_SHOTS-Object.keys(photos[slot]||{}).length;
+  const btn=$("#btn-photo"); btn.disabled=true; btn.textContent="올리는 중…";
+  const room=MAX_SHOTS-Object.keys(photos).length;
   try{
     for(const f of files.slice(0,room)){
       const data=await shrink(f);
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
-        { data, name:f.name||"", at:Date.now() });
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
+        { data, by:slot, name:f.name||"", at:Date.now() });
     }
     mark("저장됨",true);
-    if(files.length>room) alert(`한 사람당 ${MAX_SHOTS}장까지입니다.`);
+    if(files.length>room) alert(`한 주에 ${MAX_SHOTS}장까지 올릴 수 있습니다.`);
   }catch(err){ console.error(err); alert("사진 올리기 실패: "+err.message); mark("저장 안 됨",false); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent="+ 사진"; } }
+  finally{ btn.disabled=false; btn.textContent="사진 추가"; }
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
