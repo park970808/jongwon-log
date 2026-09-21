@@ -65,6 +65,34 @@ textarea.f:focus,input.f:focus{background:#EAF0FB}
 .big textarea.f{min-height:118px}
 .mid textarea.f{min-height:52px}
 
+.rich-editor{
+  width:100%;border:0;background:transparent;outline:none;
+  padding:5px 7px;font:inherit;font-size:13px;line-height:1.55;
+  min-height:32px;white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.rich-editor:focus{background:#EAF0FB}
+.rich-editor[contenteditable="false"]{cursor:default}
+.big .rich-editor{min-height:118px}
+.mid .rich-editor{min-height:52px}
+table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-height:22px}
+.rich-editor:empty:before{
+  content:attr(data-placeholder);color:#999;pointer-events:none;
+}
+.inline-photo-node{
+  display:inline-block;position:relative;vertical-align:middle;
+  max-width:220px;margin:4px 5px;border:1px solid #999;background:#F4F4F4;
+  line-height:0;
+}
+.inline-photo-node img{
+  display:block;max-width:218px;max-height:180px;width:auto;height:auto;cursor:zoom-in;
+}
+.inline-photo-node button{
+  position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;
+  border:0;border-radius:2px;background:rgba(0,0,0,.65);color:#fff;
+  font-size:13px;line-height:20px;cursor:pointer;
+}
+.rich-caret-target{outline:2px solid #1D5FD6;outline-offset:-2px}
+
 .peer{
   position:absolute;top:1px;right:3px;font-size:10.5px;color:#fff;background:var(--focus);
   border-radius:2px;padding:0 5px;pointer-events:none;font-family:Pretendard,sans-serif;z-index:2;
@@ -73,6 +101,17 @@ textarea.f:focus,input.f:focus{background:#EAF0FB}
 td.abs{cursor:pointer;font-size:12.5px;padding:5px 6px;user-select:none;white-space:nowrap;overflow:hidden}
 td.abs:hover{background:#F7F7F7}
 td.abs b{font-weight:400;margin-right:4px}
+td.abs{cursor:default}
+.abs-wrap{display:flex;align-items:center;gap:4px}
+.abs-check{
+  border:0;background:transparent;padding:0;margin:0;width:18px;height:18px;
+  font:inherit;font-size:15px;line-height:18px;cursor:pointer;flex:0 0 18px;
+}
+.abs-name{
+  width:100%;min-width:0;border:0;background:transparent;outline:none;
+  font:inherit;font-size:12.5px;padding:2px 0;
+}
+.abs-name:focus{background:#EAF0FB}
 td.abs.on{color:var(--red)}
 
 .sched-cap{text-align:center;font-size:12.5px;padding:3px 0 5px}
@@ -184,7 +223,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <span class="grow"></span>
     <button id="btn-team">팀: <span id="toolbar-team">장원급제</span></button>
     <span id="who-label">–</span>
-    <button id="btn-photo">사진 추가</button>
+    <button id="btn-photo" title="긴 글 입력칸에서는 커서 위치에 사진이 삽입됩니다">사진 추가</button>
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
   </div>
@@ -199,13 +238,18 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
-        <td class="cell mid" colspan="6" data-key="s:weekly"><textarea class="f" data-f="weekly" placeholder="1."></textarea></td></tr>
+        <td class="cell mid" colspan="6" data-key="s:weekly"><div class="f rich-editor" data-f="weekly" data-rich-key="s:weekly" data-placeholder="1." contenteditable="true"></div></td></tr>
       <tr id="abs-row"><th class="lbl red">프로젝트 결시자</th></tr>
       <tr>
         <th class="lbl">총 과제수행 기간<br>(시작일 ~ 마감일)</th>
         <td class="cell" colspan="2" data-key="s:period"><input class="f" type="text" data-f="period"></td>
         <td class="tight red">진행시간</td>
-        <td class="cell" data-key="s:hours"><div class="flex"><input class="f" type="text" data-f="hours" style="text-align:right"><span class="unit">/ 110H</span></div></td>
+        <td class="cell" data-key="s:hours"><div class="flex">
+          <input class="f" type="text" data-f="hours" style="text-align:right" aria-label="진행시간">
+          <span class="unit">/</span>
+          <input class="f" type="text" data-f="totalHours" value="110" style="width:58px;text-align:right;padding-left:2px;padding-right:2px" aria-label="총 진행시간">
+          <span class="unit">H</span>
+        </div></td>
         <td class="tight red">프로젝트<br>진행율</td>
         <td class="cell" data-key="s:progress"><div class="flex"><input class="f" type="text" data-f="progress" style="text-align:right"><span class="unit">%</span></div></td>
       </tr>
@@ -215,13 +259,13 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
           <table class="pbl" id="pbl-table"></table>
         </td></tr>
       <tr><th class="lbl red">팀운영 계획</th>
-        <td class="cell big" colspan="6" data-key="s:plan"><textarea class="f" data-f="plan"></textarea></td></tr>
+        <td class="cell big" colspan="6" data-key="s:plan"><div class="f rich-editor" data-f="plan" data-rich-key="s:plan" contenteditable="true"></div></td></tr>
       <tr><th class="lbl red">팀 주요<br>회의내용<br>(매주)</th>
-        <td class="cell big" colspan="6" data-key="s:meeting"><textarea class="f" data-f="meeting"></textarea></td></tr>
+        <td class="cell big" colspan="6" data-key="s:meeting"><div class="f rich-editor" data-f="meeting" data-rich-key="s:meeting" contenteditable="true"></div></td></tr>
       <tr><th class="lbl red">차기 추진<br>예정 사항</th>
-        <td class="cell big" colspan="6" data-key="s:next"><textarea class="f" data-f="next"></textarea></td></tr>
+        <td class="cell big" colspan="6" data-key="s:next"><div class="f rich-editor" data-f="next" data-rich-key="s:next" contenteditable="true"></div></td></tr>
       <tr><th class="lbl red">멘토 의견</th>
-        <td class="cell big" colspan="6" data-key="s:mentor"><textarea class="f" data-f="mentor"></textarea></td></tr>
+        <td class="cell big" colspan="6" data-key="s:mentor"><div class="f rich-editor" data-f="mentor" data-rich-key="s:mentor" contenteditable="true"></div></td></tr>
     </table>
 
     <h3 class="doc-title next">2. 훈련생별 주요활동일지</h3>
@@ -298,10 +342,10 @@ let TEAM_NAME=TEAM?.name||"";
 const PBL_STEPS=[["팀편성","10%"],["계획(20%)","20%"],["피드백","30%"],["수행","40%"],["멘토링","50%"],
   ["수행","60%"],["피드백","70%"],["수행","80%"],["결과제출","90%"],["피드백","100%"]];
 const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
-const SHARED_FIELDS=["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
+const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},inlinePhotos={},unsub=[],peers={},focusedField=null,photoTargetKey=null,timers={};
+let shared={},members={},logs={},photos={},inlinePhotos={},unsub=[],peers={},focusedField=null,photoTargetKey=null,richEditors={},richRanges={},timers={};
 const pendingWrites=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
@@ -501,6 +545,183 @@ function track(n,key){
   });
   n.addEventListener("blur",()=>{focusedField=null;beat();});
 }
+const RICH_SHARED=new Set(["weekly","plan","meeting","next","mentor"]);
+
+function normalizeTokens(tokens,fallback=""){
+  if(Array.isArray(tokens)&&tokens.length) return tokens;
+  return fallback!==""?[{type:"text",text:String(fallback)}]:[];
+}
+function mergeTextTokens(tokens){
+  const out=[];
+  for(const t of tokens){
+    if(!t)continue;
+    if(t.type==="text"){
+      const s=String(t.text??"").replace(/\u200B/g,"");
+      if(!s)continue;
+      if(out.length&&out[out.length-1].type==="text") out[out.length-1].text+=s;
+      else out.push({type:"text",text:s});
+    }else if(t.type==="image"&&t.id){
+      out.push({type:"image",id:String(t.id)});
+    }
+  }
+  return out;
+}
+function tokensPlain(tokens){
+  return mergeTextTokens(tokens).filter(t=>t.type==="text").map(t=>t.text).join("");
+}
+function appendTextWithBreaks(parent,text){
+  const parts=String(text??"").split("\n");
+  parts.forEach((part,i)=>{
+    if(i) parent.appendChild(document.createElement("br"));
+    if(part) parent.appendChild(document.createTextNode(part));
+  });
+}
+function makeInlinePhotoNode(pid,p,editable=true){
+  const wrap=el("span","inline-photo-node");
+  wrap.dataset.photoId=pid;
+  wrap.contentEditable="false";
+  const img=el("img");
+  img.src=p?.data||"";
+  img.alt=p?.name||"사진";
+  img.onclick=ev=>{
+    ev.stopPropagation();
+    const lb=$("#lightbox");
+    lb.querySelector("img").src=img.src;
+    lb.classList.remove("hide");
+  };
+  wrap.appendChild(img);
+  if(editable){
+    const del=el("button");
+    del.type="button"; del.title="사진 삭제"; del.textContent="×";
+    del.onclick=async ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      const editor=wrap.closest(".rich-editor");
+      const key=editor?.dataset.richKey;
+      if(!confirm("이 사진을 지울까요?"))return;
+      try{
+        await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));
+        wrap.remove();
+        if(editor&&key) saveRichEditor(key,editor,0);
+      }catch(e){fail(e);}
+    };
+    wrap.appendChild(del);
+  }
+  return wrap;
+}
+function renderRichEditor(editor,tokens,fallback,editable=true){
+  if(!editor||document.activeElement===editor)return;
+  const list=normalizeTokens(tokens,fallback);
+  editor.innerHTML="";
+  list.forEach(t=>{
+    if(t.type==="text") appendTextWithBreaks(editor,t.text);
+    else if(t.type==="image"){
+      const p=inlinePhotos[t.id];
+      if(p?.data) editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
+    }
+  });
+}
+function editorTokens(editor){
+  const out=[];
+  function walk(node){
+    if(node.nodeType===Node.TEXT_NODE){ out.push({type:"text",text:node.nodeValue||""}); return; }
+    if(node.nodeType!==Node.ELEMENT_NODE)return;
+    if(node.classList?.contains("inline-photo-node")){
+      const id=node.dataset.photoId;
+      if(id)out.push({type:"image",id});
+      return;
+    }
+    if(node.tagName==="BR"){ out.push({type:"text",text:"\n"}); return; }
+    const isBlock=["DIV","P"].includes(node.tagName);
+    Array.from(node.childNodes).forEach(walk);
+    if(isBlock&&node!==editor){
+      const last=out[out.length-1];
+      if(!(last?.type==="text"&&last.text.endsWith("\n"))) out.push({type:"text",text:"\n"});
+    }
+  }
+  Array.from(editor.childNodes).forEach(walk);
+  return mergeTextTokens(out);
+}
+function richDataForKey(key){
+  let m;
+  if((m=key.match(/^s:(.+)$/))){
+    const f=m[1];
+    return {tokens:shared.rich?.[f],fallback:shared[f]??""};
+  }
+  if((m=key.match(/^p:(\d+)$/))){
+    const k="p"+m[1];
+    return {tokens:shared.richPbl?.[k],fallback:(shared.pbl||{})[k]??(PBL_DEFAULT[Number(m[1])]||"")};
+  }
+  if((m=key.match(/^(m\d+):(content)$/))){
+    const d=members[m[1]]||{};
+    return {tokens:d.contentRich,fallback:d.content??""};
+  }
+  if((m=key.match(/^l:(\d+):(content|note)$/))){
+    const d=logs["r"+m[1]]||{}, f=m[2];
+    return {tokens:d[f+"Rich"],fallback:d[f]??""};
+  }
+  return {tokens:null,fallback:""};
+}
+function captureRichRange(editor,key){
+  const sel=window.getSelection();
+  if(!sel||!sel.rangeCount)return;
+  const r=sel.getRangeAt(0);
+  if(editor.contains(r.commonAncestorContainer)) richRanges[key]=r.cloneRange();
+}
+function bindRichEditor(editor,key,editable=true){
+  if(!editor)return;
+  richEditors[key]=editor;
+  editor.dataset.richKey=key;
+  editor.contentEditable=editable?"true":"false";
+  const host=editor.closest("[data-key]");
+  const activate=()=>{
+    if(!editable)return;
+    focusedField=key;
+    photoTargetKey=key;
+    document.querySelectorAll(".photo-target,.rich-caret-target").forEach(x=>x.classList.remove("photo-target","rich-caret-target"));
+    if(host) host.classList.add("rich-caret-target");
+    captureRichRange(editor,key);
+    beat();
+  };
+  if(editable){
+    ["focus","keyup","mouseup","input"].forEach(ev=>editor.addEventListener(ev,()=>{
+      activate();
+      if(ev==="input") saveRichEditor(key,editor);
+    }));
+    editor.addEventListener("blur",()=>{focusedField=null;captureRichRange(editor,key);beat();});
+  }
+}
+function saveRichEditor(key,editor,delay=700){
+  const tokens=editorTokens(editor), plain=tokensPlain(tokens), targetWeek=weekId;
+  mark("입력 중…",false);
+  scheduleWrite("rich:"+key,async()=>{
+    try{
+      let m;
+      if((m=key.match(/^s:(.+)$/))){
+        const f=m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
+        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
+        await updateDoc(ref,{[f]:plain,[`rich.${f}`]:tokens});
+      }else if((m=key.match(/^p:(\d+)$/))){
+        const k="p"+m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
+        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
+        await updateDoc(ref,{[`pbl.${k}`]:plain,[`richPbl.${k}`]:tokens});
+      }else if((m=key.match(/^(m\d+):content$/))){
+        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",m[1]),{content:plain,contentRich:tokens},{merge:true});
+      }else if((m=key.match(/^l:(\d+):(content|note)$/))){
+        const f=m[2];
+        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+m[1]),{[f]:plain,[f+"Rich"]:tokens},{merge:true});
+      }
+      mark("저장됨",true);
+    }catch(e){fail(e);throw e;}
+  },delay);
+}
+function refreshRichEditors(){
+  Object.entries(richEditors).forEach(([key,editor])=>{
+    const {tokens,fallback}=richDataForKey(key);
+    const editable=editor.contentEditable!=="false";
+    renderRichEditor(editor,tokens,fallback,editable);
+  });
+}
+
 function start(){
   $("#app").classList.remove("hide");
   buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared(); bindTeamName();
@@ -521,23 +742,44 @@ function start(){
 function buildAbsent(){
   const tr=$("#abs-row");
   for(let i=1;i<=MEMBERS;i++){
+    const id="m"+i;
     const td=el("td","abs"); td.id="abs-"+i;
-    td.innerHTML=`<b>□</b><span id="abs-label-${i}">${i}</span>`;
-    td.onclick=()=>{
-      const on=!((shared.absent||{})["m"+i]);
-      shared.absent=Object.assign({},shared.absent,{["m"+i]:on});
-      paintAbsent(); save(`absent.m${i}`,on,0);
+    td.innerHTML=`<div class="abs-wrap">
+      <button type="button" class="abs-check" id="abs-check-${i}" aria-label="${i}번 결시 체크">□</button>
+      <input class="abs-name" id="abs-name-${i}" type="text" placeholder="이름">
+    </div>`;
+
+    const check=td.querySelector(".abs-check");
+    const input=td.querySelector(".abs-name");
+
+    check.onclick=()=>{
+      const on=!((shared.absent||{})[id]);
+      shared.absent=Object.assign({},shared.absent,{[id]:on});
+      paintAbsent();
+      save(`absent.${id}`,on,0);
     };
+
+    input.addEventListener("input",()=>{
+      shared.absentNames=Object.assign({},shared.absentNames,{[id]:input.value});
+      save(`absentNames.${id}`,input.value);
+    });
+
     tr.appendChild(td);
   }
 }
 function paintAbsent(){
   for(let i=1;i<=MEMBERS;i++){
+    const id="m"+i;
     const td=$("#abs-"+i); if(!td)continue;
-    const on=!!((shared.absent||{})["m"+i]);
+    const on=!!((shared.absent||{})[id]);
     td.classList.toggle("on",on);
-    td.querySelector("b").textContent=on?"■":"□";
-    td.querySelector("span").textContent=(members["m"+i]||{}).name||i;
+
+    const check=$("#abs-check-"+i);
+    const input=$("#abs-name-"+i);
+    if(check) check.textContent=on?"■":"□";
+    if(input && document.activeElement!==input){
+      input.value=((shared.absentNames||{})[id])||"";
+    }
   }
 }
 function buildPbl(){
@@ -548,11 +790,10 @@ function buildPbl(){
   PBL_STEPS.forEach(([name,pct],i)=>{
     const tr=el("tr");
     tr.innerHTML=(i===0?`<td class="vert" rowspan="10">프로젝트팀 활동</td>`:"")
-      +`<td>${name}</td><td>${pct}</td><td class="cell" data-key="p:${i}"><textarea class="f" id="pbl-${i}" rows="1"></textarea></td>`;
+      +`<td>${name}</td><td>${pct}</td><td class="cell" data-key="p:${i}"><div class="f rich-editor" id="pbl-${i}" data-rich-key="p:${i}" contenteditable="true"></div></td>`;
     t.appendChild(tr);
-    const ta=tr.querySelector("textarea");
-    track(ta,"p:"+i);
-    ta.addEventListener("input",()=>{autosize(ta);save(`pbl.p${i}`,ta.value);});
+    const editor=$("#pbl-"+i);
+    bindRichEditor(editor,"p:"+i,true);
   });
 }
 function buildMembers(){
@@ -563,16 +804,19 @@ function buildMembers(){
     r1.innerHTML=`<td class="cell" data-key="${id}:name" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">이름 :</span><input class="f" id="${id}-name" type="text" ${mine?"":"readonly"}></div></td>
       <td class="cell" rowspan="2" style="vertical-align:top" data-key="${id}:content">
-        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea>
+        <div class="f rich-editor" id="${id}-content" data-rich-key="${id}:content" style="min-height:74px" contenteditable="${mine?"true":"false"}"></div>
         <div class="shots" id="${id}-shots"></div></td>`;
     r2.innerHTML=`<td class="cell" data-key="${id}:role" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">역할 :</span><input class="f" id="${id}-role" type="text" ${mine?"":"readonly"}></div></td>`;
     t.appendChild(r1); t.appendChild(r2);
-    if(mine) ["name","role","content"].forEach(f=>{
+    ["name","role"].forEach(f=>{
       const n=$("#"+id+"-"+f);
-      track(n,id+":"+f);
-      n.addEventListener("input",()=>{autosize(n);saveMember(f,n.value);});
+      if(mine){
+        track(n,id+":"+f);
+        n.addEventListener("input",()=>{autosize(n);saveMember(f,n.value);});
+      }
     });
+    bindRichEditor($("#"+id+"-content"),id+":content",mine);
   }
 }
 function buildLogs(){
@@ -581,21 +825,25 @@ function buildLogs(){
     const tr=el("tr");
     tr.innerHTML=`
       <td class="cell" data-key="l:${r}:date"><input class="f" id="lg-${r}-date" type="text" style="text-align:center"></td>
-      <td class="cell" data-key="l:${r}:content"><textarea class="f" id="lg-${r}-content" rows="1"></textarea></td>
-      <td class="cell" data-key="l:${r}:note"><textarea class="f" id="lg-${r}-note" rows="1"></textarea></td>`;
+      <td class="cell" data-key="l:${r}:content"><div class="f rich-editor" id="lg-${r}-content" data-rich-key="l:${r}:content" contenteditable="true"></div></td>
+      <td class="cell" data-key="l:${r}:note"><div class="f rich-editor" id="lg-${r}-note" data-rich-key="l:${r}:note" contenteditable="true"></div></td>`;
     t.appendChild(tr);
-    ["date","content","note"].forEach(f=>{
-      const n=$(`#lg-${r}-${f}`);
-      track(n,`l:${r}:${f}`);
-      n.addEventListener("input",()=>{autosize(n);saveLog(r,f,n.value);});
-    });
+    const date=$("#lg-"+r+"-date");
+    track(date,`l:${r}:date`);
+    date.addEventListener("input",()=>saveLog(r,"date",date.value));
+    bindRichEditor($("#lg-"+r+"-content"),`l:${r}:content`,true);
+    bindRichEditor($("#lg-"+r+"-note"),`l:${r}:note`,true);
   }
 }
 function bindShared(){
   SHARED_FIELDS.forEach(f=>{
     const n=document.querySelector(`[data-f="${f}"]`);
-    track(n,"s:"+f);
-    n.addEventListener("input",()=>{autosize(n);save(f,n.value);});
+    if(RICH_SHARED.has(f)){
+      bindRichEditor(n,"s:"+f,true);
+    }else{
+      track(n,"s:"+f);
+      n.addEventListener("input",()=>{autosize(n);save(f,n.value);});
+    }
   });
 }
 
@@ -611,7 +859,8 @@ function openWeek(id){
   unsub.push(onSnapshot(collection(wref,"members"),s=>{members={};s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
   unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
-    inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data()); renderInlinePhotos();
+    inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
+    renderInlinePhotos(); refreshRichEditors();
   },fail));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
@@ -679,30 +928,39 @@ function saveLog(row,field,value){
 function renderShared(){
   SHARED_FIELDS.forEach(f=>{
     const n=document.querySelector(`[data-f="${f}"]`);
-    if(document.activeElement!==n){ n.value=shared[f]??""; autosize(n); }
+    if(!n)return;
+    if(RICH_SHARED.has(f)){
+      renderRichEditor(n,shared.rich?.[f],shared[f]??"",true);
+    }else if(document.activeElement!==n){
+      n.value=shared[f]??(f==="totalHours"?"110":""); autosize(n);
+    }
   });
   PBL_STEPS.forEach((_,i)=>{
-    const n=$("#pbl-"+i);
-    if(n&&document.activeElement!==n){ n.value=(shared.pbl||{})["p"+i]??(PBL_DEFAULT[i]||""); autosize(n); }
+    const n=$("#pbl-"+i), k="p"+i;
+    if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
   });
   paintAbsent();
 }
 function renderMembers(){
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i,d=members[id]||{};
-    ["name","role","content"].forEach(f=>{
+    ["name","role"].forEach(f=>{
       const n=$("#"+id+"-"+f);
       if(n&&document.activeElement!==n){ n.value=d[f]??""; autosize(n); }
     });
+    const editor=$("#"+id+"-content");
+    if(editor) renderRichEditor(editor,d.contentRich,d.content??"",id===slot);
   }
   paintAbsent();
 }
 function renderLogs(){
   for(let r=1;r<=LOG_ROWS;r++){
     const d=logs["r"+r]||{};
-    ["date","content","note"].forEach(f=>{
-      const n=$(`#lg-${r}-${f}`);
-      if(n&&document.activeElement!==n){ n.value=d[f]??""; autosize(n); }
+    const date=$("#lg-"+r+"-date");
+    if(date&&document.activeElement!==date) date.value=d.date??"";
+    ["content","note"].forEach(f=>{
+      const editor=$(`#lg-${r}-${f}`);
+      if(editor) renderRichEditor(editor,d[f+"Rich"],d[f]??"",true);
     });
   }
 }
@@ -730,7 +988,7 @@ function renderInlinePhotos(){
   Object.entries(inlinePhotos||{})
     .sort((a,b)=>(a[1].at||0)-(b[1].at||0))
     .forEach(([pid,p])=>{
-      if(!p.target)return;
+      if(!p.target||p.mode==="inline")return;
       (grouped[p.target]||(grouped[p.target]=[])).push([pid,p]);
     });
   Object.entries(grouped).forEach(([target,list])=>{
@@ -802,21 +1060,46 @@ $("#pick").onchange=async e=>{
   const room=MAX_SHOTS-current;
   const picked=files.slice(0,Math.max(room,0));
   const bad=[];
+  const richEditor=richEditors[target];
+  let range=richRanges[target]?.cloneRange()||null;
+
   for(let i=0;i<picked.length;i++){
     const f=picked[i];
     btn.textContent=`올리는 중 ${i+1}/${picked.length}`;
     try{
       const img=await shrink(f);
       const pid="p"+Date.now()+Math.floor(Math.random()*99999);
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid),{
+      const photoDoc={
         target,
         data:img.data,
         w:img.w,
         h:img.h,
         name:f.name||"",
         by:uid,
-        at:Date.now()
-      });
+        at:Date.now(),
+        mode:richEditor?"inline":"attached"
+      };
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid),photoDoc);
+      inlinePhotos[pid]=photoDoc;
+
+      if(richEditor){
+        if(!range||!richEditor.contains(range.commonAncestorContainer)){
+          range=document.createRange();
+          range.selectNodeContents(richEditor);
+          range.collapse(false);
+        }
+        const node=makeInlinePhotoNode(pid,photoDoc,true);
+        range.deleteContents();
+        range.insertNode(node);
+        range.setStartAfter(node); range.collapse(true);
+        const spacer=document.createTextNode("\u200B");
+        range.insertNode(spacer);
+        range.setStartAfter(spacer); range.collapse(true);
+        richRanges[target]=range.cloneRange();
+        const sel=window.getSelection();
+        sel.removeAllRanges(); sel.addRange(range);
+        saveRichEditor(target,richEditor,0);
+      }
     }catch(err){ console.error(f.name,err); bad.push((f.name||"사진")+" — "+err.message); }
   }
   btn.disabled=false; btn.textContent="사진 추가";
@@ -942,12 +1225,61 @@ function addPics(xdoc, tbl, row, col, shots){
     sub.appendChild(p);
   }
 }
+function addInlineRunImage(xdoc,p,ref,sh){
+  if(!sh)return;
+  let cw=Math.min(18000,sh.w*PX), chh=Math.round(cw*sh.h/sh.w);
+  if(chh>16000){chh=16000;cw=Math.round(chh*sh.w/sh.h);}
+  const run=xdoc.createElementNS(HP,"hp:run");
+  run.setAttribute("charPrIDRef",ref);
+  const frag=new DOMParser().parseFromString(picXml(sh.item,sh.w,sh.h,cw,chh),"application/xml");
+  run.appendChild(xdoc.importNode(frag.documentElement,true));
+  run.appendChild(xdoc.createElementNS(HP,"hp:t"));
+  p.appendChild(run);
+}
+function addInlineRunText(xdoc,p,ref,text){
+  if(!text)return;
+  const run=xdoc.createElementNS(HP,"hp:run");
+  run.setAttribute("charPrIDRef",ref);
+  const t=xdoc.createElementNS(HP,"hp:t");
+  t.appendChild(xdoc.createTextNode(text));
+  run.appendChild(t); p.appendChild(run);
+}
+function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap){
+  const tc=findCell(tbl,row,col); if(!tc)return;
+  const sub=kids(tc,"hp:subList")[0]; if(!sub)return;
+  const ps=kids(sub,"hp:p"); if(!ps.length)return;
+  const base=ps[0];
+  const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
+  ps.slice(1).forEach(p=>sub.removeChild(p));
+  const list=normalizeTokens(tokens,fallback);
+  const paragraphs=[[]];
+  list.forEach(tok=>{
+    if(tok.type==="image"){paragraphs[paragraphs.length-1].push(tok);return;}
+    String(tok.text??"").split("\n").forEach((part,i)=>{
+      if(i)paragraphs.push([]);
+      if(part)paragraphs[paragraphs.length-1].push({type:"text",text:part});
+    });
+  });
+  if(!paragraphs.length)paragraphs.push([]);
+  paragraphs.forEach((parts,i)=>{
+    const p=i===0?base:base.cloneNode(true);
+    Array.from(p.getElementsByTagName("hp:run")).forEach(r=>r.parentNode.removeChild(r));
+    Array.from(p.getElementsByTagName("hp:linesegarray")).forEach(r=>r.parentNode.removeChild(r));
+    parts.forEach(tok=>{
+      if(tok.type==="text")addInlineRunText(xdoc,p,ref,tok.text);
+      else if(tok.type==="image")addInlineRunImage(xdoc,p,ref,itemMap[tok.id]);
+    });
+    if(i>0)sub.appendChild(p);
+  });
+}
+
 function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
   const sharedMap={
     "s:topic":[T1,1,1],
     "s:weekly":[T1,2,1],
     "s:period":[T1,4,1],
     "s:hours":[T1,4,6],
+    "s:totalHours":[T1,4,6],
     "s:progress":[T1,4,10],
     "s:plan":[T1,6,1],
     "s:meeting":[T1,7,1],
@@ -976,38 +1308,77 @@ function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
   return null;
 }
 
+function exportRichForKey(key){
+  return richDataForKey(key);
+}
+
 $("#btn-export").onclick=async()=>{
-  const btn=$("#btn-export"); btn.disabled=true; btn.textContent="만드는 중…";
+  const btn=$("#btn-export");
+  const w=weekMeta(weekId);
+  const suggestedName=`01_훈련생_프로젝트_활동일지_${TEAM_NAME}_${w.friday.replace(/-/g,"")}.hwpx`;
+  let fileHandle=null;
+
   try{
+    // Chrome/Edge 등 File System Access API 지원 브라우저에서는
+    // 파일명과 저장 위치를 사용자가 직접 고를 수 있는 저장 팝업을 띄웁니다.
+    if("showSaveFilePicker" in window){
+      btn.textContent="저장 위치 선택…";
+      fileHandle=await window.showSaveFilePicker({
+        suggestedName,
+        types:[{
+          description:"한글 HWPX 문서",
+          accept:{"application/zip":[".hwpx"]}
+        }]
+      });
+    }
+
+    btn.disabled=true;
+    btn.textContent="만드는 중…";
+
     const buf=await (await fetch(TEMPLATE,{cache:"no-store"})).arrayBuffer();
     const zip=await JSZip.loadAsync(buf);
     const xdoc=new DOMParser().parseFromString(await zip.file("Contents/section0.xml").async("string"),"application/xml");
     const [T1,TPBL,TMEM,TLOG]=Array.from(xdoc.getElementsByTagName("hp:tbl"));
-    const w=weekMeta(weekId);
+
+    const binFiles=[]; let imgNo=0;
+    const inlineItemMap={};
+    for(const [pid,sh] of Object.entries(inlinePhotos||{})){
+      if(sh.mode!=="inline"||!sh.data)continue;
+      let iw=sh.w,ih=sh.h;
+      if(!iw||!ih){
+        const im=new Image(); im.src=sh.data;
+        try{if(im.decode)await im.decode();}catch(e){}
+        iw=im.naturalWidth||800; ih=im.naturalHeight||600;
+      }
+      imgNo++;
+      const item="image"+imgNo;
+      binFiles.push({item,path:"BinData/"+item+".jpg",bytes:dataToBytes(sh.data)});
+      inlineItemMap[pid]={item,w:iw,h:ih};
+    }
 
     fillCell(xdoc,T1,0,1,TEAM_NAME);
     fillCell(xdoc,T1,1,1,shared.topic||"");
-    fillCell(xdoc,T1,2,1,shared.weekly||"");
+    fillCellRich(xdoc,T1,2,1,shared.rich?.weekly,shared.weekly||"",inlineItemMap);
     [1,2,3,5,7,9].forEach((c,i)=>{
-      const nm=(members["m"+(i+1)]||{}).name||String(i+1);
-      fillCell(xdoc,T1,3,c,`${(shared.absent||{})["m"+(i+1)]?"■":"□"} ${nm}`);
+      const id="m"+(i+1);
+      const nm=((shared.absentNames||{})[id])||"";
+      fillCell(xdoc,T1,3,c,`${(shared.absent||{})[id]?"■":"□"} ${nm}`.trimEnd());
     });
     fillCell(xdoc,T1,4,1,shared.period||"");
-    fillCell(xdoc,T1,4,6,`${shared.hours||"    "} / 110H`);
+    fillCell(xdoc,T1,4,6,`${shared.hours||"    "} / ${shared.totalHours||"110"}H`);
     fillCell(xdoc,T1,4,10,`${shared.progress||"    "} %`);
-    fillCell(xdoc,T1,6,1,shared.plan||"");
-    fillCell(xdoc,T1,7,1,shared.meeting||"");
-    fillCell(xdoc,T1,8,1,shared.next||"");
-    fillCell(xdoc,T1,9,1,shared.mentor||"");
+    fillCellRich(xdoc,T1,6,1,shared.rich?.plan,shared.plan||"",inlineItemMap);
+    fillCellRich(xdoc,T1,7,1,shared.rich?.meeting,shared.meeting||"",inlineItemMap);
+    fillCellRich(xdoc,T1,8,1,shared.rich?.next,shared.next||"",inlineItemMap);
+    fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap);
 
-    PBL_STEPS.forEach((_,i)=>fillCell(xdoc,TPBL,i+2,3,(shared.pbl||{})["p"+i]??(PBL_DEFAULT[i]||"")));
+    PBL_STEPS.forEach((_,i)=>{const k="p"+i;fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap);});
 
-    const binFiles=[]; let imgNo=0;
     for(let i=0;i<MEMBERS;i++){
       const id="m"+(i+1), m=members[id]||{};
       fillCell(xdoc,TMEM,i*2,0,"이름 : "+(m.name||""));
       fillCell(xdoc,TMEM,i*2+1,0,"역할 : "+(m.role||""));
-      fillCell(xdoc,TMEM,i*2,1,m.content||"");
+      fillCellRich(xdoc,TMEM,i*2,1,m.contentRich,m.content||"",inlineItemMap);
       const shots=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([,p])=>p);
       const ready=[];
       for(const sh of shots){
@@ -1028,15 +1399,15 @@ $("#btn-export").onclick=async()=>{
     for(let r=1;r<=LOG_ROWS;r++){
       const d=logs["r"+r]||{};
       fillCell(xdoc,TLOG,r,0,d.date||"");
-      fillCell(xdoc,TLOG,r,1,d.content||"");
-      fillCell(xdoc,TLOG,r,2,d.note||"");
+      fillCellRich(xdoc,TLOG,r,1,d.contentRich,d.content||"",inlineItemMap);
+      fillCellRich(xdoc,TLOG,r,2,d.noteRich,d.note||"",inlineItemMap);
     }
 
     // 현재 커서가 있던 입력칸에 추가한 사진도 HWPX의 같은 셀에 삽입
     const inlineReady={};
     const inlineList=Object.values(inlinePhotos||{}).sort((a,b)=>(a.at||0)-(b.at||0));
     for(const sh of inlineList){
-      if(!sh.data||!sh.target)continue;
+      if(!sh.data||!sh.target||sh.mode==="inline")continue;
       let iw=sh.w,ih=sh.h;
       if(!iw||!ih){
         const im=new Image(); im.src=sh.data;
@@ -1077,12 +1448,27 @@ $("#btn-export").onclick=async()=>{
       out.file(n,data,{compression:"DEFLATE"});
     }
     binFiles.forEach(b=>out.file(b.path,b.bytes,{compression:"DEFLATE"}));
-    const a=el("a");
-    a.href=URL.createObjectURL(await out.generateAsync({type:"blob"}));
-    a.download=`01_훈련생_프로젝트_활동일지_${TEAM_NAME}_${w.friday.replace(/-/g,"")}.hwpx`;
-    a.click(); URL.revokeObjectURL(a.href);
+    const blob=await out.generateAsync({type:"blob"});
+
+    if(fileHandle){
+      const writable=await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    }else{
+      // 저장 팝업 API를 지원하지 않는 브라우저는 기존 다운로드 방식으로 대체합니다.
+      const a=el("a");
+      a.href=URL.createObjectURL(blob);
+      a.download=suggestedName;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    }
+
     mark("내보냈습니다",true);
   }catch(e){
+    if(e&&e.name==="AbortError"){
+      mark("저장 취소됨",false);
+      return;
+    }
     console.error(e);
     alert("내보내기 실패: "+e.message+"\n\ntemplate.hwpx 가 index.html과 같은 폴더에 있는지 확인해 주세요.");
   }finally{ btn.disabled=false; btn.textContent="한글 파일 내보내기"; }
