@@ -9,11 +9,13 @@ export function resolveTeam(search) {
   const params = new URLSearchParams(search);
   const id = params.get("team") ?? DEFAULT_TEAM.id;
   if (!validTeamId(id)) return null;
-  return KNOWN_TEAMS.find(team => team.id === id) ?? { id, name: id };
+  return KNOWN_TEAMS.find(team => team.id === id) ?? null;
 }
 
 export function teamUrl(id, href) {
-  if (!validTeamId(id)) throw new Error("팀 ID는 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.");
+  if (!validTeamId(id) || !KNOWN_TEAMS.some(team => team.id === id)) {
+    throw new Error("등록된 팀만 열 수 있습니다.");
+  }
   const url = new URL(href);
   if (id === DEFAULT_TEAM.id) url.searchParams.delete("team");
   else url.searchParams.set("team", id);

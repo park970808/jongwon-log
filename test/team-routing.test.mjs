@@ -10,7 +10,7 @@ test("기존 주소는 기존 팀을 그대로 연다", () => {
 test("두 팀의 주소와 이름을 구분한다", () => {
   assert.deepEqual(resolveTeam("?team=jangwon"), DEFAULT_TEAM);
   assert.deepEqual(resolveTeam("?team=team-2"), { id: "team-2", name: "2팀" });
-  assert.deepEqual(resolveTeam("?team=another-team"), { id: "another-team", name: "another-team" });
+  assert.equal(resolveTeam("?team=another-team"), null);
 });
 
 test("허용되지 않은 팀 ID를 데이터 경로로 사용하지 않는다", () => {
@@ -28,4 +28,5 @@ test("GitHub Pages의 경로와 기존 쿼리를 유지한 채 팀을 전환한�
     "https://example.github.io/jongwon-log/?utm_source=bookmark&team=team-2#top");
   assert.equal(teamUrl("jangwon",teamUrl("team-2",base)),base);
   assert.throws(()=>teamUrl("../other",base));
+  assert.throws(()=>teamUrl("another-team",base));
 });
