@@ -244,11 +244,15 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
         <th class="lbl">총 과제수행 기간<br>(시작일 ~ 마감일)</th>
         <td class="cell" colspan="2" data-key="s:period"><input class="f" type="text" data-f="period"></td>
         <td class="tight red">진행시간</td>
-        <td class="cell" data-key="s:hours"><div class="flex">
-          <input class="f" type="text" data-f="hours" style="text-align:right" aria-label="진행시간">
-          <span class="unit">/</span>
-          <input class="f" type="text" data-f="totalHours" value="110" style="width:58px;text-align:right;padding-left:2px;padding-right:2px" aria-label="총 진행시간">
-          <span class="unit">H</span>
+        <td class="cell" data-key="s:hours"><div class="flex" style="gap:3px;padding:0 4px">
+          <input class="f" type="text" data-f="hours"
+            style="width:0;min-width:38px;flex:1 1 0;text-align:right;padding-left:2px;padding-right:2px"
+            placeholder="0" aria-label="진행시간">
+          <span style="flex:0 0 auto">/</span>
+          <input class="f" type="text" data-f="totalHours" value="110"
+            style="width:46px;flex:0 0 46px;text-align:right;padding-left:2px;padding-right:2px"
+            aria-label="총 진행시간">
+          <span style="flex:0 0 auto;padding-right:2px">H</span>
         </div></td>
         <td class="tight red">프로젝트<br>진행율</td>
         <td class="cell" data-key="s:progress"><div class="flex"><input class="f" type="text" data-f="progress" style="text-align:right"><span class="unit">%</span></div></td>
