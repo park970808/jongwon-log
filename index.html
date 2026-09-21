@@ -115,6 +115,15 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 .slot:hover{border-color:#1D5FD6}
 .slot b{display:block;font-size:15px}
 .slot span{font-size:12px;color:#777}
+.team-overlay{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.58);overflow:auto;padding:24px}
+.team-overlay .gate{margin:7vh auto;box-shadow:0 8px 35px rgba(0,0,0,.3)}
+.team-links{display:grid;gap:10px;margin-bottom:18px}
+.team-id{display:flex;gap:8px}
+.team-id input,.join-code{width:100%;border:1px solid #BBB;padding:10px}
+.team-id button{white-space:nowrap;border:0;background:#2B2B2B;color:#fff;padding:10px 14px;cursor:pointer}
+.team-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.team-actions button{border:0;background:transparent;color:#1D5FD6;cursor:pointer}
+.gate .error{color:#B00020;margin-top:12px}
 .hide{display:none!important}
 .note{font-size:12px;color:#777;margin-top:12px}
 @media (max-width:860px){ .desk{padding:12px 0 60px} .page{padding:32px 28px 42px} }
@@ -130,6 +139,33 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
   <p class="note" id="cfg-err"></p>
 </div>
 
+<div id="gate-team" class="team-overlay hide">
+  <div class="gate">
+    <h2>팀 선택</h2>
+    <p>팀마다 활동일지가 별도로 저장됩니다. 받은 팀 주소가 있다면 그대로 열어 주세요.</p>
+    <div class="team-links" id="team-list"></div>
+    <label for="team-input">다른 팀 ID</label>
+    <form class="team-id" id="team-form">
+      <input id="team-input" type="text" autocomplete="off" placeholder="예: team-3" maxlength="40">
+      <button type="submit">이동</button>
+    </form>
+    <p class="note">팀 ID는 영문 소문자·숫자·하이픈으로 입력하세요. 새 팀은 Firebase에 먼저 등록해야 합니다.</p>
+    <p class="note error" id="team-error" role="alert"></p>
+    <div class="team-actions"><button id="team-close" type="button">닫기</button></div>
+  </div>
+</div>
+
+<div id="gate-join" class="gate hide">
+  <h2 id="join-title">팀에 들어가기</h2>
+  <p>팀 관리자에게 받은 초대 코드를 입력하세요. 한 번 가입하면 이 브라우저에서 계속 사용할 수 있습니다.</p>
+  <form id="join-form">
+    <input class="join-code" id="join-code" type="password" autocomplete="off" placeholder="팀 초대 코드" required>
+    <button class="go" type="submit" style="margin-top:12px">팀에 들어가기</button>
+  </form>
+  <p class="note error" id="join-error" role="alert"></p>
+  <button id="join-team-change" type="button">다른 팀 선택</button>
+</div>
+
 <div id="gate-slot" class="gate hide">
   <h2>어느 자리인가요</h2>
   <p>활동일지에서 본인이 쓸 칸을 고르세요. 이름은 들어가서 바로 바꿀 수 있습니다.</p>
@@ -143,6 +179,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <button id="btn-prev-copy">지난 주 가져오기</button>
     <span id="save-status">불러오는 중</span>
     <span class="grow"></span>
+    <button id="btn-team">팀: <span id="toolbar-team">장원급제</span></button>
     <span id="who-label">–</span>
     <button id="btn-photo">사진 추가</button>
     <button id="btn-switch">자리 바꾸기</button>
@@ -155,7 +192,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <table class="doc">
       <colgroup><col style="width:128px"><col><col><col style="width:74px"><col style="width:96px"><col style="width:74px"><col style="width:72px"></colgroup>
       <tr><th class="lbl">팀 명</th>
-        <td class="cell" colspan="6"><input class="f" type="text" value="장원급제" readonly></td></tr>
+        <td class="cell" colspan="6"><input class="f" id="document-team" type="text" value="장원급제" readonly></td></tr>
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
@@ -207,25 +244,96 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+/* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
+const DEFAULT_TEAM={id:"jangwon",name:"장원급제"};
+const KNOWN_TEAMS=[
+  DEFAULT_TEAM,
+  {id:"team-2",name:"2팀"}
+];
+
+function validTeamId(id){
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(id||""));
+}
+
+function resolveTeam(search){
+  const params=new URLSearchParams(search||"");
+  const id=params.get("team")||DEFAULT_TEAM.id;
+  if(!validTeamId(id)) return null;
+  return KNOWN_TEAMS.find(team=>team.id===id)||{id,name:id};
+}
+
+function teamUrl(id,href=location.href){
+  const url=new URL(href);
+  if(id===DEFAULT_TEAM.id) url.searchParams.delete("team");
+  else url.searchParams.set("team",id);
+  return url.toString();
+}
+
 /* ════════ 설정 ════════ */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAe-KaHt0a6yrV7-BXSOqycusA0Kv2Gz0A",
-  authDomain: "jangwon-287b2.firebaseapp.com",
-  projectId: "jangwon-287b2",
-  storageBucket: "jangwon-287b2.firebasestorage.app",
-  messagingSenderId: "85352966138",
-  appId: "1:85352966138:web:37c613ead65a6fe881e643"
+const FIREBASE_CONFIGS = {
+  jangwon: {
+    apiKey: "AIzaSyAe-KaHt0a6yrV7-BXSOqycusA0Kv2Gz0A",
+    authDomain: "jangwon-287b2.firebaseapp.com",
+    projectId: "jangwon-287b2",
+    storageBucket: "jangwon-287b2.firebasestorage.app",
+    messagingSenderId: "85352966138",
+    appId: "1:85352966138:web:37c613ead65a6fe881e643"
+  },
+
+  "team-2": {
+    apiKey: "AIzaSyApQ1LKMnxhI1g7xMwPqwVUxUEfTHEDV-0",
+    authDomain: "jongwon-log-team-2.firebaseapp.com",
+    projectId: "jongwon-log-team-2",
+    storageBucket: "jongwon-log-team-2.firebasestorage.app",
+    messagingSenderId: "863440395387",
+    appId: "1:863440395387:web:a4e117002b1ac81e3cd6de"
+  }
 };
-const TEAM_ID="jangwon", TEAM_NAME="장원급제", MEMBERS=6, LOG_ROWS=23, TEMPLATE="./template.hwpx";
+const TEAM=resolveTeam(location.search);
+const TEAM_ID=TEAM?.id, MEMBERS=6, LOG_ROWS=23, TEMPLATE="./template.hwpx";
+let TEAM_NAME=TEAM?.name||"";
 const PBL_STEPS=[["팀편성","10%"],["계획(20%)","20%"],["피드백","30%"],["수행","40%"],["멘토링","50%"],
   ["수행","60%"],["피드백","70%"],["수행","80%"],["결과제출","90%"],["피드백","100%"]];
 const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
 
-let db,auth,uid,slot,weekId;
+let db,auth,uid,slot,weekId,started=false;
 let shared={},members={},logs={},photos={},unsub=[],peers={},focusedField=null,timers={};
+const pendingWrites=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+
+function setTeamName(name){
+  TEAM_NAME=name;
+  $("#toolbar-team").textContent=name;
+  $("#document-team").value=name;
+  document.title=`${name} · 훈련생 프로젝트 활동일지`;
+}
+function showTeamPicker(){ $("#team-error").textContent=""; $("#gate-team").classList.remove("hide"); }
+async function goToTeam(id){
+  if(!validTeamId(id)){ $("#team-error").textContent="팀 ID 형식이 올바르지 않습니다."; return; }
+  try{
+    await flushPending();
+    location.assign(teamUrl(id,location.href));
+  }catch(e){ $("#team-error").textContent="저장되지 않은 내용이 있어 팀을 바꾸지 않았습니다. 연결을 확인해 주세요."; }
+}
+function initTeamPicker(){
+  const list=$("#team-list");
+  KNOWN_TEAMS.forEach(team=>{
+    const button=el("button","slot");
+    button.type="button";
+    button.innerHTML=`<b>${team.name}</b><span>${team.id}</span>`;
+    button.onclick=()=>goToTeam(team.id);
+    list.appendChild(button);
+  });
+  $("#team-form").onsubmit=e=>{e.preventDefault(); goToTeam($("#team-input").value.trim());};
+  $("#team-close").onclick=()=>{
+    if(!TEAM) return goToTeam("jangwon");
+    $("#gate-team").classList.add("hide");
+  };
+  $("#btn-team").onclick=showTeamPicker;
+  $("#join-team-change").onclick=showTeamPicker;
+}
 
 /* ── 주차 ── */
 function mondayOf(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
@@ -253,18 +361,78 @@ const weekMeta=id=>WEEKS.find(w=>w.id===id)||WEEKS[0];
 
 /* ── 부팅 ── */
 function boot(){
-  const cfg=FIREBASE_CONFIG||JSON.parse(localStorage.getItem("fb-config")||"null");
+  initTeamPicker();
+  if(!TEAM){ showTeamPicker(); $("#team-error").textContent="주소의 팀 ID 형식이 올바르지 않습니다."; return; }
+  setTeamName(TEAM_NAME);
+  const cfg=FIREBASE_CONFIGS[TEAM_ID]||JSON.parse(localStorage.getItem("fb-config-"+TEAM_ID)||"null");
   if(!cfg){ $("#gate-config").classList.remove("hide"); return; }
+  console.info(`[팀 연결] ${TEAM_ID} → Firebase ${cfg.projectId}`);
   const app=initializeApp(cfg);
   auth=getAuth(app); db=getFirestore(app);
   signInAnonymously(auth).catch(e=>alert("로그인 실패: "+e.message+"\n\n익명 로그인이 켜져 있는지, 승인된 도메인에 이 주소가 등록됐는지 확인해 주세요."));
-  onAuthStateChanged(auth,u=>{ if(!u)return; uid=u.uid; slot=localStorage.getItem("slot-"+TEAM_ID); slot?start():slotGate(); });
+  onAuthStateChanged(auth,async u=>{
+    if(!u||started)return;
+    uid=u.uid;
+    try{
+      const teamDoc=await getDoc(doc(db,"teams",TEAM_ID));
+      if(!teamDoc.exists() && TEAM_ID!=="jangwon"){
+        showJoin("아직 등록되지 않은 팀입니다. Firebase에서 팀을 먼저 만든 뒤 다시 열어 주세요.",false);
+        return;
+      }
+      if(teamDoc.exists() && teamDoc.data().name) setTeamName(teamDoc.data().name);
+      enterLog();
+    }catch(e){
+      if(e.code==="permission-denied" && TEAM_ID==="jangwon"){
+        // Older rules may allow the original subcollections but not the parent document.
+        try{
+          await getDoc(doc(db,"teams",TEAM_ID,"weeks",WEEKS[0].id));
+          enterLog();
+          return;
+        }catch(legacyError){
+          if(legacyError.code!=="permission-denied"){
+            showJoin("연결 상태를 확인한 뒤 새로고침해 주세요.",false);
+            return;
+          }
+        }
+      }
+      if(e.code==="permission-denied") showJoin("",true);
+      else showJoin("연결 상태를 확인한 뒤 새로고침해 주세요.",false);
+    }
+  });
 }
+function enterLog(){
+  if(started)return;
+  started=true;
+  $("#gate-join").classList.add("hide");
+  slot=localStorage.getItem("slot-"+TEAM_ID);
+  slot?start():slotGate();
+}
+function showJoin(message,canJoin){
+  $("#join-title").textContent=`${TEAM_NAME}에 들어가기`;
+  $("#join-error").textContent=message;
+  $("#join-form").classList.toggle("hide",!canJoin);
+  $("#gate-join").classList.remove("hide");
+}
+$("#join-form").onsubmit=async e=>{
+  e.preventDefault();
+  const code=$("#join-code").value.trim();
+  const button=$("#join-form button"); button.disabled=true;
+  try{
+    await setDoc(doc(db,"teams",TEAM_ID,"access",uid),{code,joinedAt:serverTimestamp()});
+    const teamDoc=await getDoc(doc(db,"teams",TEAM_ID));
+    if(teamDoc.exists() && teamDoc.data().name) setTeamName(teamDoc.data().name);
+    $("#join-code").value="";
+    enterLog();
+  }catch(err){
+    $("#join-error").textContent=err.code==="permission-denied"
+      ?"초대 코드가 맞지 않거나 팀이 아직 설정되지 않았습니다.":"연결에 실패했습니다. 다시 시도해 주세요.";
+  }finally{button.disabled=false;}
+};
 $("#cfg-save").onclick=()=>{
   try{
     const c=JSON.parse($("#cfg-input").value.trim().replace(/^const\s+\w+\s*=\s*/,"").replace(/;\s*$/,"").replace(/(\w+):/g,'"$1":').replace(/"""/g,'"'));
     if(!c.projectId) throw 0;
-    localStorage.setItem("fb-config",JSON.stringify(c)); location.reload();
+    localStorage.setItem("fb-config-"+TEAM_ID,JSON.stringify(c)); location.reload();
   }catch(e){ $("#cfg-err").textContent="JSON 형식이 아닙니다."; }
 };
 function slotGate(){
@@ -280,7 +448,13 @@ function slotGate(){
     const n=$("#sn-"+d.id.slice(1)); if(n&&d.data().name) n.textContent=d.data().name;
   })).catch(()=>{});
 }
-$("#btn-switch").onclick=()=>{ localStorage.removeItem("slot-"+TEAM_ID); location.reload(); };
+$("#btn-switch").onclick=async()=>{
+  try{
+    await flushPending();
+    localStorage.removeItem("slot-"+TEAM_ID);
+    location.reload();
+  }catch(e){alert("저장되지 않은 내용이 있습니다. 연결을 확인한 뒤 다시 시도해 주세요.");}
+};
 
 /* ── 화면 ── */
 const autosize=t=>{ if(t.tagName==="TEXTAREA"){ t.style.height="auto"; t.style.height=(t.scrollHeight+2)+"px"; } };
@@ -294,7 +468,14 @@ function start(){
   const sel=$("#week-sel");
   WEEKS.forEach(w=>{const o=el("option");o.value=w.id;o.textContent=w.label;sel.appendChild(o);});
   const now=WEEKS.find(w=>w.label.includes("이번 주"))||WEEKS[0];
-  sel.value=now.id; sel.onchange=()=>openWeek(sel.value);
+  sel.value=now.id; sel.onchange=async()=>{
+    sel.disabled=true;
+    try{
+      await flushPending();
+      openWeek(sel.value);
+    }catch(e){ sel.value=weekId; }
+    finally{ sel.disabled=false; }
+  };
   openWeek(now.id);
   setInterval(beat,12000);
 }
@@ -382,10 +563,13 @@ function bindShared(){
 /* ── 데이터 ── */
 function openWeek(id){
   unsub.forEach(u=>u()); unsub=[]; peers={}; photos={};
+  shared={}; members={}; logs={};
   weekId=id;
+  renderShared(); renderMembers(); renderLogs();
+  for(let i=1;i<=MEMBERS;i++) renderPhotos("m"+i);
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
   unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
-  unsub.push(onSnapshot(collection(wref,"members"),s=>{s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
+  unsub.push(onSnapshot(collection(wref,"members"),s=>{members={};s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
@@ -402,33 +586,50 @@ function openWeek(id){
 }
 const fail=e=>{console.error(e);mark("저장 안 됨",false);};
 function mark(t,ok){const s=$("#save-status");s.textContent=t;s.classList.toggle("on",!!ok);}
+function scheduleWrite(key,write,delay){
+  clearTimeout(timers[key]);
+  pendingWrites.set(key,write);
+  timers[key]=setTimeout(()=>{
+    pendingWrites.delete(key); delete timers[key];
+    write().catch(()=>{});
+  },delay);
+}
+async function flushPending(){
+  const jobs=Array.from(pendingWrites.entries());
+  pendingWrites.clear();
+  jobs.forEach(([key])=>{clearTimeout(timers[key]);delete timers[key];});
+  await Promise.all(jobs.map(([,write])=>write()));
+}
 
 function save(path,value,delay=700){
-  clearTimeout(timers[path]); mark("입력 중…",false);
-  timers[path]=setTimeout(async()=>{
+  const targetWeek=weekId;
+  mark("입력 중…",false);
+  scheduleWrite("s:"+path,async()=>{
     try{
-      const ref=doc(db,"teams",TEAM_ID,"weeks",weekId);
+      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
       await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
       await updateDoc(ref,{[path]:value});
       mark("저장됨",true);
-    }catch(e){fail(e);}
+    }catch(e){fail(e);throw e;}
   },delay);
 }
 function saveMember(field,value){
-  const k="m"+field; clearTimeout(timers[k]); mark("입력 중…",false);
-  timers[k]=setTimeout(async()=>{
+  const targetWeek=weekId, targetSlot=slot;
+  mark("입력 중…",false);
+  scheduleWrite("m:"+field,async()=>{
     try{
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot),{[field]:value},{merge:true});
-      if(field==="name") await setDoc(doc(db,"teams",TEAM_ID,"roster",slot),{name:value},{merge:true});
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",targetSlot),{[field]:value},{merge:true});
+      if(field==="name") await setDoc(doc(db,"teams",TEAM_ID,"roster",targetSlot),{name:value},{merge:true});
       mark("저장됨",true);
-    }catch(e){fail(e);}
+    }catch(e){fail(e);throw e;}
   },700);
 }
 function saveLog(row,field,value){
-  const k="l"+row+field; clearTimeout(timers[k]); mark("입력 중…",false);
-  timers[k]=setTimeout(async()=>{
-    try{ await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"logs","r"+row),{[field]:value},{merge:true}); mark("저장됨",true); }
-    catch(e){fail(e);}
+  const targetWeek=weekId;
+  mark("입력 중…",false);
+  scheduleWrite("l:"+row+":"+field,async()=>{
+    try{ await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+row),{[field]:value},{merge:true}); mark("저장됨",true); }
+    catch(e){fail(e);throw e;}
   },700);
 }
 
