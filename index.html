@@ -97,11 +97,19 @@ table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-hei
   position:absolute;top:1px;right:3px;font-size:10.5px;color:#fff;background:var(--focus);
   border-radius:2px;padding:0 5px;pointer-events:none;font-family:Pretendard,sans-serif;z-index:2;
 }
+.locked-by-other{background:#F3F3F3!important}
+.locked-by-other input,.locked-by-other textarea,.locked-by-other .rich-editor{cursor:not-allowed!important}
+.lock-badge{
+  position:absolute;left:3px;top:1px;z-index:3;
+  max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:#5B5B5B;color:#fff;border-radius:2px;padding:1px 5px;
+  font:10.5px/1.35 Pretendard,sans-serif;pointer-events:none;
+}
 
 td.abs{cursor:pointer;font-size:12.5px;padding:5px 6px;user-select:none;white-space:nowrap;overflow:hidden}
 td.abs:hover{background:#F7F7F7}
 td.abs b{font-weight:400;margin-right:4px}
-td.abs{cursor:default}
+td.abs{cursor:default;position:relative}
 .abs-wrap{display:flex;align-items:center;gap:4px}
 .abs-check{
   border:0;background:transparent;padding:0;margin:0;width:18px;height:18px;
@@ -234,7 +242,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <table class="doc">
       <colgroup><col style="width:128px"><col><col><col style="width:74px"><col style="width:96px"><col style="width:74px"><col style="width:72px"></colgroup>
       <tr><th class="lbl">팀 명</th>
-        <td class="cell" colspan="6"><input class="f" id="document-team" type="text" value="장원급제"></td></tr>
+        <td class="cell" colspan="6" data-key="team:name"><input class="f" id="document-team" type="text" value="장원급제"></td></tr>
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
@@ -294,7 +302,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
+import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp, runTransaction }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
@@ -351,10 +359,169 @@ const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},inlinePhotos={},unsub=[],peers={},focusedField=null,photoTargetKey=null,richEditors={},richRanges={},timers={};
+let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},focusedField=null,photoTargetKey=null,richEditors={},richRanges={},timers={};
+const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+
+const LOCK_TTL=45000;
+const LOCK_RENEW_MS=10000;
+
+function currentEditorName(){
+  if(slot){
+    const n=(members[slot]||{}).name;
+    if(n)return n;
+    return slot.replace("m","")+"번 자리";
+  }
+  return "다른 사용자";
+}
+function lockDocId(key){ return encodeURIComponent(key); }
+function lockRef(key){
+  if(!weekId) throw new Error("week-not-ready");
+  return doc(db,"teams",TEAM_ID,"weeks",weekId,"locks",lockDocId(key));
+}
+function lockIsActive(v){
+  return !!(v&&Number(v.expiresAt||0)>Date.now());
+}
+function otherLock(key){
+  const v=locks[key];
+  return lockIsActive(v)&&v.owner!==uid?v:null;
+}
+function setLockableNode(node,key,kind="plain",editable=true){
+  if(!node||!editable)return;
+  node.dataset.lockKey=key;
+  node.dataset.lockKind=kind;
+  if(kind==="plain") node.dataset.baseReadonly=node.readOnly?"1":"0";
+  else node.dataset.baseContenteditable=node.contentEditable==="false"?"false":"true";
+
+  const stopUnauthorized=e=>{
+    if(!myLocks.has(key)){
+      e.preventDefault();
+      e.stopPropagation();
+      const v=otherLock(key);
+      if(v) mark(`${v.name||"다른 사용자"}님이 수정 중`,false);
+      else mark("편집 권한 확인 중…",false);
+    }
+  };
+  node.addEventListener("beforeinput",stopUnauthorized);
+  node.addEventListener("paste",stopUnauthorized);
+  node.addEventListener("drop",stopUnauthorized);
+}
+function applyNodeLockState(node,key){
+  if(!node)return;
+  const v=otherLock(key);
+  const kind=node.dataset.lockKind||"plain";
+  if(kind==="rich"){
+    const base=node.dataset.baseContenteditable!=="false";
+    if(!myLocks.has(key)) node.contentEditable=(base&&!v)?"true":"false";
+  }else{
+    const base=node.dataset.baseReadonly==="1";
+    node.readOnly=base||!!v;
+  }
+  const host=node.closest("[data-key]")||node.closest("td");
+  if(host){
+    host.classList.toggle("locked-by-other",!!v);
+    host.querySelectorAll(":scope > .lock-badge").forEach(x=>x.remove());
+    if(v){
+      const b=el("span","lock-badge");
+      b.textContent=`${v.name||"다른 사용자"} 수정 중`;
+      host.appendChild(b);
+    }
+  }
+}
+function renderFieldLocks(){
+  document.querySelectorAll("[data-lock-key]").forEach(node=>{
+    applyNodeLockState(node,node.dataset.lockKey);
+  });
+}
+async function acquireFieldLock(key){
+  if(!key||!uid||!weekId)return false;
+  if(myLocks.has(key))return true;
+  if(lockPending.has(key))return lockPending.get(key);
+
+  const job=(async()=>{
+    const ref=lockRef(key);
+    const now=Date.now();
+    let denied=null;
+    try{
+      await runTransaction(db,async tx=>{
+        const snap=await tx.get(ref);
+        const v=snap.exists()?snap.data():null;
+        if(v&&v.owner!==uid&&Number(v.expiresAt||0)>now){
+          denied=v;
+          throw new Error("field-locked");
+        }
+        tx.set(ref,{
+          owner:uid,
+          name:currentEditorName(),
+          field:key,
+          expiresAt:Date.now()+LOCK_TTL,
+          updatedAt:serverTimestamp()
+        });
+      });
+      const mine={
+        owner:uid,name:currentEditorName(),field:key,
+        expiresAt:Date.now()+LOCK_TTL
+      };
+      locks[key]=mine;
+      myLocks.add(key);
+      renderFieldLocks();
+      return true;
+    }catch(e){
+      if(denied){
+        locks[key]=denied;
+        renderFieldLocks();
+        mark(`${denied.name||"다른 사용자"}님이 수정 중`,false);
+        return false;
+      }
+      console.error("잠금 획득 실패",e);
+      mark("편집 잠금을 가져오지 못했습니다",false);
+      return false;
+    }finally{
+      lockPending.delete(key);
+    }
+  })();
+
+  lockPending.set(key,job);
+  return job;
+}
+async function releaseFieldLock(key){
+  if(!key||!myLocks.has(key))return;
+  myLocks.delete(key);
+  try{
+    await flushPending();
+  }catch(e){}
+  try{
+    const ref=lockRef(key);
+    const snap=await getDoc(ref);
+    if(snap.exists()&&snap.data().owner===uid) await deleteDoc(ref);
+  }catch(e){
+    console.warn("잠금 해제 실패",e);
+  }
+  if(locks[key]?.owner===uid) delete locks[key];
+  renderFieldLocks();
+}
+async function releaseAllLocks(){
+  const keys=Array.from(myLocks);
+  await Promise.all(keys.map(k=>releaseFieldLock(k)));
+}
+async function renewMyLocks(){
+  if(!uid||!weekId||!myLocks.size)return;
+  const until=Date.now()+LOCK_TTL;
+  await Promise.all(Array.from(myLocks).map(async key=>{
+    try{
+      await setDoc(lockRef(key),{
+        owner:uid,name:currentEditorName(),field:key,
+        expiresAt:until,updatedAt:serverTimestamp()
+      },{merge:true});
+      if(locks[key]?.owner===uid)locks[key].expiresAt=until;
+    }catch(e){
+      console.warn("잠금 갱신 실패",key,e);
+    }
+  }));
+  renderFieldLocks();
+}
 
 function setTeamName(name){
   TEAM_NAME=name||TEAM?.name||TEAM_ID;
@@ -366,6 +533,7 @@ function setTeamName(name){
 function teamMetaRef(){ return doc(db,"teams",TEAM_ID,"weeks","__team__"); }
 function bindTeamName(){
   const input=$("#document-team");
+  track(input,"team:name");
   input.addEventListener("input",()=>{
     const name=input.value;
     TEAM_NAME=name||TEAM?.name||TEAM_ID;
@@ -396,6 +564,7 @@ async function goToTeam(id){
   if(!validTeamId(id)){ $("#team-error").textContent="팀 ID 형식이 올바르지 않습니다."; return; }
   try{
     await flushPending();
+    await releaseAllLocks();
     location.assign(teamUrl(id,location.href));
   }catch(e){ $("#team-error").textContent="저장되지 않은 내용이 있어 팀을 바꾸지 않았습니다. 연결을 확인해 주세요."; }
 }
@@ -533,6 +702,7 @@ function slotGate(){
 $("#btn-switch").onclick=async()=>{
   try{
     await flushPending();
+    await releaseAllLocks();
     localStorage.removeItem("slot-"+TEAM_ID);
     location.reload();
   }catch(e){alert("저장되지 않은 내용이 있습니다. 연결을 확인한 뒤 다시 시도해 주세요.");}
@@ -541,7 +711,15 @@ $("#btn-switch").onclick=async()=>{
 /* ── 화면 ── */
 const autosize=t=>{ if(t.tagName==="TEXTAREA"){ t.style.height="auto"; t.style.height=(t.scrollHeight+2)+"px"; } };
 function track(n,key){
-  n.addEventListener("focus",()=>{
+  setLockableNode(n,key,"plain",!n.readOnly);
+  n.addEventListener("focus",async()=>{
+    if(n.dataset.baseReadonly==="1")return;
+    const ok=await acquireFieldLock(key);
+    if(!ok){
+      n.blur();
+      return;
+    }
+    applyNodeLockState(n,key);
     focusedField=key;
     photoTargetKey=key;
     document.querySelectorAll(".photo-target").forEach(x=>x.classList.remove("photo-target"));
@@ -549,7 +727,11 @@ function track(n,key){
     if(host) host.classList.add("photo-target");
     beat();
   });
-  n.addEventListener("blur",()=>{focusedField=null;beat();});
+  n.addEventListener("blur",()=>{
+    focusedField=null;
+    beat();
+    releaseFieldLock(key);
+  });
 }
 const RICH_SHARED=new Set(["weekly","plan","meeting","next","mentor"]);
 
@@ -678,9 +860,10 @@ function bindRichEditor(editor,key,editable=true){
   richEditors[key]=editor;
   editor.dataset.richKey=key;
   editor.contentEditable=editable?"true":"false";
+  setLockableNode(editor,key,"rich",editable);
   const host=editor.closest("[data-key]");
   const activate=()=>{
-    if(!editable)return;
+    if(!editable||!myLocks.has(key))return;
     focusedField=key;
     photoTargetKey=key;
     document.querySelectorAll(".photo-target,.rich-caret-target").forEach(x=>x.classList.remove("photo-target","rich-caret-target"));
@@ -689,11 +872,27 @@ function bindRichEditor(editor,key,editable=true){
     beat();
   };
   if(editable){
-    ["focus","keyup","mouseup","input"].forEach(ev=>editor.addEventListener(ev,()=>{
+    editor.addEventListener("focus",async()=>{
+      const ok=await acquireFieldLock(key);
+      if(!ok){
+        editor.blur();
+        return;
+      }
+      applyNodeLockState(editor,key);
       activate();
-      if(ev==="input") saveRichEditor(key,editor);
-    }));
-    editor.addEventListener("blur",()=>{focusedField=null;captureRichRange(editor,key);beat();});
+    });
+    ["keyup","mouseup"].forEach(ev=>editor.addEventListener(ev,activate));
+    editor.addEventListener("input",()=>{
+      if(!myLocks.has(key))return;
+      activate();
+      saveRichEditor(key,editor);
+    });
+    editor.addEventListener("blur",()=>{
+      focusedField=null;
+      captureRichRange(editor,key);
+      beat();
+      releaseFieldLock(key);
+    });
   }
 }
 function saveRichEditor(key,editor,delay=700){
@@ -738,18 +937,21 @@ function start(){
     sel.disabled=true;
     try{
       await flushPending();
+      await releaseAllLocks();
       openWeek(sel.value);
     }catch(e){ sel.value=weekId; }
     finally{ sel.disabled=false; }
   };
   openWeek(now.id);
   setInterval(beat,12000);
+  setInterval(renewMyLocks,LOCK_RENEW_MS);
+  setInterval(renderFieldLocks,5000);
 }
 function buildAbsent(){
   const tr=$("#abs-row");
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
-    const td=el("td","abs"); td.id="abs-"+i;
+    const td=el("td","abs"); td.id="abs-"+i; td.dataset.key="absname:"+id;
     td.innerHTML=`<div class="abs-wrap">
       <button type="button" class="abs-check" id="abs-check-${i}" aria-label="${i}번 결시 체크">□</button>
       <input class="abs-name" id="abs-name-${i}" type="text" placeholder="이름">
@@ -758,13 +960,22 @@ function buildAbsent(){
     const check=td.querySelector(".abs-check");
     const input=td.querySelector(".abs-name");
 
-    check.onclick=()=>{
-      const on=!((shared.absent||{})[id]);
-      shared.absent=Object.assign({},shared.absent,{[id]:on});
-      paintAbsent();
-      save(`absent.${id}`,on,0);
+    check.onclick=async()=>{
+      const key="abscheck:"+id;
+      const ok=await acquireFieldLock(key);
+      if(!ok)return;
+      try{
+        const on=!((shared.absent||{})[id]);
+        shared.absent=Object.assign({},shared.absent,{[id]:on});
+        paintAbsent();
+        save(`absent.${id}`,on,0);
+        await flushPending();
+      }finally{
+        await releaseFieldLock(key);
+      }
     };
 
+    track(input,"absname:"+id);
     input.addEventListener("input",()=>{
       shared.absentNames=Object.assign({},shared.absentNames,{[id]:input.value});
       save(`absentNames.${id}`,input.value);
@@ -855,7 +1066,7 @@ function bindShared(){
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={}; inlinePhotos={};
+  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={}; inlinePhotos={}; locks={};
   shared={}; members={}; logs={};
   weekId=id;
   renderShared(); renderMembers(); renderLogs(); renderInlinePhotos();
@@ -868,6 +1079,15 @@ function openWeek(id){
     inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
     renderInlinePhotos(); refreshRichEditors();
   },fail));
+  unsub.push(onSnapshot(collection(wref,"locks"),s=>{
+    locks={};
+    const now=Date.now();
+    s.forEach(d=>{
+      const v=d.data()||{};
+      if(v.field&&Number(v.expiresAt||0)>now) locks[v.field]=v;
+    });
+    renderFieldLocks();
+  },e=>console.warn("잠금 상태 동기화 실패",e)));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
@@ -1061,6 +1281,11 @@ $("#pick").onchange=async e=>{
   const files=Array.from(e.target.files||[]); if(!files.length)return;
   const target=photoTargetKey;
   if(!target)return;
+  const photoLock=await acquireFieldLock(target);
+  if(!photoLock){
+    alert("다른 사용자가 이 칸을 수정 중이라 사진을 추가할 수 없습니다.");
+    return;
+  }
   const btn=$("#btn-photo"); btn.disabled=true;
   const current=Object.values(inlinePhotos||{}).filter(p=>p.target===target).length;
   const room=MAX_SHOTS-current;
@@ -1112,6 +1337,7 @@ $("#pick").onchange=async e=>{
   mark(bad.length&&bad.length===picked.length?"저장 안 됨":"저장됨", !(bad.length&&bad.length===picked.length));
   if(files.length>picked.length) alert(`한 입력칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
   if(bad.length) alert("올리지 못한 사진:\n\n"+bad.join("\n"));
+  await releaseFieldLock(target);
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
@@ -1160,6 +1386,33 @@ function findCell(tbl,row,col){
   }
   return null;
 }
+function makeTableFlowAcrossPages(tbl){
+  if(!tbl)return;
+  // 표가 한 페이지에 통째로 붙어 있으려고 하지 않고,
+  // 셀/행 단위로 다음 페이지에 자연스럽게 이어지도록 설정합니다.
+  tbl.setAttribute("pageBreak","CELL");
+  tbl.setAttribute("noAdjust","0");
+
+  const pos=kids(tbl,"hp:pos")[0];
+  if(pos){
+    // HWPX에서 treatAsChar="1"인 긴 표는 페이지를 넘기지 못하고
+    // 통째로 다음 페이지로 이동하거나 아래가 잘릴 수 있습니다.
+    pos.setAttribute("treatAsChar","0");
+    pos.setAttribute("flowWithText","1");
+    pos.setAttribute("allowOverlap","0");
+  }
+
+  // 고정 레이아웃 캐시가 이전 페이지 배치를 강제하지 않도록
+  // 표를 담고 있는 문단의 줄 배치 캐시는 제거해 한글이 다시 계산하게 합니다.
+  const run=tbl.parentNode;
+  const para=run&&run.parentNode;
+  if(para&&para.tagName==="hp:p"){
+    Array.from(para.getElementsByTagName("hp:linesegarray")).forEach(n=>{
+      if(n.parentNode===para) n.parentNode.removeChild(n);
+    });
+  }
+}
+
 function fillCell(xdoc,tbl,row,col,text){
   const tc=findCell(tbl,row,col); if(!tc)return;
   const sub=kids(tc,"hp:subList")[0]; if(!sub)return;
@@ -1346,6 +1599,11 @@ $("#btn-export").onclick=async()=>{
     const xdoc=new DOMParser().parseFromString(await zip.file("Contents/section0.xml").async("string"),"application/xml");
     const [T1,TPBL,TMEM,TLOG]=Array.from(xdoc.getElementsByTagName("hp:tbl"));
 
+    // 큰 표는 페이지 경계에서 자연스럽게 이어지게 함.
+    // PBL 표(TPBL)는 1번 표 안에 들어가는 중첩 표라 그대로 두고,
+    // 바깥쪽 1번 표 / 훈련생별 표 / 프로젝트 일지만 흐름형으로 바꿉니다.
+    [T1,TMEM,TLOG].forEach(makeTableFlowAcrossPages);
+
     const binFiles=[]; let imgNo=0;
     const inlineItemMap={};
     for(const [pid,sh] of Object.entries(inlinePhotos||{})){
@@ -1479,6 +1737,13 @@ $("#btn-export").onclick=async()=>{
     alert("내보내기 실패: "+e.message+"\n\ntemplate.hwpx 가 index.html과 같은 폴더에 있는지 확인해 주세요.");
   }finally{ btn.disabled=false; btn.textContent="한글 파일 내보내기"; }
 };
+
+
+window.addEventListener("pagehide",()=>{
+  Array.from(myLocks).forEach(key=>{
+    try{ deleteDoc(lockRef(key)); }catch(e){}
+  });
+});
 
 boot();
 </script>
