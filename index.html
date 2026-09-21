@@ -246,13 +246,24 @@ import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 설정 ════════ */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAe-KaHt0a6yrV7-BXSOqycusA0Kv2Gz0A",
-  authDomain: "jangwon-287b2.firebaseapp.com",
-  projectId: "jangwon-287b2",
-  storageBucket: "jangwon-287b2.firebasestorage.app",
-  messagingSenderId: "85352966138",
-  appId: "1:85352966138:web:37c613ead65a6fe881e643"
+const FIREBASE_CONFIGS = {
+  jangwon: {
+    apiKey: "AIzaSyAe-KaHt0a6yrV7-BXSOqycusA0Kv2Gz0A",
+    authDomain: "jangwon-287b2.firebaseapp.com",
+    projectId: "jangwon-287b2",
+    storageBucket: "jangwon-287b2.firebasestorage.app",
+    messagingSenderId: "85352966138",
+    appId: "1:85352966138:web:37c613ead65a6fe881e643"
+  },
+
+  "team-2": {
+    apiKey: "AIzaSyApQ1LKMnxhI1g7xMwPqwVUxUEfTHEDV-0",
+    authDomain: "jongwon-log-team-2.firebaseapp.com",
+    projectId: "jongwon-log-team-2",
+    storageBucket: "jongwon-log-team-2.firebasestorage.app",
+    messagingSenderId: "863440395387",
+    appId: "1:863440395387:web:a4e117002b1ac81e3cd6de"
+  }
 };
 const TEAM=resolveTeam(location.search);
 const TEAM_ID=TEAM?.id, MEMBERS=6, LOG_ROWS=23, TEMPLATE="./template.hwpx";
@@ -329,7 +340,7 @@ function boot(){
   initTeamPicker();
   if(!TEAM){ showTeamPicker(); $("#team-error").textContent="주소의 팀 ID 형식이 올바르지 않습니다."; return; }
   setTeamName(TEAM_NAME);
-  const cfg=FIREBASE_CONFIG||JSON.parse(localStorage.getItem("fb-config")||"null");
+  const cfg=FIREBASE_CONFIGS[TEAM_ID]||JSON.parse(localStorage.getItem("fb-config")||"null");
   if(!cfg){ $("#gate-config").classList.remove("hide"); return; }
   const app=initializeApp(cfg);
   auth=getAuth(app); db=getFirestore(app);
