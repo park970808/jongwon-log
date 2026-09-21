@@ -98,6 +98,9 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
   border:0;border-radius:2px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;display:none;
 }
 .shot:hover button{display:block}
+.inline-shots{display:flex;flex-wrap:wrap;gap:8px;padding:6px 7px 7px;border-top:1px dashed #D7D7D7}
+.inline-shots .shot{width:126px;height:94px}
+.photo-target{outline:2px solid #1D5FD6;outline-offset:-2px}
 #lightbox{
   position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:flex;
   align-items:center;justify-content:center;cursor:zoom-out;
@@ -192,7 +195,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <table class="doc">
       <colgroup><col style="width:128px"><col><col><col style="width:74px"><col style="width:96px"><col style="width:74px"><col style="width:72px"></colgroup>
       <tr><th class="lbl">팀 명</th>
-        <td class="cell" colspan="6"><input class="f" id="document-team" type="text" value="장원급제" readonly></td></tr>
+        <td class="cell" colspan="6"><input class="f" id="document-team" type="text" value="장원급제"></td></tr>
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
@@ -298,16 +301,45 @@ const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},unsub=[],peers={},focusedField=null,timers={};
+let shared={},members={},logs={},photos={},inlinePhotos={},unsub=[],peers={},focusedField=null,photoTargetKey=null,timers={};
 const pendingWrites=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
 function setTeamName(name){
-  TEAM_NAME=name;
-  $("#toolbar-team").textContent=name;
-  $("#document-team").value=name;
-  document.title=`${name} · 훈련생 프로젝트 활동일지`;
+  TEAM_NAME=name||TEAM?.name||TEAM_ID;
+  $("#toolbar-team").textContent=TEAM_NAME;
+  const input=$("#document-team");
+  if(input&&document.activeElement!==input) input.value=TEAM_NAME;
+  document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
+}
+function teamMetaRef(){ return doc(db,"teams",TEAM_ID,"weeks","__team__"); }
+function bindTeamName(){
+  const input=$("#document-team");
+  input.addEventListener("input",()=>{
+    const name=input.value;
+    TEAM_NAME=name||TEAM?.name||TEAM_ID;
+    $("#toolbar-team").textContent=TEAM_NAME;
+    document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
+    mark("입력 중…",false);
+    scheduleWrite("team:name",async()=>{
+      try{
+        await setDoc(teamMetaRef(),{name,updatedAt:serverTimestamp()},{merge:true});
+        mark("저장됨",true);
+      }catch(e){
+        // 구형 1팀 규칙에서 __team__ 문서가 막힌 경우 현재 주차 문서에도 보조 저장
+        if(weekId){
+          await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId),{teamName:name},{merge:true});
+          mark("저장됨",true);
+        }else throw e;
+      }
+    },700);
+  });
+  try{
+    onSnapshot(teamMetaRef(),s=>{
+      if(s.exists()&&typeof s.data().name==="string") setTeamName(s.data().name);
+    },()=>{});
+  }catch(e){}
 }
 function showTeamPicker(){ $("#team-error").textContent=""; $("#gate-team").classList.remove("hide"); }
 async function goToTeam(id){
@@ -459,12 +491,19 @@ $("#btn-switch").onclick=async()=>{
 /* ── 화면 ── */
 const autosize=t=>{ if(t.tagName==="TEXTAREA"){ t.style.height="auto"; t.style.height=(t.scrollHeight+2)+"px"; } };
 function track(n,key){
-  n.addEventListener("focus",()=>{focusedField=key;beat();});
+  n.addEventListener("focus",()=>{
+    focusedField=key;
+    photoTargetKey=key;
+    document.querySelectorAll(".photo-target").forEach(x=>x.classList.remove("photo-target"));
+    const host=n.closest("[data-key]");
+    if(host) host.classList.add("photo-target");
+    beat();
+  });
   n.addEventListener("blur",()=>{focusedField=null;beat();});
 }
 function start(){
   $("#app").classList.remove("hide");
-  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared();
+  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared(); bindTeamName();
   const sel=$("#week-sel");
   WEEKS.forEach(w=>{const o=el("option");o.value=w.id;o.textContent=w.label;sel.appendChild(o);});
   const now=WEEKS.find(w=>w.label.includes("이번 주"))||WEEKS[0];
@@ -562,15 +601,18 @@ function bindShared(){
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={};
+  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={}; inlinePhotos={};
   shared={}; members={}; logs={};
   weekId=id;
-  renderShared(); renderMembers(); renderLogs();
+  renderShared(); renderMembers(); renderLogs(); renderInlinePhotos();
   for(let i=1;i<=MEMBERS;i++) renderPhotos("m"+i);
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
-  unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
+  unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};if(shared.teamName)setTeamName(shared.teamName);renderShared();},fail));
   unsub.push(onSnapshot(collection(wref,"members"),s=>{members={};s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
   unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
+  unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
+    inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data()); renderInlinePhotos();
+  },fail));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
@@ -682,6 +724,34 @@ function renderPhotos(id){
     box.appendChild(d);
   });
 }
+function renderInlinePhotos(){
+  document.querySelectorAll(".inline-shots").forEach(x=>x.remove());
+  const grouped={};
+  Object.entries(inlinePhotos||{})
+    .sort((a,b)=>(a[1].at||0)-(b[1].at||0))
+    .forEach(([pid,p])=>{
+      if(!p.target)return;
+      (grouped[p.target]||(grouped[p.target]=[])).push([pid,p]);
+    });
+  Object.entries(grouped).forEach(([target,list])=>{
+    const host=document.querySelector(`[data-key="${CSS.escape(target)}"]`);
+    if(!host)return;
+    const box=el("div","inline-shots");
+    list.forEach(([pid,p])=>{
+      const d=el("div","shot");
+      d.innerHTML=`<img src="${p.data}" alt=""><button title="삭제">×</button>`;
+      d.querySelector("img").onclick=()=>{const lb=$("#lightbox");lb.querySelector("img").src=p.data;lb.classList.remove("hide");};
+      d.querySelector("button").onclick=async()=>{
+        if(!confirm("이 사진을 지울까요?"))return;
+        try{await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));}
+        catch(e){fail(e);}
+      };
+      box.appendChild(d);
+    });
+    host.appendChild(box);
+  });
+}
+
 async function loadImage(file){
   try{ return await createImageBitmap(file); }catch(e){}
   const url=URL.createObjectURL(file);
@@ -715,11 +785,21 @@ async function shrink(file){
   }
   throw new Error("사진 용량이 너무 큽니다");
 }
-$("#btn-photo").onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
+$("#btn-photo").onclick=()=>{
+  if(!photoTargetKey){
+    alert("사진을 넣을 입력칸을 먼저 클릭해 주세요. 파란 테두리가 표시된 칸에 사진이 들어갑니다.");
+    return;
+  }
+  $("#pick").value="";
+  $("#pick").click();
+};
 $("#pick").onchange=async e=>{
   const files=Array.from(e.target.files||[]); if(!files.length)return;
+  const target=photoTargetKey;
+  if(!target)return;
   const btn=$("#btn-photo"); btn.disabled=true;
-  const room=MAX_SHOTS-Object.keys(photos[slot]||{}).length;
+  const current=Object.values(inlinePhotos||{}).filter(p=>p.target===target).length;
+  const room=MAX_SHOTS-current;
   const picked=files.slice(0,Math.max(room,0));
   const bad=[];
   for(let i=0;i<picked.length;i++){
@@ -727,13 +807,21 @@ $("#pick").onchange=async e=>{
     btn.textContent=`올리는 중 ${i+1}/${picked.length}`;
     try{
       const img=await shrink(f);
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
-        { data:img.data, w:img.w, h:img.h, name:f.name||"", at:Date.now() });
+      const pid="p"+Date.now()+Math.floor(Math.random()*99999);
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid),{
+        target,
+        data:img.data,
+        w:img.w,
+        h:img.h,
+        name:f.name||"",
+        by:uid,
+        at:Date.now()
+      });
     }catch(err){ console.error(f.name,err); bad.push((f.name||"사진")+" — "+err.message); }
   }
   btn.disabled=false; btn.textContent="사진 추가";
   mark(bad.length&&bad.length===picked.length?"저장 안 됨":"저장됨", !(bad.length&&bad.length===picked.length));
-  if(files.length>picked.length) alert(`본인 칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
+  if(files.length>picked.length) alert(`한 입력칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
   if(bad.length) alert("올리지 못한 사진:\n\n"+bad.join("\n"));
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
@@ -854,6 +942,40 @@ function addPics(xdoc, tbl, row, col, shots){
     sub.appendChild(p);
   }
 }
+function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
+  const sharedMap={
+    "s:topic":[T1,1,1],
+    "s:weekly":[T1,2,1],
+    "s:period":[T1,4,1],
+    "s:hours":[T1,4,6],
+    "s:progress":[T1,4,10],
+    "s:plan":[T1,6,1],
+    "s:meeting":[T1,7,1],
+    "s:next":[T1,8,1],
+    "s:mentor":[T1,9,1]
+  };
+  if(sharedMap[target]) return sharedMap[target];
+
+  let m=target.match(/^p:(\d+)$/);
+  if(m) return [TPBL,Number(m[1])+2,3];
+
+  m=target.match(/^m(\d+):(name|role|content)$/);
+  if(m){
+    const i=Number(m[1])-1, f=m[2];
+    if(i<0||i>=MEMBERS)return null;
+    if(f==="name")return [TMEM,i*2,0];
+    if(f==="role")return [TMEM,i*2+1,0];
+    return [TMEM,i*2,1];
+  }
+
+  m=target.match(/^l:(\d+):(date|content|note)$/);
+  if(m){
+    const r=Number(m[1]), col={date:0,content:1,note:2}[m[2]];
+    return [TLOG,r,col];
+  }
+  return null;
+}
+
 $("#btn-export").onclick=async()=>{
   const btn=$("#btn-export"); btn.disabled=true; btn.textContent="만드는 중…";
   try{
@@ -909,6 +1031,27 @@ $("#btn-export").onclick=async()=>{
       fillCell(xdoc,TLOG,r,1,d.content||"");
       fillCell(xdoc,TLOG,r,2,d.note||"");
     }
+
+    // 현재 커서가 있던 입력칸에 추가한 사진도 HWPX의 같은 셀에 삽입
+    const inlineReady={};
+    const inlineList=Object.values(inlinePhotos||{}).sort((a,b)=>(a.at||0)-(b.at||0));
+    for(const sh of inlineList){
+      if(!sh.data||!sh.target)continue;
+      let iw=sh.w,ih=sh.h;
+      if(!iw||!ih){
+        const im=new Image(); im.src=sh.data;
+        try{if(im.decode)await im.decode();}catch(e){}
+        iw=im.naturalWidth||800; ih=im.naturalHeight||600;
+      }
+      imgNo++;
+      const item="image"+imgNo;
+      binFiles.push({item,path:"BinData/"+item+".jpg",bytes:dataToBytes(sh.data)});
+      (inlineReady[sh.target]||(inlineReady[sh.target]=[])).push({item,w:iw,h:ih});
+    }
+    Object.entries(inlineReady).forEach(([target,ready])=>{
+      const loc=inlineTargetCell(target,T1,TPBL,TMEM,TLOG);
+      if(loc)addPics(xdoc,loc[0],loc[1],loc[2],ready);
+    });
 
     const out=new JSZip();
     out.file("mimetype",await zip.file("mimetype").async("uint8array"),{compression:"STORE"});
