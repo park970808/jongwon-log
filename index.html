@@ -444,9 +444,12 @@ function currentEditorName(){
   }
   return "다른 사용자";
 }
-function lockWeekRef(){
-  if(!weekId) throw new Error("week-not-ready");
-  return doc(db,"teams",TEAM_ID,"weeks",weekId);
+function lockDocId(key){
+  return encodeURIComponent(String(key));
+}
+function lockRef(key){
+  if(!weekId)throw new Error("week-not-ready");
+  return doc(db,"teams",TEAM_ID,"weeks",weekId,"locks",lockDocId(key));
 }
 function cleanLockMap(map){
   const now=Date.now(),out={};
@@ -454,10 +457,6 @@ function cleanLockMap(map){
     if(v&&Number(v.expiresAt||0)>now)out[k]=v;
   });
   return out;
-}
-function syncLocksFromShared(){
-  locks=cleanLockMap(shared.editLocks||{});
-  renderFieldLocks();
 }
 function lockIsActive(v){
   return !!(v&&Number(v.expiresAt||0)>Date.now());
@@ -519,32 +518,27 @@ async function acquireFieldLock(key){
   if(lockPending.has(key))return lockPending.get(key);
 
   const job=(async()=>{
-    const ref=lockWeekRef();
+    const ref=lockRef(key);
     const now=Date.now();
     let denied=null;
 
     try{
       await runTransaction(db,async tx=>{
         const snap=await tx.get(ref);
-        const data=snap.exists()?snap.data():{};
-        const map=cleanLockMap(data.editLocks||{});
-        const v=map[key];
+        const v=snap.exists()?snap.data():null;
 
         if(v&&v.owner!==uid&&Number(v.expiresAt||0)>now){
           denied=v;
           throw new Error("field-locked");
         }
 
-        map[key]={
+        tx.set(ref,{
           owner:uid,
           name:currentEditorName(),
           field:key,
-          expiresAt:Date.now()+LOCK_TTL
-        };
-
-        // 현재 주차 문서는 이미 기존 입력내용 저장에 쓰는 문서이므로
-        // 별도의 locks 컬렉션 권한이 필요하지 않습니다.
-        tx.set(ref,{editLocks:map},{merge:true});
+          expiresAt:Date.now()+LOCK_TTL,
+          updatedAt:Date.now()
+        });
       });
 
       const mine={
@@ -557,6 +551,7 @@ async function acquireFieldLock(key){
       myLocks.add(key);
       renderFieldLocks();
       return true;
+
     }catch(e){
       if(denied){
         locks[key]=denied;
@@ -565,14 +560,22 @@ async function acquireFieldLock(key){
         return false;
       }
 
-      console.error("잠금 획득 실패",e);
-      const code=String(e?.code||"");
+      console.error("잠금 획득 실패",{
+        code:e?.code||"",
+        message:e?.message||String(e),
+        field:key
+      });
+
+      const code=String(e?.code||"unknown");
       if(code.includes("permission-denied")){
-        mark("편집 잠금 권한 오류",false);
+        mark("잠금 권한 설정 필요",false);
       }else if(code.includes("unavailable")||code.includes("offline")){
-        mark("네트워크 연결 후 다시 시도",false);
+        mark("네트워크 연결 확인",false);
+      }else if(code.includes("aborted")){
+        mark("잠금 충돌 · 다시 클릭",false);
       }else{
-        mark("편집 잠금 연결 오류",false);
+        // 더 이상 모든 오류를 '연결 오류'라고 숨기지 않습니다.
+        mark(`잠금 오류: ${code}`,false);
       }
       return false;
     }finally{
@@ -583,10 +586,10 @@ async function acquireFieldLock(key){
   lockPending.set(key,job);
   return job;
 }
+
 async function releaseFieldLock(key){
   if(!key)return;
 
-  // 잠금 획득 transaction이 아직 진행 중이라면 끝난 뒤 해제합니다.
   if(lockPending.has(key)){
     try{await lockPending.get(key);}catch(e){}
   }
@@ -595,24 +598,13 @@ async function releaseFieldLock(key){
   try{await flushPending();}catch(e){}
 
   try{
-    const ref=lockWeekRef();
-    await runTransaction(db,async tx=>{
-      const snap=await tx.get(ref);
-      if(!snap.exists())return;
-      const data=snap.data()||{};
-      const map=cleanLockMap(data.editLocks||{});
-      const v=map[key];
-
-      // 내 잠금일 때만 제거합니다.
-      if(v?.owner===uid){
-        delete map[key];
-        tx.set(ref,{editLocks:map},{merge:true});
-      }
-    });
+    const ref=lockRef(key);
+    const snap=await getDoc(ref);
+    if(snap.exists()&&snap.data()?.owner===uid){
+      await deleteDoc(ref);
+    }
   }catch(e){
-    console.warn("잠금 해제 실패",e);
-    // 서버 삭제가 실패해도 TTL이 지나면 자동 해제되므로
-    // 내 화면에서는 즉시 잠금을 내려 사용성을 유지합니다.
+    console.warn("잠금 해제 실패",e?.code,e?.message);
   }
 
   if(locks[key]?.owner===uid)delete locks[key];
@@ -627,37 +619,39 @@ async function releaseAllLocks(){
 async function renewMyLocks(){
   if(!uid||!weekId||!myLocks.size)return;
 
-  const keys=Array.from(myLocks);
   const until=Date.now()+LOCK_TTL;
+  const jobs=Array.from(myLocks).map(async key=>{
+    try{
+      const ref=lockRef(key);
+      const snap=await getDoc(ref);
 
-  try{
-    const ref=lockWeekRef();
-    await runTransaction(db,async tx=>{
-      const snap=await tx.get(ref);
-      const data=snap.exists()?snap.data():{};
-      const map=cleanLockMap(data.editLocks||{});
+      // 서버에서 이미 다른 사람이 소유하게 된 잠금은 갱신하지 않습니다.
+      if(snap.exists()&&snap.data()?.owner!==uid){
+        myLocks.delete(key);
+        if(locks[key]?.owner===uid)delete locks[key];
+        return;
+      }
 
-      keys.forEach(key=>{
-        // 다른 사용자가 이미 소유한 잠금은 절대로 덮어쓰지 않습니다.
-        if(map[key]&&map[key].owner!==uid)return;
-        map[key]={
-          owner:uid,
-          name:currentEditorName(),
-          field:key,
-          expiresAt:until
-        };
-      });
+      await setDoc(ref,{
+        owner:uid,
+        name:currentEditorName(),
+        field:key,
+        expiresAt:until,
+        updatedAt:Date.now()
+      },{merge:true});
 
-      tx.set(ref,{editLocks:map},{merge:true});
-    });
+      locks[key]={
+        owner:uid,
+        name:currentEditorName(),
+        field:key,
+        expiresAt:until
+      };
+    }catch(e){
+      console.warn("잠금 갱신 실패",key,e?.code,e?.message);
+    }
+  });
 
-    keys.forEach(key=>{
-      if(locks[key]?.owner===uid)locks[key].expiresAt=until;
-    });
-  }catch(e){
-    console.warn("잠금 갱신 실패",e);
-  }
-
+  await Promise.allSettled(jobs);
   renderFieldLocks();
 }
 
@@ -1644,7 +1638,6 @@ function openWeek(id){
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
   unsub.push(onSnapshot(wref,s=>{
     shared=s.data()||{};
-    syncLocksFromShared();
     if(shared.teamName)setTeamName(shared.teamName);
     reconcileLocalRichEdits();
     renderShared();
@@ -1663,6 +1656,28 @@ function openWeek(id){
     inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
     renderInlinePhotos(); refreshRichEditors();
   },fail));
+
+  // 잠금은 일반 작업 데이터와 완전히 분리된 전용 문서로 구독합니다.
+  // 필드마다 문서가 하나라 다른 칸의 입력/저장과 transaction이 충돌하지 않습니다.
+  unsub.push(onSnapshot(collection(wref,"locks"),s=>{
+    const next={};
+    const now=Date.now();
+    s.forEach(d=>{
+      const v=d.data()||{};
+      if(v.field&&Number(v.expiresAt||0)>now)next[v.field]=v;
+    });
+    // 내 잠금은 서버 snapshot이 잠깐 늦어도 로컬 상태를 유지
+    myLocks.forEach(key=>{
+      if(locks[key]?.owner===uid&&!next[key])next[key]=locks[key];
+    });
+    locks=next;
+    renderFieldLocks();
+  },e=>{
+    console.error("잠금 구독 실패",e?.code,e?.message);
+    if(String(e?.code||"").includes("permission-denied")){
+      mark("잠금 권한 설정 필요",false);
+    }
+  }));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
@@ -2458,9 +2473,11 @@ document.addEventListener("focusin",()=>{
 });
 
 window.addEventListener("pagehide",()=>{
-  // 종료 시 비동기 요청은 브라우저가 중간에 끊을 수 있으므로
-  // 해제를 시도하되, 실패하더라도 LOCK_TTL 후 자동 만료됩니다.
-  releaseAllLocks().catch(()=>{});
+  // 브라우저 종료 시 요청이 끝까지 가지 않을 수 있으므로 best-effort 정리.
+  // 실패해도 expiresAt TTL(20초)로 자동 해제됩니다.
+  Array.from(myLocks).forEach(key=>{
+    try{deleteDoc(lockRef(key));}catch(e){}
+  });
 });
 
 boot();
