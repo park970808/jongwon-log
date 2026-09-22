@@ -372,11 +372,11 @@ import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
-const DEFAULT_TEAM={id:"jangwon",name:"장원급제"};
+const DEFAULT_TEAM={id:"team-3",name:"3팀"};
 const KNOWN_TEAMS=[
   DEFAULT_TEAM,
-  {id:"team-2",name:"2팀"},
-  {id:"team-3",name:"3팀"}
+  {id:"jangwon",name:"장원급제"},
+  {id:"team-2",name:"2팀"}
 ];
 
 function validTeamId(id){
@@ -681,7 +681,7 @@ function initTeamPicker(){
   });
   $("#team-form").onsubmit=e=>{e.preventDefault(); goToTeam($("#team-input").value.trim());};
   $("#team-close").onclick=()=>{
-    if(!TEAM) return goToTeam("jangwon");
+    if(!TEAM) return goToTeam("team-3");
     $("#gate-team").classList.add("hide");
   };
   $("#btn-team").onclick=showTeamPicker;
