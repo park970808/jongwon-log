@@ -52,10 +52,14 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .formatbar button.fmt-toggle{min-width:29px;padding:4px 6px;font-weight:700}
 .formatbar button.fmt-toggle.on{background:#1D5FD6;border-color:#3E7DE0}
-.formatbar .fmt-color-btn{font-weight:700}
-.formatbar .fmt-color-btn[data-fmt-color="#000000"]{color:#fff}
-.formatbar .fmt-color-btn[data-fmt-color="#C00000"]{color:#ff7070}
-.formatbar .fmt-color-btn[data-fmt-color="#0000FF"]{color:#7ca5ff}
+.formatbar .fmt-color-box{
+  width:24px;height:24px;min-width:24px;padding:0;border:1px solid #8A8A8A;
+  border-radius:3px;cursor:pointer;
+}
+.formatbar .fmt-color-box.black{background:#000}
+.formatbar .fmt-color-box.red{background:#C00000}
+.formatbar .fmt-color-box.blue{background:#0000FF}
+.formatbar .fmt-color-box:hover{outline:2px solid #fff;outline-offset:1px}
 .formatbar label{
   display:flex;align-items:center;gap:3px;color:#D7D7D7;white-space:nowrap;
 }
@@ -263,7 +267,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
 
-    <div class="formatbar" id="formatbar" aria-label="글자 및 문단 서식">
+    <div class="formatbar" id="formatbar" aria-label="글자 서식">
       <div class="fmt-group">
         <select id="fmt-font" title="글꼴">
           <option value="">글꼴</option>
@@ -280,44 +284,21 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       </div>
 
       <div class="fmt-sep"></div>
+
       <div class="fmt-group">
         <button type="button" class="fmt-toggle" data-fmt-bool="bold" title="진하게"><b>B</b></button>
         <button type="button" class="fmt-toggle" data-fmt-bool="italic" title="기울임"><i>I</i></button>
         <button type="button" class="fmt-toggle" data-fmt-bool="underline" title="밑줄"><u>U</u></button>
         <button type="button" class="fmt-toggle" data-fmt-bool="strike" title="취소선"><s>S</s></button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="sup" title="위 첨자">x²</button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="sub" title="아래 첨자">x₂</button>
       </div>
 
       <div class="fmt-sep"></div>
-      <div class="fmt-group">
-        <span style="color:#D7D7D7">글자색</span>
-        <button type="button" class="fmt-color-btn" data-fmt-color="#000000" title="검은색">검정</button>
-        <button type="button" class="fmt-color-btn" data-fmt-color="#C00000" title="빨간색">빨강</button>
-        <button type="button" class="fmt-color-btn" data-fmt-color="#0000FF" title="파란색">파랑</button>
-        <label>형광펜 <input type="color" id="fmt-bg" value="#fff59d"></label>
-      </div>
 
-      <div class="fmt-sep"></div>
-      <div class="fmt-group">
-        <button type="button" data-fmt-align="left" title="왼쪽 정렬">왼쪽</button>
-        <button type="button" data-fmt-align="center" title="가운데 정렬">가운데</button>
-        <button type="button" data-fmt-align="right" title="오른쪽 정렬">오른쪽</button>
-        <button type="button" data-fmt-align="justify" title="양쪽 정렬">양쪽</button>
-        <select id="fmt-line" title="줄 간격">
-          <option value="">줄간격</option>
-          <option value="100">100%</option><option value="120">120%</option><option value="130">130%</option>
-          <option value="150">150%</option><option value="160">160%</option><option value="180">180%</option>
-          <option value="200">200%</option>
-        </select>
+      <div class="fmt-group fmt-colors" aria-label="글자색">
+        <button type="button" class="fmt-color-box black" data-fmt-color="#000000" title="검은색" aria-label="검은색"></button>
+        <button type="button" class="fmt-color-box red" data-fmt-color="#C00000" title="빨간색" aria-label="빨간색"></button>
+        <button type="button" class="fmt-color-box blue" data-fmt-color="#0000FF" title="파란색" aria-label="파란색"></button>
       </div>
-
-      <div class="fmt-sep"></div>
-      <div class="fmt-group">
-        <label>빨간 라벨색 <input type="color" id="fmt-label-color" value="#c00000"></label>
-      </div>
-
-      <span class="fmt-note">긴 글 칸에서 텍스트를 선택한 뒤 서식을 적용하세요. 선택이 없으면 해당 칸 전체에 적용됩니다.</span>
     </div>
   </div>
 
@@ -1192,8 +1173,6 @@ function updateFormatToolbar(){
   if(!editor)return;
   const off=selectionOffsets(editor,key),style=styleAtTextOffset(editorTokens(editor),off.start);
   document.querySelectorAll("[data-fmt-bool]").forEach(b=>b.classList.toggle("on",!!style[b.dataset.fmtBool]));
-  const para=paraStyleForKey(key);
-  $("#fmt-line").value=para.lineSpacing||"";
 }
 async function applyParaPatch(patch){
   const key=formatTargetKey,editor=key&&richEditors[key];
@@ -1221,17 +1200,6 @@ function initFormatToolbar(){
   bar.querySelectorAll("[data-fmt-color]").forEach(b=>{
     b.onclick=()=>applyCharFormat({color:b.dataset.fmtColor});
   });
-  $("#fmt-bg").onchange=e=>applyCharFormat({bg:e.target.value});
-
-  bar.querySelectorAll("[data-fmt-align]").forEach(b=>b.onclick=()=>applyParaPatch({align:b.dataset.fmtAlign}));
-  $("#fmt-line").onchange=e=>{if(e.target.value)applyParaPatch({lineSpacing:Number(e.target.value)});};
-
-  $("#fmt-label-color").onchange=e=>{
-    const color=e.target.value.toUpperCase();
-    shared.labelColor=color;
-    document.documentElement.style.setProperty("--red",color);
-    save("labelColor",color,0);
-  };
 
   document.addEventListener("selectionchange",()=>{
     const a=document.activeElement;
@@ -1655,9 +1623,7 @@ function renderShared(){
     const n=$("#pbl-"+i), k="p"+i;
     if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
   });
-  const labelColor=shared.labelColor||"#C00000";
-  document.documentElement.style.setProperty("--red",labelColor);
-  const lc=$("#fmt-label-color");if(lc&&document.activeElement!==lc)lc.value=labelColor.toLowerCase();
+  document.documentElement.style.setProperty("--red","#C00000");
   paintAbsent();
 }
 function renderMembers(){
@@ -2200,7 +2166,6 @@ $("#btn-export").onclick=async()=>{
     const xdoc=new DOMParser().parseFromString(await zip.file("Contents/section0.xml").async("string"),"application/xml");
     const hdoc=new DOMParser().parseFromString(await zip.file("Contents/header.xml").async("string"),"application/xml");
     const styleCtx=createHwpStyleContext(hdoc);
-    recolorTemplateRedRuns(xdoc,styleCtx,shared.labelColor||"#FF0000");
     const [T1,TPBL,TMEM,TLOG]=Array.from(xdoc.getElementsByTagName("hp:tbl"));
 
     // 큰 표는 페이지 경계에서 자연스럽게 이어지게 함.
