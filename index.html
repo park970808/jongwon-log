@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="app-version" content="team3-final-v3-20260922">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -41,38 +42,6 @@ button,input,textarea,select{font:inherit;color:inherit}
 #save-status.on{color:#7FD6B4}
 #who-label{color:#B9B9B9}
 
-.formatbar{
-  flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;
-  padding-top:7px;border-top:1px solid #454545;font-size:12px;
-}
-.formatbar .fmt-group{display:flex;align-items:center;gap:3px}
-.formatbar .fmt-sep{width:1px;height:26px;background:#555;margin:0 3px}
-.formatbar select,.formatbar button{
-  padding:4px 7px;min-height:28px;
-}
-.formatbar button.fmt-toggle{min-width:29px;padding:4px 6px;font-weight:700}
-.formatbar button.fmt-toggle.on{background:#1D5FD6;border-color:#3E7DE0}
-.formatbar .fmt-color-box{
-  width:24px;height:24px;min-width:24px;padding:0;border:1px solid #8A8A8A;
-  border-radius:3px;cursor:pointer;
-}
-.formatbar .fmt-color-box.black{background:#000}
-.formatbar .fmt-color-box.red{background:#C00000}
-.formatbar .fmt-color-box.blue{background:#0000FF}
-.formatbar .fmt-color-box:hover{outline:2px solid #fff;outline-offset:1px}
-.formatbar label{
-  display:flex;align-items:center;gap:3px;color:#D7D7D7;white-space:nowrap;
-}
-.formatbar input[type="color"]{
-  width:29px;height:28px;padding:1px;border:1px solid #666;background:#333;border-radius:3px;cursor:pointer;
-}
-.formatbar .fmt-note{color:#AAA;margin-left:auto;font-size:11.5px}
-.rich-text-run{white-space:pre-wrap}
-.rich-editor.fmt-left{text-align:left}
-.rich-editor.fmt-center{text-align:center}
-.rich-editor.fmt-right{text-align:right}
-.rich-editor.fmt-justify{text-align:justify}
-
 /* ── 문서 ── */
 .desk{padding:22px 14px 70px;overflow-x:auto}
 .page{width:794px;margin:0 auto;background:#fff;padding:52px 50px 60px;box-shadow:0 2px 14px rgba(0,0,0,.35)}
@@ -97,61 +66,14 @@ textarea.f:focus,input.f:focus{background:#EAF0FB}
 .big textarea.f{min-height:118px}
 .mid textarea.f{min-height:52px}
 
-.rich-editor{
-  width:100%;border:0;background:transparent;outline:none;
-  padding:5px 7px;font:inherit;font-size:13px;line-height:1.55;
-  min-height:32px;white-space:pre-wrap;overflow-wrap:anywhere;
-}
-.rich-editor:focus{background:#EAF0FB}
-.rich-editor[contenteditable="false"]{cursor:default}
-.big .rich-editor{min-height:118px}
-.mid .rich-editor{min-height:52px}
-table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-height:22px}
-.rich-editor:empty:before{
-  content:attr(data-placeholder);color:#999;pointer-events:none;
-}
-.inline-photo-node{
-  display:inline-block;position:relative;vertical-align:middle;
-  max-width:220px;margin:4px 5px;border:1px solid #999;background:#F4F4F4;
-  line-height:0;
-}
-.inline-photo-node img{
-  display:block;max-width:218px;max-height:180px;width:auto;height:auto;cursor:zoom-in;
-}
-.inline-photo-node button{
-  position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;
-  border:0;border-radius:2px;background:rgba(0,0,0,.65);color:#fff;
-  font-size:13px;line-height:20px;cursor:pointer;
-}
-.rich-caret-target{outline:2px solid #1D5FD6;outline-offset:-2px}
-
 .peer{
   position:absolute;top:1px;right:3px;font-size:10.5px;color:#fff;background:var(--focus);
   border-radius:2px;padding:0 5px;pointer-events:none;font-family:Pretendard,sans-serif;z-index:2;
-}
-.locked-by-other{background:#F3F3F3!important}
-.locked-by-other input,.locked-by-other textarea,.locked-by-other .rich-editor{cursor:not-allowed!important}
-.lock-badge{
-  position:absolute;left:3px;top:1px;z-index:3;
-  max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  background:#5B5B5B;color:#fff;border-radius:2px;padding:1px 5px;
-  font:10.5px/1.35 Pretendard,sans-serif;pointer-events:none;
 }
 
 td.abs{cursor:pointer;font-size:12.5px;padding:5px 6px;user-select:none;white-space:nowrap;overflow:hidden}
 td.abs:hover{background:#F7F7F7}
 td.abs b{font-weight:400;margin-right:4px}
-td.abs{cursor:default;position:relative}
-.abs-wrap{display:flex;align-items:center;gap:4px}
-.abs-check{
-  border:0;background:transparent;padding:0;margin:0;width:18px;height:18px;
-  font:inherit;font-size:15px;line-height:18px;cursor:pointer;flex:0 0 18px;
-}
-.abs-name{
-  width:100%;min-width:0;border:0;background:transparent;outline:none;
-  font:inherit;font-size:12.5px;padding:2px 0;
-}
-.abs-name:focus{background:#EAF0FB}
 td.abs.on{color:var(--red)}
 
 .sched-cap{text-align:center;font-size:12.5px;padding:3px 0 5px}
@@ -177,9 +99,6 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
   border:0;border-radius:2px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;display:none;
 }
 .shot:hover button{display:block}
-.inline-shots{display:flex;flex-wrap:wrap;gap:8px;padding:6px 7px 7px;border-top:1px dashed #D7D7D7}
-.inline-shots .shot{width:126px;height:94px}
-.photo-target{outline:2px solid #1D5FD6;outline-offset:-2px}
 #lightbox{
   position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:flex;
   align-items:center;justify-content:center;cursor:zoom-out;
@@ -263,43 +182,9 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <span class="grow"></span>
     <button id="btn-team">팀: <span id="toolbar-team">장원급제</span></button>
     <span id="who-label">–</span>
-    <button id="btn-photo" title="긴 글 입력칸에서는 커서 위치에 사진이 삽입됩니다">사진 추가</button>
+    <button id="btn-photo">사진 추가</button>
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
-
-    <div class="formatbar" id="formatbar" aria-label="글자 서식">
-      <div class="fmt-group">
-        <select id="fmt-font" title="글꼴">
-          <option value="">글꼴</option>
-          <option value="맑은 고딕">맑은 고딕</option>
-          <option value="함초롬돋움">함초롬돋움</option>
-          <option value="함초롬바탕">함초롬바탕</option>
-        </select>
-        <select id="fmt-size" title="글자 크기">
-          <option value="">크기</option>
-          <option>8</option><option>9</option><option>10</option><option>11</option><option>12</option>
-          <option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
-          <option>28</option><option>32</option><option>36</option>
-        </select>
-      </div>
-
-      <div class="fmt-sep"></div>
-
-      <div class="fmt-group">
-        <button type="button" class="fmt-toggle" data-fmt-bool="bold" title="진하게"><b>B</b></button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="italic" title="기울임"><i>I</i></button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="underline" title="밑줄"><u>U</u></button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="strike" title="취소선"><s>S</s></button>
-      </div>
-
-      <div class="fmt-sep"></div>
-
-      <div class="fmt-group fmt-colors" aria-label="글자색">
-        <button type="button" class="fmt-color-box black" data-fmt-color="#000000" title="검은색" aria-label="검은색"></button>
-        <button type="button" class="fmt-color-box red" data-fmt-color="#C00000" title="빨간색" aria-label="빨간색"></button>
-        <button type="button" class="fmt-color-box blue" data-fmt-color="#0000FF" title="파란색" aria-label="파란색"></button>
-      </div>
-    </div>
   </div>
 
   <div class="desk"><div class="page">
@@ -308,28 +193,17 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <table class="doc">
       <colgroup><col style="width:128px"><col><col><col style="width:74px"><col style="width:96px"><col style="width:74px"><col style="width:72px"></colgroup>
       <tr><th class="lbl">팀 명</th>
-        <td class="cell" colspan="6" data-key="team:name"><input class="f" id="document-team" type="text" value="장원급제"></td></tr>
+        <td class="cell" colspan="6"><input class="f" id="document-team" type="text" value="장원급제" readonly></td></tr>
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
-        <td class="cell mid" colspan="6" data-key="s:weekly"><div class="f rich-editor" data-f="weekly" data-rich-key="s:weekly" data-placeholder="1." contenteditable="true"></div></td></tr>
+        <td class="cell mid" colspan="6" data-key="s:weekly"><textarea class="f" data-f="weekly" placeholder="1."></textarea></td></tr>
       <tr id="abs-row"><th class="lbl red">프로젝트 결시자</th></tr>
       <tr>
         <th class="lbl">총 과제수행 기간<br>(시작일 ~ 마감일)</th>
         <td class="cell" colspan="2" data-key="s:period"><input class="f" type="text" data-f="period"></td>
         <td class="tight red">진행시간</td>
-        <td class="cell" data-key="s:hours">
-        <div class="flex" style="width:100%;min-width:0;gap:1px;padding:0 1px;font-size:11.5px;overflow:hidden">
-          <input class="f" type="text" data-f="hours"
-            style="width:0;min-width:0;flex:1 1 0;text-align:right;padding:4px 1px;font-size:11.5px"
-            placeholder="0" aria-label="진행시간">
-          <span style="flex:0 0 auto;line-height:1">/</span>
-          <input class="f" type="text" data-f="totalHours" value="110"
-            style="width:32px;min-width:32px;max-width:32px;flex:0 0 32px;text-align:right;padding:4px 1px;font-size:11.5px"
-            aria-label="총 진행시간">
-          <span style="flex:0 0 auto;line-height:1;padding-right:1px">H</span>
-        </div>
-      </td>
+        <td class="cell" data-key="s:hours"><div class="flex"><input class="f" type="text" data-f="hours" style="text-align:right"><span class="unit">/ 110H</span></div></td>
         <td class="tight red">프로젝트<br>진행율</td>
         <td class="cell" data-key="s:progress"><div class="flex"><input class="f" type="text" data-f="progress" style="text-align:right"><span class="unit">%</span></div></td>
       </tr>
@@ -339,13 +213,13 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
           <table class="pbl" id="pbl-table"></table>
         </td></tr>
       <tr><th class="lbl red">팀운영 계획</th>
-        <td class="cell big" colspan="6" data-key="s:plan"><div class="f rich-editor" data-f="plan" data-rich-key="s:plan" contenteditable="true"></div></td></tr>
+        <td class="cell big" colspan="6" data-key="s:plan"><textarea class="f" data-f="plan"></textarea></td></tr>
       <tr><th class="lbl red">팀 주요<br>회의내용<br>(매주)</th>
-        <td class="cell big" colspan="6" data-key="s:meeting"><div class="f rich-editor" data-f="meeting" data-rich-key="s:meeting" contenteditable="true"></div></td></tr>
+        <td class="cell big" colspan="6" data-key="s:meeting"><textarea class="f" data-f="meeting"></textarea></td></tr>
       <tr><th class="lbl red">차기 추진<br>예정 사항</th>
-        <td class="cell big" colspan="6" data-key="s:next"><div class="f rich-editor" data-f="next" data-rich-key="s:next" contenteditable="true"></div></td></tr>
+        <td class="cell big" colspan="6" data-key="s:next"><textarea class="f" data-f="next"></textarea></td></tr>
       <tr><th class="lbl red">멘토 의견</th>
-        <td class="cell big" colspan="6" data-key="s:mentor"><div class="f rich-editor" data-f="mentor" data-rich-key="s:mentor" contenteditable="true"></div></td></tr>
+        <td class="cell big" colspan="6" data-key="s:mentor"><textarea class="f" data-f="mentor"></textarea></td></tr>
     </table>
 
     <h3 class="doc-title next">2. 훈련생별 주요활동일지</h3>
@@ -366,36 +240,11 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 <input type="file" id="pick" accept="image/*" multiple class="hide">
 
 <script type="module">
+import { KNOWN_TEAMS, resolveTeam, teamUrl, validTeamId } from "./team-routing.mjs";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-/* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
-const DEFAULT_TEAM={id:"jangwon",name:"장원급제"};
-const KNOWN_TEAMS=[
-  DEFAULT_TEAM,
-  {id:"team-2",name:"2팀"},
-  {id:"team-3",name:"3팀"}
-];
-
-function validTeamId(id){
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(id||""));
-}
-
-function resolveTeam(search){
-  const params=new URLSearchParams(search||"");
-  const id=params.get("team")||DEFAULT_TEAM.id;
-  if(!validTeamId(id)) return null;
-  return KNOWN_TEAMS.find(team=>team.id===id)||{id,name:id};
-}
-
-function teamUrl(id,href=location.href){
-  const url=new URL(href);
-  if(id===DEFAULT_TEAM.id) url.searchParams.delete("team");
-  else url.searchParams.set("team",id);
-  return url.toString();
-}
 
 /* ════════ 설정 ════════ */
 const FIREBASE_CONFIGS = {
@@ -433,240 +282,25 @@ let TEAM_NAME=TEAM?.name||"";
 const PBL_STEPS=[["팀편성","10%"],["계획(20%)","20%"],["피드백","30%"],["수행","40%"],["멘토링","50%"],
   ["수행","60%"],["피드백","70%"],["수행","80%"],["결과제출","90%"],["피드백","100%"]];
 const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
-const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
+const SHARED_FIELDS=["topic","weekly","period","hours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},presenceAll={},presenceReady=false,focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
-const myLocks=new Set(), lockPending=new Map();
+let shared={},members={},logs={},photos={},unsub=[],peers={},focusedField=null,timers={};
 const pendingWrites=new Map();
-const writeChains=new Map();
-const localRichEdits=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
-const PRESENCE_HEARTBEAT_MS=30000;
-const PRESENCE_STALE_MS=70000;
-
-function currentEditorName(){
-  if(slot){
-    const n=(members[slot]||{}).name;
-    if(n)return n;
-    return slot.replace("m","")+"번 자리";
-  }
-  return "다른 사용자";
-}
-function presenceRef(){
-  if(!uid)throw new Error("auth-not-ready");
-  return doc(db,"teams",TEAM_ID,"presence",uid);
-}
-function activePresence(v){
-  return !!(v&&Number(v.at||0)>Date.now()-PRESENCE_STALE_MS);
-}
-function presenceClaimsForField(key){
-  return Object.entries(presenceAll)
-    .filter(([,v])=>activePresence(v)&&v.week===weekId&&v.field===key)
-    .map(([owner,v])=>({owner,...v}))
-    .sort((a,b)=>String(a.owner).localeCompare(String(b.owner)));
-}
-function winningPresenceForField(key){
-  return presenceClaimsForField(key)[0]||null;
-}
-function otherLock(key){
-  const v=locks[key];
-  return v&&v.owner!==uid?v:null;
-}
-function setLockableNode(node,key,kind="plain",editable=true){
-  if(!node||!editable)return;
-  node.dataset.lockKey=key;
-  node.dataset.lockKind=kind;
-  if(kind==="plain") node.dataset.baseReadonly=node.readOnly?"1":"0";
-  else node.dataset.baseContenteditable=node.contentEditable==="false"?"false":"true";
-
-  const stopUnauthorized=e=>{
-    if(!myLocks.has(key)){
-      e.preventDefault();
-      e.stopPropagation();
-      const v=otherLock(key);
-      if(v) mark(`${v.name||"다른 사용자"}님이 수정 중`,false);
-      else mark("잠깐 후 다시 클릭해 주세요",false);
-    }
-  };
-  node.addEventListener("beforeinput",stopUnauthorized);
-  node.addEventListener("paste",stopUnauthorized);
-  node.addEventListener("drop",stopUnauthorized);
-}
-function applyNodeLockState(node,key){
-  if(!node)return;
-  const v=otherLock(key);
-  const kind=node.dataset.lockKind||"plain";
-  if(kind==="rich"){
-    const base=node.dataset.baseContenteditable!=="false";
-    if(!myLocks.has(key)) node.contentEditable=(base&&!v)?"true":"false";
-  }else{
-    const base=node.dataset.baseReadonly==="1";
-    node.readOnly=base||!!v;
-  }
-  const host=node.closest("[data-key]")||node.closest("td");
-  if(host){
-    host.classList.toggle("locked-by-other",!!v);
-    host.querySelectorAll(":scope > .lock-badge").forEach(x=>x.remove());
-    if(v){
-      const b=el("span","lock-badge");
-      b.textContent=`${v.name||"다른 사용자"} 수정 중`;
-      host.appendChild(b);
-    }
-  }
-}
-function renderFieldLocks(){
-  document.querySelectorAll("[data-lock-key]").forEach(node=>{
-    applyNodeLockState(node,node.dataset.lockKey);
-  });
-}
-function rebuildLocksFromPresence(){
-  const next={};
-  const fields=new Set();
-
-  Object.values(presenceAll).forEach(v=>{
-    if(activePresence(v)&&v.week===weekId&&v.field)fields.add(v.field);
-  });
-
-  fields.forEach(key=>{
-    const winner=winningPresenceForField(key);
-    if(winner)next[key]=winner;
-  });
-
-  locks=next;
-
-  // 두 사람이 거의 동시에 같은 칸을 눌렀다면 uid 기준으로 한 명만 남깁니다.
-  // transaction/추가 읽기 없이 모든 클라이언트가 같은 승자를 계산합니다.
-  for(const key of Array.from(myLocks)){
-    const winner=next[key];
-    if(winner&&winner.owner!==uid){
-      myLocks.delete(key);
-      if(focusedField===key)focusedField=null;
-
-      const active=document.activeElement;
-      if(active?.dataset?.lockKey===key){
-        setTimeout(()=>active.blur(),0);
-      }
-      mark(`${winner.name||"다른 사용자"}님이 수정 중`,false);
-    }
-  }
-
-  renderFieldLocks();
-}
-let presenceWrite=Promise.resolve();
-function publishPresence(field=focusedField){
-  if(!uid||!weekId)return Promise.resolve();
-
-  const payload={
-    name:currentEditorName(),
-    field:field||null,
-    week:weekId,
-    at:Date.now()
-  };
-
-  // 한 사용자의 presence 쓰기만 순서대로 보냅니다.
-  presenceWrite=presenceWrite.catch(()=>{}).then(
-    ()=>setDoc(presenceRef(),payload,{merge:true})
-  ).catch(e=>{
-    console.warn("presence 저장 실패",e?.code,e?.message);
-    if(String(e?.code||"").includes("resource-exhausted")){
-      mark("Firebase 사용량 한도 초과",false);
-    }
-  });
-  return presenceWrite;
-}
-async function acquireFieldLock(key){
-  if(!key||!uid||!weekId)return false;
-  if(myLocks.has(key))return true;
-
-  // 이미 다른 사람이 잡고 있는 칸이면 네트워크 요청 없이 즉시 차단합니다.
-  const current=winningPresenceForField(key);
-  if(current&&current.owner!==uid){
-    locks[key]=current;
-    renderFieldLocks();
-    mark(`${current.name||"다른 사용자"}님이 수정 중`,false);
-    return false;
-  }
-
-  // 즉시 로컬 편집 허용. 느린 transaction/권한확인 대기 없음.
-  myLocks.clear();
-  myLocks.add(key);
-  focusedField=key;
-  locks[key]={owner:uid,name:currentEditorName(),field:key,week:weekId,at:Date.now()};
-  renderFieldLocks();
-
-  // 서버에는 기존 presence 문서 하나만 갱신합니다.
-  publishPresence(key);
-
-  return true;
-}
-async function releaseFieldLock(key){
-  if(!key)return;
-
-  myLocks.delete(key);
-
-  // 입력한 내용은 먼저 저장 완료시킵니다.
-  try{await flushPending();}catch(e){}
-
-  if(focusedField===key)focusedField=null;
-  if(locks[key]?.owner===uid)delete locks[key];
-  renderFieldLocks();
-
-  // 이미 다른 칸으로 이동한 경우 새 칸 claim을 null로 덮지 않습니다.
-  const activeKey=document.activeElement?.dataset?.lockKey||null;
-  if(!activeKey&&!focusedField)publishPresence(null);
-}
-async function releaseAllLocks(){
-  myLocks.clear();
-  focusedField=null;
-  renderFieldLocks();
-  await publishPresence(null);
-}
-
 function setTeamName(name){
-  TEAM_NAME=name||TEAM?.name||TEAM_ID;
-  $("#toolbar-team").textContent=TEAM_NAME;
-  const input=$("#document-team");
-  if(input&&document.activeElement!==input) input.value=TEAM_NAME;
-  document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
-}
-function teamMetaRef(){ return doc(db,"teams",TEAM_ID,"weeks","__team__"); }
-function bindTeamName(){
-  const input=$("#document-team");
-  track(input,"team:name");
-  input.addEventListener("input",()=>{
-    const name=input.value;
-    TEAM_NAME=name||TEAM?.name||TEAM_ID;
-    $("#toolbar-team").textContent=TEAM_NAME;
-    document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
-    mark("입력 중…",false);
-    scheduleWrite("team:name",async()=>{
-      try{
-        await setDoc(teamMetaRef(),{name,updatedAt:serverTimestamp()},{merge:true});
-        mark("저장됨",true);
-      }catch(e){
-        // 구형 1팀 규칙에서 __team__ 문서가 막힌 경우 현재 주차 문서에도 보조 저장
-        if(weekId){
-          await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId),{teamName:name},{merge:true});
-          mark("저장됨",true);
-        }else throw e;
-      }
-    },700);
-  });
-  try{
-    onSnapshot(teamMetaRef(),s=>{
-      if(s.exists()&&typeof s.data().name==="string") setTeamName(s.data().name);
-    },()=>{});
-  }catch(e){}
+  TEAM_NAME=name;
+  $("#toolbar-team").textContent=name;
+  $("#document-team").value=name;
+  document.title=`${name} · 훈련생 프로젝트 활동일지`;
 }
 function showTeamPicker(){ $("#team-error").textContent=""; $("#gate-team").classList.remove("hide"); }
 async function goToTeam(id){
   if(!validTeamId(id)){ $("#team-error").textContent="팀 ID 형식이 올바르지 않습니다."; return; }
   try{
     await flushPending();
-    await releaseAllLocks();
     location.assign(teamUrl(id,location.href));
   }catch(e){ $("#team-error").textContent="저장되지 않은 내용이 있어 팀을 바꾸지 않았습니다. 연결을 확인해 주세요."; }
 }
@@ -717,9 +351,10 @@ function boot(){
   initTeamPicker();
   if(!TEAM){ showTeamPicker(); $("#team-error").textContent="주소의 팀 ID 형식이 올바르지 않습니다."; return; }
   setTeamName(TEAM_NAME);
-  const cfg=FIREBASE_CONFIGS[TEAM_ID]||JSON.parse(localStorage.getItem("fb-config-"+TEAM_ID)||"null");
+  let storedCfg=null;
+  try{ storedCfg=JSON.parse(localStorage.getItem("fb-config-"+TEAM_ID)||"null"); }catch(e){}
+  const cfg=FIREBASE_CONFIGS[TEAM_ID]||storedCfg;
   if(!cfg){ $("#gate-config").classList.remove("hide"); return; }
-  console.info(`[팀 연결] ${TEAM_ID} → Firebase ${cfg.projectId}`);
   const app=initializeApp(cfg);
   auth=getAuth(app); db=getFirestore(app);
   signInAnonymously(auth).catch(e=>alert("로그인 실패: "+e.message+"\n\n익명 로그인이 켜져 있는지, 승인된 도메인에 이 주소가 등록됐는지 확인해 주세요."));
@@ -727,7 +362,15 @@ function boot(){
     if(!u||started)return;
     uid=u.uid;
     try{
-      const teamDoc=await getDoc(doc(db,"teams",TEAM_ID));
+      const teamRef=doc(db,"teams",TEAM_ID);
+      const teamDoc=await getDoc(teamRef);
+      if(!teamDoc.exists() && TEAM_ID==="team-3"){
+        // The built-in team-3 configuration is sufficient registration.
+        // A missing parent document must not block its week/roster subcollections.
+        setTeamName("3팀");
+        enterLog();
+        return;
+      }
       if(!teamDoc.exists() && TEAM_ID!=="jangwon"){
         showJoin("아직 등록되지 않은 팀입니다. Firebase에서 팀을 먼저 만든 뒤 다시 열어 주세요.",false);
         return;
@@ -804,7 +447,6 @@ function slotGate(){
 $("#btn-switch").onclick=async()=>{
   try{
     await flushPending();
-    await releaseAllLocks();
     localStorage.removeItem("slot-"+TEAM_ID);
     location.reload();
   }catch(e){alert("저장되지 않은 내용이 있습니다. 연결을 확인한 뒤 다시 시도해 주세요.");}
@@ -813,654 +455,12 @@ $("#btn-switch").onclick=async()=>{
 /* ── 화면 ── */
 const autosize=t=>{ if(t.tagName==="TEXTAREA"){ t.style.height="auto"; t.style.height=(t.scrollHeight+2)+"px"; } };
 function track(n,key){
-  setLockableNode(n,key,"plain",!n.readOnly);
-  n.addEventListener("focus",async()=>{
-    if(n.dataset.baseReadonly==="1")return;
-    const ok=await acquireFieldLock(key);
-    if(!ok){
-      n.blur();
-      return;
-    }
-
-    // transaction 대기 중 사용자가 이미 다른 칸으로 이동한 경우
-    // 방금 얻은 잠금을 즉시 반납합니다.
-    if(document.activeElement!==n){
-      await releaseFieldLock(key);
-      return;
-    }
-
-    applyNodeLockState(n,key);
-    focusedField=key;
-    photoTargetKey=key;
-    document.querySelectorAll(".photo-target").forEach(x=>x.classList.remove("photo-target"));
-    const host=n.closest("[data-key]");
-    if(host) host.classList.add("photo-target");
-  });
-  n.addEventListener("blur",async()=>{
-    focusedField=null;
-    await releaseFieldLock(key);
-  });
+  n.addEventListener("focus",()=>{focusedField=key;beat();});
+  n.addEventListener("blur",()=>{focusedField=null;beat();});
 }
-const RICH_SHARED=new Set(["weekly","plan","meeting","next","mentor"]);
-
-function cleanFmt(style){
-  const s=style&&typeof style==="object"?style:{}, o={};
-  const fonts=["맑은 고딕","함초롬돋움","함초롬바탕"];
-  if(fonts.includes(s.font))o.font=s.font;
-  const size=Number(s.size); if(size>=5&&size<=72)o.size=Math.round(size*10)/10;
-  const ratio=Number(s.ratio); if(ratio>=50&&ratio<=200&&ratio!==100)o.ratio=Math.round(ratio);
-  const spacing=Number(s.spacing); if(spacing>=-50&&spacing<=50&&spacing!==0)o.spacing=Math.round(spacing);
-  ["bold","italic","underline","strike","outline","shadow","emboss","engrave","sup","sub"].forEach(k=>{if(s[k])o[k]=true;});
-  if(/^#[0-9a-f]{6}$/i.test(s.color||""))o.color=s.color.toUpperCase();
-  if(/^#[0-9a-f]{6}$/i.test(s.bg||""))o.bg=s.bg.toUpperCase();
-  if(o.sup&&o.sub)delete o.sub;
-  return o;
-}
-function fmtKey(style){return JSON.stringify(cleanFmt(style));}
-function sameFmt(a,b){return fmtKey(a)===fmtKey(b);}
-function mergeFmt(base,patch){
-  const o=Object.assign({},cleanFmt(base));
-  if(patch&&patch.__clear)return {};
-  Object.entries(patch||{}).forEach(([k,v])=>{
-    if(k==="__clear")return;
-    if(v===null||v===false||v===""||(k==="ratio"&&Number(v)===100)||(k==="spacing"&&Number(v)===0))delete o[k];
-    else o[k]=v;
-  });
-  if(o.sup)delete o.sub;
-  if(o.sub)delete o.sup;
-  return cleanFmt(o);
-}
-function normalizeTokens(tokens,fallback=""){
-  // 배열이 존재하면 빈 배열([])도 "의도적으로 모두 삭제됨"을 뜻합니다.
-  // 예전에는 tokens.length가 0이면 fallback의 과거 글을 다시 보여줘서
-  // 삭제한 문장이 되살아나는 문제가 있었습니다.
-  if(Array.isArray(tokens)) return tokens.map(t=>{
-    if(t?.type==="text")return {type:"text",text:String(t.text??""),style:cleanFmt(t.style)};
-    if(t?.type==="image"&&t.id)return {type:"image",id:String(t.id)};
-    return null;
-  }).filter(Boolean);
-  return fallback!==""?[{type:"text",text:String(fallback),style:{}}]:[];
-}
-function mergeTextTokens(tokens){
-  const out=[];
-  for(const t of tokens||[]){
-    if(!t)continue;
-    if(t.type==="text"){
-      const s=String(t.text??"").replace(/\u200B/g,"");
-      if(!s)continue;
-      const style=cleanFmt(t.style);
-      if(out.length&&out[out.length-1].type==="text"&&sameFmt(out[out.length-1].style,style))out[out.length-1].text+=s;
-      else out.push({type:"text",text:s,style});
-    }else if(t.type==="image"&&t.id){
-      out.push({type:"image",id:String(t.id)});
-    }
-  }
-  return out;
-}
-function tokensPlain(tokens){
-  return mergeTextTokens(tokens).filter(t=>t.type==="text").map(t=>t.text).join("");
-}
-function applyFmtCss(node,style){
-  const s=cleanFmt(style);
-  node.style.fontFamily=s.font||"";
-  node.style.fontSize=s.size?`${s.size}pt`:"";
-  node.style.fontWeight=s.bold?"700":"";
-  node.style.fontStyle=s.italic?"italic":"";
-  const dec=[]; if(s.underline)dec.push("underline"); if(s.strike)dec.push("line-through");
-  node.style.textDecoration=dec.join(" ");
-  node.style.color=s.color||"";
-  node.style.backgroundColor=s.bg||"";
-  node.style.letterSpacing=s.spacing?`${s.spacing/100}em`:"";
-  node.style.fontStretch=s.ratio?`${s.ratio}%`:"";
-  node.style.verticalAlign=s.sup?"super":s.sub?"sub":"";
-  if(s.sup||s.sub)node.style.fontSize=s.size?`${Math.max(5,s.size*.78)}pt`:"0.78em";
-  let shadows=[];
-  if(s.shadow)shadows.push("1px 1px 1px rgba(0,0,0,.45)");
-  if(s.emboss)shadows.push("-1px -1px 0 #fff,1px 1px 0 #777");
-  if(s.engrave)shadows.push("1px 1px 0 #fff,-1px -1px 0 #777");
-  node.style.textShadow=shadows.join(",");
-  node.style.webkitTextStroke=s.outline?"0.45px currentColor":"";
-}
-function appendTextWithBreaks(parent,text,style={}){
-  const s=cleanFmt(style);
-  if(Object.keys(s).length===0){
-    parent.appendChild(document.createTextNode(String(text??"")));
-    return;
-  }
-  const span=el("span","rich-text-run");
-  span.dataset.fmt=JSON.stringify(s);
-  applyFmtCss(span,s);
-  span.appendChild(document.createTextNode(String(text??"")));
-  parent.appendChild(span);
-}
-function makeInlinePhotoNode(pid,p,editable=true){
-  const wrap=el("span","inline-photo-node");
-  wrap.dataset.photoId=pid;
-  wrap.contentEditable="false";
-  const img=el("img");
-  img.src=p?.data||"";
-  img.alt=p?.name||"사진";
-  img.onclick=ev=>{
-    ev.stopPropagation();
-    const lb=$("#lightbox");
-    lb.querySelector("img").src=img.src;
-    lb.classList.remove("hide");
-  };
-  wrap.appendChild(img);
-  if(editable){
-    const del=el("button");
-    del.type="button"; del.title="사진 삭제"; del.textContent="×";
-    del.onclick=async ev=>{
-      ev.preventDefault(); ev.stopPropagation();
-      const editor=wrap.closest(".rich-editor");
-      const key=editor?.dataset.richKey;
-      if(!confirm("이 사진을 지울까요?"))return;
-      try{
-        await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));
-        wrap.remove();
-        if(editor&&key) saveRichEditor(key,editor,0);
-      }catch(e){fail(e);}
-    };
-    wrap.appendChild(del);
-  }
-  return wrap;
-}
-function renderRichContent(editor,tokens,fallback,editable=true){
-  const list=normalizeTokens(tokens,fallback);
-  editor.innerHTML="";
-  list.forEach(t=>{
-    if(t.type==="text")appendTextWithBreaks(editor,t.text,t.style);
-    else if(t.type==="image"){
-      const p=inlinePhotos[t.id];
-      if(p?.data)editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
-    }
-  });
-}
-function renderRichEditor(editor,tokens,fallback,editable=true){
-  if(!editor||document.activeElement===editor)return;
-  const key=editor.dataset.richKey;
-  const local=key?localRichEdits.get(key):null;
-  if(local){tokens=local.tokens;fallback=local.plain;}
-  renderRichContent(editor,tokens,fallback,editable);
-  applyParaStyleToEditor(editor,paraStyleForKey(key));
-}
-function editorTokens(editor){
-  // contenteditable에서 모든 글자를 지워도 브라우저가 <br> 또는
-  // <div><br></div>를 남기는 경우가 있습니다. 사진도 없고 실제 텍스트도
-  // 하나도 없으면 무조건 완전한 빈 값([])으로 저장합니다.
-  const hasInlineImage=!!editor.querySelector(".inline-photo-node");
-  const visibleText=(editor.textContent||"").replace(/\u200B/g,"");
-  if(!hasInlineImage && visibleText==="") return [];
-
-  const out=[];
-  function pushText(s,style={}){
-    s=String(s??"").replace(/\u200B/g,"");
-    if(!s)return;
-    out.push({type:"text",text:s,style:cleanFmt(style)});
-  }
-  function walk(node){
-    if(node.nodeType===Node.TEXT_NODE){pushText(node.nodeValue||"");return;}
-    if(node.nodeType!==Node.ELEMENT_NODE)return;
-    if(node.classList?.contains("inline-photo-node")){
-      const id=node.dataset.photoId;
-      if(id)out.push({type:"image",id});
-      return;
-    }
-    if(node.classList?.contains("rich-text-run")){
-      let style={};
-      try{style=JSON.parse(node.dataset.fmt||"{}");}catch(e){}
-      pushText(node.textContent||"",style);
-      return;
-    }
-    if(node.tagName==="BR"){pushText("\n");return;}
-    const isBlock=["DIV","P"].includes(node.tagName);
-    const before=out.length;
-    Array.from(node.childNodes).forEach(walk);
-    if(isBlock&&node!==editor){
-      const last=out[out.length-1];
-      if(out.length===before||!(last?.type==="text"&&last.text.endsWith("\n")))pushText("\n");
-    }
-  }
-  Array.from(editor.childNodes).forEach(walk);
-  return mergeTextTokens(out);
-}
-function richStateSignature(plain,tokens){
-  return JSON.stringify({
-    plain:String(plain??""),
-    tokens:normalizeTokens(Array.isArray(tokens)?tokens:undefined,"")
-  });
-}
-function remoteRichStateForKey(key){
-  let m;
-  if((m=key.match(/^s:(.+)$/))){
-    const f=m[1];
-    return {plain:shared[f]??"",tokens:shared.rich?.[f]};
-  }
-  if((m=key.match(/^p:(\d+)$/))){
-    const k="p"+m[1];
-    return {plain:(shared.pbl||{})[k]??"",tokens:shared.richPbl?.[k]};
-  }
-  if((m=key.match(/^(m\d+):content$/))){
-    const d=members[m[1]]||{};
-    return {plain:d.content??"",tokens:d.contentRich};
-  }
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{},f=m[2];
-    return {plain:d[f]??"",tokens:d[f+"Rich"]};
-  }
-  return null;
-}
-function reconcileLocalRichEdits(){
-  for(const [key,local] of localRichEdits){
-    const remote=remoteRichStateForKey(key);
-    if(!remote)continue;
-    // 서버가 우리가 마지막으로 저장한 정확한 값까지 따라왔을 때만
-    // 로컬 보호막을 해제합니다.
-    if(
-      Array.isArray(remote.tokens) &&
-      richStateSignature(remote.plain,remote.tokens)===richStateSignature(local.plain,local.tokens)
-    ){
-      localRichEdits.delete(key);
-    }
-  }
-}
-function richDataForKey(key){
-  const local=localRichEdits.get(key);
-  if(local)return {tokens:local.tokens,fallback:local.plain};
-
-  let m;
-  if((m=key.match(/^s:(.+)$/))){
-    const f=m[1];
-    return {tokens:shared.rich?.[f],fallback:shared[f]??""};
-  }
-  if((m=key.match(/^p:(\d+)$/))){
-    const k="p"+m[1];
-    return {tokens:shared.richPbl?.[k],fallback:(shared.pbl||{})[k]??(PBL_DEFAULT[Number(m[1])]||"")};
-  }
-  if((m=key.match(/^(m\d+):(content)$/))){
-    const d=members[m[1]]||{};
-    return {tokens:d.contentRich,fallback:d.content??""};
-  }
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{}, f=m[2];
-    return {tokens:d[f+"Rich"],fallback:d[f]??""};
-  }
-  return {tokens:null,fallback:""};
-}
-function cleanParaStyle(style){
-  const s=style&&typeof style==="object"?style:{},o={};
-  if(["left","center","right","justify"].includes(s.align))o.align=s.align;
-  const ls=Number(s.lineSpacing); if(ls>=80&&ls<=300)o.lineSpacing=Math.round(ls);
-  const indent=Number(s.indent); if(indent>=0&&indent<=8&&indent!==0)o.indent=Math.round(indent);
-  return o;
-}
-function paraStyleForKey(key){
-  if(!key)return {};
-  let m;
-  if((m=key.match(/^s:(.+)$/)))return cleanParaStyle(shared.richPara?.[m[1]]);
-  if((m=key.match(/^p:(\d+)$/)))return cleanParaStyle(shared.richPblPara?.["p"+m[1]]);
-  if((m=key.match(/^(m\d+):content$/)))return cleanParaStyle((members[m[1]]||{}).contentPara);
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{};return cleanParaStyle(d[m[2]+"Para"]);
-  }
-  return {};
-}
-function applyParaStyleToEditor(editor,style){
-  if(!editor)return;
-  const s=cleanParaStyle(style);
-  editor.style.textAlign=s.align||"";
-  editor.style.lineHeight=s.lineSpacing?String(s.lineSpacing/100):"";
-  editor.style.paddingLeft=`${7+(s.indent||0)*14}px`;
-}
-function saveParaStyle(key,style){
-  const s=cleanParaStyle(style),targetWeek=weekId;
-  let m;
-  if((m=key.match(/^s:(.+)$/))){
-    const f=m[1];shared.richPara=Object.assign({},shared.richPara,{[f]:s});
-  }else if((m=key.match(/^p:(\d+)$/))){
-    const k="p"+m[1];shared.richPblPara=Object.assign({},shared.richPblPara,{[k]:s});
-  }else if((m=key.match(/^(m\d+):content$/))){
-    const id=m[1];members[id]=Object.assign({},members[id]||{},{contentPara:s});
-  }else if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const id="r"+m[1],f=m[2];logs[id]=Object.assign({},logs[id]||{},{[f+"Para"]:s});
-  }
-  const editor=richEditors[key];if(editor)applyParaStyleToEditor(editor,s);
-  scheduleWrite("para:"+key,async()=>{
-    let mm;
-    if((mm=key.match(/^s:(.+)$/))){
-      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-      await setDoc(ref,{[`richPara.${mm[1]}`]:s},{merge:true});
-    }else if((mm=key.match(/^p:(\d+)$/))){
-      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-      await setDoc(ref,{[`richPblPara.p${mm[1]}`]:s},{merge:true});
-    }else if((mm=key.match(/^(m\d+):content$/))){
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",mm[1]),{contentPara:s},{merge:true});
-    }else if((mm=key.match(/^l:(\d+):(content|note)$/))){
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+mm[1]),{[mm[2]+"Para"]:s},{merge:true});
-    }
-  },0);
-}
-function textLenWithoutPhotos(node){
-  if(!node)return 0;
-  if(node.nodeType===Node.TEXT_NODE)return (node.nodeValue||"").replace(/\u200B/g,"").length;
-  if(node.nodeType!==Node.ELEMENT_NODE)return 0;
-  if(node.classList?.contains("inline-photo-node"))return 0;
-  let n=0;Array.from(node.childNodes).forEach(c=>n+=textLenWithoutPhotos(c));return n;
-}
-function domPointOffset(root,target,targetOffset){
-  let total=0,done=false;
-  function walk(node){
-    if(done)return;
-    if(node===target){
-      if(node.nodeType===Node.TEXT_NODE)total+=(node.nodeValue||"").replace(/\u200B/g,"").slice(0,targetOffset).length;
-      else Array.from(node.childNodes).slice(0,targetOffset).forEach(c=>total+=textLenWithoutPhotos(c));
-      done=true;return;
-    }
-    if(node.nodeType===Node.TEXT_NODE){total+=(node.nodeValue||"").replace(/\u200B/g,"").length;return;}
-    if(node.nodeType!==Node.ELEMENT_NODE||node.classList?.contains("inline-photo-node"))return;
-    Array.from(node.childNodes).forEach(walk);
-  }
-  walk(root);return total;
-}
-function selectionOffsets(editor,key){
-  const sel=window.getSelection();
-  let r=null;
-  if(sel&&sel.rangeCount&&editor.contains(sel.getRangeAt(0).commonAncestorContainer))r=sel.getRangeAt(0);
-  else if(richRanges[key]&&editor.contains(richRanges[key].commonAncestorContainer))r=richRanges[key];
-  const total=tokensPlain(editorTokens(editor)).length;
-  if(!r)return {start:0,end:total,caret:total,collapsed:true};
-  const start=domPointOffset(editor,r.startContainer,r.startOffset);
-  const end=domPointOffset(editor,r.endContainer,r.endOffset);
-  return {start:Math.min(start,end),end:Math.max(start,end),caret:end,collapsed:r.collapsed};
-}
-function textPointAt(editor,offset){
-  let remain=Math.max(0,offset),last={node:editor,offset:editor.childNodes.length};
-  function walk(node){
-    if(node.nodeType===Node.TEXT_NODE){
-      const raw=node.nodeValue||"",len=raw.replace(/\u200B/g,"").length;
-      if(remain<=len){last={node,offset:Math.min(raw.length,remain)};return true;}
-      remain-=len;last={node,offset:raw.length};return false;
-    }
-    if(node.nodeType!==Node.ELEMENT_NODE||node.classList?.contains("inline-photo-node"))return false;
-    for(const c of Array.from(node.childNodes))if(walk(c))return true;
-    return false;
-  }
-  walk(editor);return last;
-}
-function restoreSelectionOffsets(editor,start,end=start){
-  const a=textPointAt(editor,start),b=textPointAt(editor,end);
-  const r=document.createRange();
-  try{r.setStart(a.node,a.offset);r.setEnd(b.node,b.offset);}catch(e){r.selectNodeContents(editor);r.collapse(false);}
-  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
-  return r;
-}
-function styleAtTextOffset(tokens,offset){
-  let pos=0,first={};
-  for(const t of mergeTextTokens(tokens)){
-    if(t.type!=="text")continue;
-    if(!Object.keys(first).length)first=t.style||{};
-    const end=pos+t.text.length;
-    if(offset>=pos&&offset<=end)return cleanFmt(t.style);
-    pos=end;
-  }
-  return cleanFmt(first);
-}
-function applyStyleRange(tokens,start,end,patch){
-  const list=mergeTextTokens(tokens),total=tokensPlain(list).length;
-  if(start===end){start=0;end=total;}
-  let pos=0,out=[];
-  for(const t of list){
-    if(t.type!=="text"){out.push(t);continue;}
-    const a=pos,b=pos+t.text.length;
-    if(end<=a||start>=b){out.push(t);pos=b;continue;}
-    const l=Math.max(0,start-a),r=Math.min(t.text.length,end-a);
-    if(l>0)out.push({type:"text",text:t.text.slice(0,l),style:t.style});
-    out.push({type:"text",text:t.text.slice(l,r),style:mergeFmt(t.style,patch)});
-    if(r<t.text.length)out.push({type:"text",text:t.text.slice(r),style:t.style});
-    pos=b;
-  }
-  return mergeTextTokens(out);
-}
-async function applyCharFormat(patch){
-  const key=formatTargetKey,editor=key&&richEditors[key];
-  if(!editor){mark("먼저 긴 글 입력칸을 선택해 주세요",false);return;}
-  const ok=await acquireFieldLock(key);if(!ok)return;
-  const off=selectionOffsets(editor,key);
-  const tokens=editorTokens(editor);
-  const next=applyStyleRange(tokens,off.start,off.end,patch);
-  renderRichContent(editor,next,"",true);
-  applyParaStyleToEditor(editor,paraStyleForKey(key));
-  editor.focus({preventScroll:true});
-  const restoreStart=off.collapsed?off.caret:off.start;
-  const restoreEnd=off.collapsed?off.caret:off.end;
-  richRanges[key]=restoreSelectionOffsets(editor,restoreStart,restoreEnd).cloneRange();
-  saveRichEditor(key,editor,0);
-  updateFormatToolbar();
-}
-async function toggleCharFormat(prop){
-  const key=formatTargetKey,editor=key&&richEditors[key];
-  if(!editor)return mark("먼저 긴 글 입력칸을 선택해 주세요",false);
-  const off=selectionOffsets(editor,key),style=styleAtTextOffset(editorTokens(editor),off.start);
-  await applyCharFormat({[prop]:!style[prop]});
-}
-function updateFormatToolbar(){
-  const key=formatTargetKey,editor=key&&richEditors[key];
-  if(!editor)return;
-  const off=selectionOffsets(editor,key),style=styleAtTextOffset(editorTokens(editor),off.start);
-  document.querySelectorAll("[data-fmt-bool]").forEach(b=>b.classList.toggle("on",!!style[b.dataset.fmtBool]));
-}
-async function applyParaPatch(patch){
-  const key=formatTargetKey,editor=key&&richEditors[key];
-  if(!editor)return mark("먼저 긴 글 입력칸을 선택해 주세요",false);
-  const ok=await acquireFieldLock(key);if(!ok)return;
-  const next=Object.assign({},paraStyleForKey(key),patch||{});
-  Object.keys(next).forEach(k=>{if(next[k]===null||next[k]===""||(k==="indent"&&Number(next[k])===0))delete next[k];});
-  saveParaStyle(key,next);
-  editor.focus({preventScroll:true});
-  if(richRanges[key]){
-    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(richRanges[key]);
-  }
-}
-function initFormatToolbar(){
-  const bar=$("#formatbar");
-  bar.addEventListener("pointerdown",()=>{formatBarInteracting=true;},true);
-  document.addEventListener("pointerup",()=>setTimeout(()=>formatBarInteracting=false,0),true);
-
-  bar.querySelectorAll("button").forEach(b=>{
-    b.addEventListener("mousedown",e=>e.preventDefault());
-  });
-  bar.querySelectorAll("[data-fmt-bool]").forEach(b=>b.onclick=()=>toggleCharFormat(b.dataset.fmtBool));
-  $("#fmt-font").onchange=e=>{if(e.target.value)applyCharFormat({font:e.target.value});e.target.value="";};
-  $("#fmt-size").onchange=e=>{if(e.target.value)applyCharFormat({size:Number(e.target.value)});e.target.value="";};
-  bar.querySelectorAll("[data-fmt-color]").forEach(b=>{
-    b.onclick=()=>applyCharFormat({color:b.dataset.fmtColor});
-  });
-
-  document.addEventListener("selectionchange",()=>{
-    const a=document.activeElement;
-    if(a?.classList?.contains("rich-editor")){
-      const key=a.dataset.richKey;
-      formatTargetKey=key;
-      captureRichRange(a,key);
-      updateFormatToolbar();
-    }
-  });
-}
-function captureRichRange(editor,key){
-  const sel=window.getSelection();
-  if(!sel||!sel.rangeCount)return;
-  const r=sel.getRangeAt(0);
-  if(editor.contains(r.commonAncestorContainer)) richRanges[key]=r.cloneRange();
-}
-function insertRichNewline(editor,key){
-  const sel=window.getSelection();
-  let range=null;
-
-  if(sel&&sel.rangeCount){
-    const current=sel.getRangeAt(0);
-    if(editor.contains(current.commonAncestorContainer)) range=current;
-  }
-  if(!range&&richRanges[key]&&editor.contains(richRanges[key].commonAncestorContainer)){
-    range=richRanges[key].cloneRange();
-  }
-  if(!range){
-    range=document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-  }
-
-  range.deleteContents();
-
-  // 브라우저가 <div>, <p>, <br> 조합으로 Enter를 표현하게 두지 않고
-  // 실제 newline 문자 하나를 삽입해서 저장 형식을 항상 동일하게 만듭니다.
-  const node=document.createTextNode("\n");
-  range.insertNode(node);
-  range.setStart(node,1);
-  range.collapse(true);
-
-  if(sel){
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-  richRanges[key]=range.cloneRange();
-  saveRichEditor(key,editor,0);
-}
-function bindRichEditor(editor,key,editable=true){
-  if(!editor)return;
-  richEditors[key]=editor;
-  editor.dataset.richKey=key;
-  editor.contentEditable=editable?"true":"false";
-  setLockableNode(editor,key,"rich",editable);
-  const host=editor.closest("[data-key]");
-  const activate=()=>{
-    if(!editable||!myLocks.has(key))return;
-    focusedField=key;
-    photoTargetKey=key;
-    formatTargetKey=key;
-    document.querySelectorAll(".photo-target,.rich-caret-target").forEach(x=>x.classList.remove("photo-target","rich-caret-target"));
-    if(host) host.classList.add("rich-caret-target");
-    captureRichRange(editor,key);
-    updateFormatToolbar();
-  };
-  if(editable){
-    editor.addEventListener("focus",async()=>{
-      const ok=await acquireFieldLock(key);
-      if(!ok){
-        editor.blur();
-        return;
-      }
-
-      if(document.activeElement!==editor){
-        await releaseFieldLock(key);
-        return;
-      }
-
-      applyNodeLockState(editor,key);
-      activate();
-    });
-    editor.addEventListener("keydown",e=>{
-      if(e.key==="Backspace"||e.key==="Delete"){
-        if(!myLocks.has(key)){
-          e.preventDefault();
-          return;
-        }
-        // 기본 삭제가 DOM에 반영된 직후 정확한 상태를 즉시 저장합니다.
-        queueMicrotask(()=>{
-          if(myLocks.has(key))saveRichEditor(key,editor,0);
-        });
-        return;
-      }
-      if(e.key!=="Enter")return;
-      if(!myLocks.has(key)){
-        e.preventDefault();
-        return;
-      }
-      e.preventDefault();
-      insertRichNewline(editor,key);
-      activate();
-    });
-    ["keyup","mouseup"].forEach(ev=>editor.addEventListener(ev,activate));
-    editor.addEventListener("input",()=>{
-      if(!myLocks.has(key))return;
-      activate();
-      saveRichEditor(key,editor);
-    });
-    editor.addEventListener("blur",async()=>{
-      captureRichRange(editor,key);
-
-      if(myLocks.has(key)) saveRichEditor(key,editor,0);
-
-      // 서식 도구를 누르는 동안에는 선택 영역과 잠금을 유지합니다.
-      if(formatBarInteracting){
-        focusedField=key;
-        publishPresence(key);
-        return;
-      }
-
-      focusedField=null;
-      await releaseFieldLock(key);
-    });
-  }
-}
-function saveRichEditor(key,editor,delay=700){
-  const tokens=editorTokens(editor), plain=tokensPlain(tokens), targetWeek=weekId;
-
-  // 서버 snapshot이 늦게 도착해도 지금 사용자가 만든 상태(특히 완전 삭제)를
-  // 다시 덮어쓰지 못하도록 마지막 로컬 편집을 별도로 보관합니다.
-  localRichEdits.set(key,{plain,tokens:normalizeTokens(tokens,"")});
-
-  // 화면의 최신 상태를 서버 응답보다 먼저 로컬 모델에도 반영합니다.
-  // 특히 모든 글자를 지웠을 때 예전 snapshot이 잠깐 다시 보이는 현상을 막습니다.
-  let localMatch;
-  if((localMatch=key.match(/^s:(.+)$/))){
-    const f=localMatch[1];
-    shared[f]=plain;
-    shared.rich=Object.assign({},shared.rich,{[f]:tokens});
-  }else if((localMatch=key.match(/^p:(\d+)$/))){
-    const k="p"+localMatch[1];
-    shared.pbl=Object.assign({},shared.pbl,{[k]:plain});
-    shared.richPbl=Object.assign({},shared.richPbl,{[k]:tokens});
-  }else if((localMatch=key.match(/^(m\d+):content$/))){
-    const id=localMatch[1];
-    members[id]=Object.assign({},members[id]||{},{content:plain,contentRich:tokens});
-  }else if((localMatch=key.match(/^l:(\d+):(content|note)$/))){
-    const id="r"+localMatch[1], f=localMatch[2];
-    logs[id]=Object.assign({},logs[id]||{},{[f]:plain,[f+"Rich"]:tokens});
-  }
-
-  mark("입력 중…",false);
-  scheduleWrite("rich:"+key,async()=>{
-    try{
-      let m;
-      if((m=key.match(/^s:(.+)$/))){
-        const f=m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
-        await updateDoc(ref,{[f]:plain,[`rich.${f}`]:tokens});
-      }else if((m=key.match(/^p:(\d+)$/))){
-        const k="p"+m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
-        await updateDoc(ref,{[`pbl.${k}`]:plain,[`richPbl.${k}`]:tokens});
-      }else if((m=key.match(/^(m\d+):content$/))){
-        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",m[1]),{content:plain,contentRich:tokens},{merge:true});
-      }else if((m=key.match(/^l:(\d+):(content|note)$/))){
-        const f=m[2];
-        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+m[1]),{[f]:plain,[f+"Rich"]:tokens},{merge:true});
-      }
-      mark("저장됨",true);
-    }catch(e){fail(e);throw e;}
-  },delay);
-}
-function refreshRichEditors(){
-  Object.entries(richEditors).forEach(([key,editor])=>{
-    const {tokens,fallback}=richDataForKey(key);
-    const editable=editor.contentEditable!=="false";
-    renderRichEditor(editor,tokens,fallback,editable);
-  });
-}
-
 function start(){
   $("#app").classList.remove("hide");
-  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared(); bindTeamName(); initFormatToolbar();
+  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared();
   const sel=$("#week-sel");
   WEEKS.forEach(w=>{const o=el("option");o.value=w.id;o.textContent=w.label;sel.appendChild(o);});
   const now=WEEKS.find(w=>w.label.includes("이번 주"))||WEEKS[0];
@@ -1468,64 +468,33 @@ function start(){
     sel.disabled=true;
     try{
       await flushPending();
-      await releaseAllLocks();
       openWeek(sel.value);
     }catch(e){ sel.value=weekId; }
     finally{ sel.disabled=false; }
   };
   openWeek(now.id);
-  setInterval(beat,PRESENCE_HEARTBEAT_MS);
+  setInterval(beat,12000);
 }
 function buildAbsent(){
   const tr=$("#abs-row");
   for(let i=1;i<=MEMBERS;i++){
-    const id="m"+i;
-    const td=el("td","abs"); td.id="abs-"+i; td.dataset.key="absname:"+id;
-    td.innerHTML=`<div class="abs-wrap">
-      <button type="button" class="abs-check" id="abs-check-${i}" aria-label="${i}번 결시 체크">□</button>
-      <input class="abs-name" id="abs-name-${i}" type="text" placeholder="이름">
-    </div>`;
-
-    const check=td.querySelector(".abs-check");
-    const input=td.querySelector(".abs-name");
-
-    check.onclick=async()=>{
-      const key="abscheck:"+id;
-      const ok=await acquireFieldLock(key);
-      if(!ok)return;
-      try{
-        const on=!((shared.absent||{})[id]);
-        shared.absent=Object.assign({},shared.absent,{[id]:on});
-        paintAbsent();
-        save(`absent.${id}`,on,0);
-        await flushPending();
-      }finally{
-        await releaseFieldLock(key);
-      }
+    const td=el("td","abs"); td.id="abs-"+i;
+    td.innerHTML=`<b>□</b><span id="abs-label-${i}">${i}</span>`;
+    td.onclick=()=>{
+      const on=!((shared.absent||{})["m"+i]);
+      shared.absent=Object.assign({},shared.absent,{["m"+i]:on});
+      paintAbsent(); save(`absent.m${i}`,on,0);
     };
-
-    track(input,"absname:"+id);
-    input.addEventListener("input",()=>{
-      shared.absentNames=Object.assign({},shared.absentNames,{[id]:input.value});
-      save(`absentNames.${id}`,input.value);
-    });
-
     tr.appendChild(td);
   }
 }
 function paintAbsent(){
   for(let i=1;i<=MEMBERS;i++){
-    const id="m"+i;
     const td=$("#abs-"+i); if(!td)continue;
-    const on=!!((shared.absent||{})[id]);
+    const on=!!((shared.absent||{})["m"+i]);
     td.classList.toggle("on",on);
-
-    const check=$("#abs-check-"+i);
-    const input=$("#abs-name-"+i);
-    if(check) check.textContent=on?"■":"□";
-    if(input && document.activeElement!==input){
-      input.value=((shared.absentNames||{})[id])||"";
-    }
+    td.querySelector("b").textContent=on?"■":"□";
+    td.querySelector("span").textContent=(members["m"+i]||{}).name||i;
   }
 }
 function buildPbl(){
@@ -1536,10 +505,11 @@ function buildPbl(){
   PBL_STEPS.forEach(([name,pct],i)=>{
     const tr=el("tr");
     tr.innerHTML=(i===0?`<td class="vert" rowspan="10">프로젝트팀 활동</td>`:"")
-      +`<td>${name}</td><td>${pct}</td><td class="cell" data-key="p:${i}"><div class="f rich-editor" id="pbl-${i}" data-rich-key="p:${i}" contenteditable="true"></div></td>`;
+      +`<td>${name}</td><td>${pct}</td><td class="cell" data-key="p:${i}"><textarea class="f" id="pbl-${i}" rows="1"></textarea></td>`;
     t.appendChild(tr);
-    const editor=$("#pbl-"+i);
-    bindRichEditor(editor,"p:"+i,true);
+    const ta=tr.querySelector("textarea");
+    track(ta,"p:"+i);
+    ta.addEventListener("input",()=>{autosize(ta);save(`pbl.p${i}`,ta.value);});
   });
 }
 function buildMembers(){
@@ -1550,19 +520,16 @@ function buildMembers(){
     r1.innerHTML=`<td class="cell" data-key="${id}:name" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">이름 :</span><input class="f" id="${id}-name" type="text" ${mine?"":"readonly"}></div></td>
       <td class="cell" rowspan="2" style="vertical-align:top" data-key="${id}:content">
-        <div class="f rich-editor" id="${id}-content" data-rich-key="${id}:content" style="min-height:74px" contenteditable="${mine?"true":"false"}"></div>
+        <textarea class="f" id="${id}-content" style="min-height:74px" ${mine?"":"readonly"}></textarea>
         <div class="shots" id="${id}-shots"></div></td>`;
     r2.innerHTML=`<td class="cell" data-key="${id}:role" style="background:${bg}">
         <div class="flex"><span class="unit" style="padding-left:6px">역할 :</span><input class="f" id="${id}-role" type="text" ${mine?"":"readonly"}></div></td>`;
     t.appendChild(r1); t.appendChild(r2);
-    ["name","role"].forEach(f=>{
+    if(mine) ["name","role","content"].forEach(f=>{
       const n=$("#"+id+"-"+f);
-      if(mine){
-        track(n,id+":"+f);
-        n.addEventListener("input",()=>{autosize(n);saveMember(f,n.value);});
-      }
+      track(n,id+":"+f);
+      n.addEventListener("input",()=>{autosize(n);saveMember(f,n.value);});
     });
-    bindRichEditor($("#"+id+"-content"),id+":content",mine);
   }
 }
 function buildLogs(){
@@ -1571,123 +538,63 @@ function buildLogs(){
     const tr=el("tr");
     tr.innerHTML=`
       <td class="cell" data-key="l:${r}:date"><input class="f" id="lg-${r}-date" type="text" style="text-align:center"></td>
-      <td class="cell" data-key="l:${r}:content"><div class="f rich-editor" id="lg-${r}-content" data-rich-key="l:${r}:content" contenteditable="true"></div></td>
-      <td class="cell" data-key="l:${r}:note"><div class="f rich-editor" id="lg-${r}-note" data-rich-key="l:${r}:note" contenteditable="true"></div></td>`;
+      <td class="cell" data-key="l:${r}:content"><textarea class="f" id="lg-${r}-content" rows="1"></textarea></td>
+      <td class="cell" data-key="l:${r}:note"><textarea class="f" id="lg-${r}-note" rows="1"></textarea></td>`;
     t.appendChild(tr);
-    const date=$("#lg-"+r+"-date");
-    track(date,`l:${r}:date`);
-    date.addEventListener("input",()=>saveLog(r,"date",date.value));
-    bindRichEditor($("#lg-"+r+"-content"),`l:${r}:content`,true);
-    bindRichEditor($("#lg-"+r+"-note"),`l:${r}:note`,true);
+    ["date","content","note"].forEach(f=>{
+      const n=$(`#lg-${r}-${f}`);
+      track(n,`l:${r}:${f}`);
+      n.addEventListener("input",()=>{autosize(n);saveLog(r,f,n.value);});
+    });
   }
 }
 function bindShared(){
   SHARED_FIELDS.forEach(f=>{
     const n=document.querySelector(`[data-f="${f}"]`);
-    if(RICH_SHARED.has(f)){
-      bindRichEditor(n,"s:"+f,true);
-    }else{
-      track(n,"s:"+f);
-      n.addEventListener("input",()=>{autosize(n);save(f,n.value);});
-    }
+    track(n,"s:"+f);
+    n.addEventListener("input",()=>{autosize(n);save(f,n.value);});
   });
 }
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={}; presenceAll={}; presenceReady=false; photos={}; inlinePhotos={}; locks={};
+  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={};
   shared={}; members={}; logs={};
-  localRichEdits.clear();
   weekId=id;
-  renderShared(); renderMembers(); renderLogs(); renderInlinePhotos();
+  renderShared(); renderMembers(); renderLogs();
   for(let i=1;i<=MEMBERS;i++) renderPhotos("m"+i);
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
-  unsub.push(onSnapshot(wref,s=>{
-    shared=s.data()||{};
-    if(shared.teamName)setTeamName(shared.teamName);
-    reconcileLocalRichEdits();
-    renderShared();
-  },fail));
-  unsub.push(onSnapshot(collection(wref,"members"),s=>{
-    members={};s.forEach(d=>members[d.id]=d.data());
-    reconcileLocalRichEdits();
-    renderMembers();
-  },fail));
-  unsub.push(onSnapshot(collection(wref,"logs"),s=>{
-    logs={};s.forEach(d=>logs[d.id]=d.data());
-    reconcileLocalRichEdits();
-    renderLogs();
-  },fail));
-  unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
-    inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
-    renderInlinePhotos(); refreshRichEditors();
-  },fail));
-
+  unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};renderShared();},fail));
+  unsub.push(onSnapshot(collection(wref,"members"),s=>{members={};s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
+  unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
       photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
     },fail));
   }
-  presenceReady=false;
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
-    presenceAll={};
-    peers={};
-    const now=Date.now();
-
-    s.forEach(d=>{
-      const v=d.data()||{};
-      if(!v.at||now-v.at>=PRESENCE_STALE_MS)return;
-      presenceAll[d.id]=v;
-      if(d.id!==uid)peers[d.id]=v;
-    });
-
-    presenceReady=true;
-    rebuildLocksFromPresence();
+    peers={}; const now=Date.now();
+    s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
     renderPeers();
-  },e=>{
-    console.error("presence 구독 실패",e?.code,e?.message);
-    if(String(e?.code||"").includes("resource-exhausted")){
-      mark("Firebase 사용량 한도 초과",false);
-    }else fail(e);
-  }));
+  },fail));
   mark("연결됨",true);
 }
 const fail=e=>{console.error(e);mark("저장 안 됨",false);};
 function mark(t,ok){const s=$("#save-status");s.textContent=t;s.classList.toggle("on",!!ok);}
-function enqueueWrite(key,write){
-  // 같은 필드의 Firebase 쓰기는 반드시 순서대로 실행합니다.
-  // 이전 저장이 네트워크에서 늦게 끝나더라도 최신 삭제/수정 내용을 덮어쓸 수 없습니다.
-  const prev=writeChains.get(key)||Promise.resolve();
-  const next=prev.catch(()=>{}).then(write);
-  writeChains.set(key,next);
-  next.finally(()=>{
-    if(writeChains.get(key)===next) writeChains.delete(key);
-  });
-  return next;
-}
 function scheduleWrite(key,write,delay){
   clearTimeout(timers[key]);
   pendingWrites.set(key,write);
   timers[key]=setTimeout(()=>{
-    pendingWrites.delete(key);
-    delete timers[key];
-    enqueueWrite(key,write).catch(()=>{});
+    pendingWrites.delete(key); delete timers[key];
+    write().catch(()=>{});
   },delay);
 }
 async function flushPending(){
-  // 아직 타이머에 남은 최신 입력을 먼저 큐에 넣습니다.
   const jobs=Array.from(pendingWrites.entries());
   pendingWrites.clear();
-  jobs.forEach(([key,write])=>{
-    clearTimeout(timers[key]);
-    delete timers[key];
-    enqueueWrite(key,write);
-  });
-
-  // 이미 전송 중인 예전 저장 + 방금 큐에 넣은 최신 저장까지 모두 끝날 때까지 기다립니다.
-  const active=Array.from(writeChains.values());
-  if(active.length) await Promise.allSettled(active);
+  jobs.forEach(([key])=>{clearTimeout(timers[key]);delete timers[key];});
+  await Promise.all(jobs.map(([,write])=>write()));
 }
 
 function save(path,value,delay=700){
@@ -1726,40 +633,30 @@ function saveLog(row,field,value){
 function renderShared(){
   SHARED_FIELDS.forEach(f=>{
     const n=document.querySelector(`[data-f="${f}"]`);
-    if(!n)return;
-    if(RICH_SHARED.has(f)){
-      renderRichEditor(n,shared.rich?.[f],shared[f]??"",true);
-    }else if(document.activeElement!==n){
-      n.value=shared[f]??(f==="totalHours"?"110":""); autosize(n);
-    }
+    if(document.activeElement!==n){ n.value=shared[f]??""; autosize(n); }
   });
   PBL_STEPS.forEach((_,i)=>{
-    const n=$("#pbl-"+i), k="p"+i;
-    if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
+    const n=$("#pbl-"+i);
+    if(n&&document.activeElement!==n){ n.value=(shared.pbl||{})["p"+i]??(PBL_DEFAULT[i]||""); autosize(n); }
   });
-  document.documentElement.style.setProperty("--red","#C00000");
   paintAbsent();
 }
 function renderMembers(){
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i,d=members[id]||{};
-    ["name","role"].forEach(f=>{
+    ["name","role","content"].forEach(f=>{
       const n=$("#"+id+"-"+f);
       if(n&&document.activeElement!==n){ n.value=d[f]??""; autosize(n); }
     });
-    const editor=$("#"+id+"-content");
-    if(editor) renderRichEditor(editor,d.contentRich,d.content??"",id===slot);
   }
   paintAbsent();
 }
 function renderLogs(){
   for(let r=1;r<=LOG_ROWS;r++){
     const d=logs["r"+r]||{};
-    const date=$("#lg-"+r+"-date");
-    if(date&&document.activeElement!==date) date.value=d.date??"";
-    ["content","note"].forEach(f=>{
-      const editor=$(`#lg-${r}-${f}`);
-      if(editor) renderRichEditor(editor,d[f+"Rich"],d[f]??"",true);
+    ["date","content","note"].forEach(f=>{
+      const n=$(`#lg-${r}-${f}`);
+      if(n&&document.activeElement!==n){ n.value=d[f]??""; autosize(n); }
     });
   }
 }
@@ -1781,34 +678,6 @@ function renderPhotos(id){
     box.appendChild(d);
   });
 }
-function renderInlinePhotos(){
-  document.querySelectorAll(".inline-shots").forEach(x=>x.remove());
-  const grouped={};
-  Object.entries(inlinePhotos||{})
-    .sort((a,b)=>(a[1].at||0)-(b[1].at||0))
-    .forEach(([pid,p])=>{
-      if(!p.target||p.mode==="inline")return;
-      (grouped[p.target]||(grouped[p.target]=[])).push([pid,p]);
-    });
-  Object.entries(grouped).forEach(([target,list])=>{
-    const host=document.querySelector(`[data-key="${CSS.escape(target)}"]`);
-    if(!host)return;
-    const box=el("div","inline-shots");
-    list.forEach(([pid,p])=>{
-      const d=el("div","shot");
-      d.innerHTML=`<img src="${p.data}" alt=""><button title="삭제">×</button>`;
-      d.querySelector("img").onclick=()=>{const lb=$("#lightbox");lb.querySelector("img").src=p.data;lb.classList.remove("hide");};
-      d.querySelector("button").onclick=async()=>{
-        if(!confirm("이 사진을 지울까요?"))return;
-        try{await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));}
-        catch(e){fail(e);}
-      };
-      box.appendChild(d);
-    });
-    host.appendChild(box);
-  });
-}
-
 async function loadImage(file){
   try{ return await createImageBitmap(file); }catch(e){}
   const url=URL.createObjectURL(file);
@@ -1842,81 +711,33 @@ async function shrink(file){
   }
   throw new Error("사진 용량이 너무 큽니다");
 }
-$("#btn-photo").onclick=()=>{
-  if(!photoTargetKey){
-    alert("사진을 넣을 입력칸을 먼저 클릭해 주세요. 파란 테두리가 표시된 칸에 사진이 들어갑니다.");
-    return;
-  }
-  $("#pick").value="";
-  $("#pick").click();
-};
+$("#btn-photo").onclick=()=>{ $("#pick").value=""; $("#pick").click(); };
 $("#pick").onchange=async e=>{
   const files=Array.from(e.target.files||[]); if(!files.length)return;
-  const target=photoTargetKey;
-  if(!target)return;
-  const photoLock=await acquireFieldLock(target);
-  if(!photoLock){
-    alert("다른 사용자가 이 칸을 수정 중이라 사진을 추가할 수 없습니다.");
-    return;
-  }
   const btn=$("#btn-photo"); btn.disabled=true;
-  const current=Object.values(inlinePhotos||{}).filter(p=>p.target===target).length;
-  const room=MAX_SHOTS-current;
+  const room=MAX_SHOTS-Object.keys(photos[slot]||{}).length;
   const picked=files.slice(0,Math.max(room,0));
   const bad=[];
-  const richEditor=richEditors[target];
-  let range=richRanges[target]?.cloneRange()||null;
-
   for(let i=0;i<picked.length;i++){
     const f=picked[i];
     btn.textContent=`올리는 중 ${i+1}/${picked.length}`;
     try{
       const img=await shrink(f);
-      const pid="p"+Date.now()+Math.floor(Math.random()*99999);
-      const photoDoc={
-        target,
-        data:img.data,
-        w:img.w,
-        h:img.h,
-        name:f.name||"",
-        by:uid,
-        at:Date.now(),
-        mode:richEditor?"inline":"attached"
-      };
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid),photoDoc);
-      inlinePhotos[pid]=photoDoc;
-
-      if(richEditor){
-        if(!range||!richEditor.contains(range.commonAncestorContainer)){
-          range=document.createRange();
-          range.selectNodeContents(richEditor);
-          range.collapse(false);
-        }
-        const node=makeInlinePhotoNode(pid,photoDoc,true);
-        range.deleteContents();
-        range.insertNode(node);
-        range.setStartAfter(node); range.collapse(true);
-        const spacer=document.createTextNode("\u200B");
-        range.insertNode(spacer);
-        range.setStartAfter(spacer); range.collapse(true);
-        richRanges[target]=range.cloneRange();
-        const sel=window.getSelection();
-        sel.removeAllRanges(); sel.addRange(range);
-        saveRichEditor(target,richEditor,0);
-      }
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",slot,"photos","p"+Date.now()+Math.floor(Math.random()*999)),
+        { data:img.data, w:img.w, h:img.h, name:f.name||"", at:Date.now() });
     }catch(err){ console.error(f.name,err); bad.push((f.name||"사진")+" — "+err.message); }
   }
   btn.disabled=false; btn.textContent="사진 추가";
   mark(bad.length&&bad.length===picked.length?"저장 안 됨":"저장됨", !(bad.length&&bad.length===picked.length));
-  if(files.length>picked.length) alert(`한 입력칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
+  if(files.length>picked.length) alert(`본인 칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
   if(bad.length) alert("올리지 못한 사진:\n\n"+bad.join("\n"));
-  await releaseFieldLock(target);
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
 async function beat(){
   if(!uid||!weekId)return;
-  await publishPresence(focusedField);
+  try{ await setDoc(doc(db,"teams",TEAM_ID,"presence",uid),{
+    name:(members[slot]||{}).name||slot.replace("m","")+"번", field:focusedField, week:weekId, at:Date.now() }); }catch(e){}
 }
 function renderPeers(){
   document.querySelectorAll(".peer").forEach(p=>p.remove());
@@ -1958,40 +779,12 @@ function findCell(tbl,row,col){
   }
   return null;
 }
-function makeTableFlowAcrossPages(tbl){
-  if(!tbl)return;
-  // 표가 한 페이지에 통째로 붙어 있으려고 하지 않고,
-  // 셀/행 단위로 다음 페이지에 자연스럽게 이어지도록 설정합니다.
-  tbl.setAttribute("pageBreak","CELL");
-  tbl.setAttribute("noAdjust","0");
-
-  const pos=kids(tbl,"hp:pos")[0];
-  if(pos){
-    // HWPX에서 treatAsChar="1"인 긴 표는 페이지를 넘기지 못하고
-    // 통째로 다음 페이지로 이동하거나 아래가 잘릴 수 있습니다.
-    pos.setAttribute("treatAsChar","0");
-    pos.setAttribute("flowWithText","1");
-    pos.setAttribute("allowOverlap","0");
-  }
-
-  // 고정 레이아웃 캐시가 이전 페이지 배치를 강제하지 않도록
-  // 표를 담고 있는 문단의 줄 배치 캐시는 제거해 한글이 다시 계산하게 합니다.
-  const run=tbl.parentNode;
-  const para=run&&run.parentNode;
-  if(para&&para.tagName==="hp:p"){
-    Array.from(para.getElementsByTagName("hp:linesegarray")).forEach(n=>{
-      if(n.parentNode===para) n.parentNode.removeChild(n);
-    });
-  }
-}
-
 function fillCell(xdoc,tbl,row,col,text){
   const tc=findCell(tbl,row,col); if(!tc)return;
   const sub=kids(tc,"hp:subList")[0]; if(!sub)return;
   const ps=kids(sub,"hp:p"); if(!ps.length)return;
   const base=ps[0];
   const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
-  const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
   ps.slice(1).forEach(p=>sub.removeChild(p));
   String(text??"").split("\n").forEach((line,i)=>{
     const p=i===0?base:base.cloneNode(true);
@@ -2057,275 +850,38 @@ function addPics(xdoc, tbl, row, col, shots){
     sub.appendChild(p);
   }
 }
-const HH="http://www.hancom.co.kr/hwpml/2011/head";
-const HWP_FONT_IDS={"맑은 고딕":"0","함초롬돋움":"1","함초롬바탕":"2"};
-
-function createHwpStyleContext(hdoc){
-  const charProps=hdoc.getElementsByTagName("hh:charProperties")[0];
-  const paraProps=hdoc.getElementsByTagName("hh:paraProperties")[0];
-  const charNodes=Array.from(charProps.getElementsByTagName("hh:charPr"));
-  const paraNodes=Array.from(paraProps.getElementsByTagName("hh:paraPr"));
-  const redIds=new Set(charNodes.filter(n=>/^#(?:FF0000|C00000)$/i.test(n.getAttribute("textColor")||"")).map(n=>n.getAttribute("id")));
-  return {
-    hdoc,charProps,paraProps,redIds,
-    nextChar:Math.max(...charNodes.map(n=>Number(n.getAttribute("id")||0)))+1,
-    nextPara:Math.max(...paraNodes.map(n=>Number(n.getAttribute("id")||0)))+1,
-    charMap:new Map(),paraMap:new Map()
-  };
-}
-function directChild(node,name){
-  return Array.from(node.children||[]).find(c=>c.tagName===name)||null;
-}
-function removeChildren(node,names){
-  Array.from(node.children||[]).forEach(c=>{if(names.includes(c.tagName))node.removeChild(c);});
-}
-function ensureCharPr(ctx,baseRef,style,forceBlackContent=false){
-  let s=cleanFmt(style);
-  if(forceBlackContent&&ctx.redIds.has(String(baseRef))&&!s.color)s=Object.assign({},s,{color:"#000000"});
-  if(!Object.keys(s).length)return String(baseRef);
-  const key=String(baseRef)+"|"+fmtKey(s);
-  if(ctx.charMap.has(key))return ctx.charMap.get(key);
-
-  const base=Array.from(ctx.charProps.getElementsByTagName("hh:charPr")).find(n=>n.getAttribute("id")===String(baseRef))
-    ||ctx.charProps.getElementsByTagName("hh:charPr")[0];
-  const cp=base.cloneNode(true),id=String(ctx.nextChar++);
-  cp.setAttribute("id",id);
-  if(s.size)cp.setAttribute("height",String(Math.round(s.size*100)));
-  if(s.color)cp.setAttribute("textColor",s.color);
-  if(s.bg)cp.setAttribute("shadeColor",s.bg);
-
-  const fontRef=directChild(cp,"hh:fontRef");
-  if(fontRef&&s.font&&HWP_FONT_IDS[s.font]!=null){
-    const fid=HWP_FONT_IDS[s.font];
-    ["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>fontRef.setAttribute(k,fid));
-  }
-  const ratio=directChild(cp,"hh:ratio");
-  if(ratio&&s.ratio)["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>ratio.setAttribute(k,String(s.ratio)));
-  const spacing=directChild(cp,"hh:spacing");
-  if(spacing&&s.spacing!=null)["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>spacing.setAttribute(k,String(s.spacing)));
-
-  removeChildren(cp,["hh:italic","hh:bold","hh:emboss","hh:engrave","hh:supscript","hh:subscript"]);
-  const underline=directChild(cp,"hh:underline");
-  if(underline){
-    underline.setAttribute("type",s.underline?"BOTTOM":"NONE");
-    underline.setAttribute("shape","SOLID");
-    underline.setAttribute("color",s.color||"#000000");
-  }
-  const strike=directChild(cp,"hh:strikeout");
-  if(strike){strike.setAttribute("shape",s.strike?"SOLID":"NONE");strike.setAttribute("color",s.color||"#000000");}
-  const outline=directChild(cp,"hh:outline");if(outline)outline.setAttribute("type",s.outline?"SOLID":"NONE");
-  const shadow=directChild(cp,"hh:shadow");if(shadow){shadow.setAttribute("type",s.shadow?"DROP":"NONE");shadow.setAttribute("color","#808080");}
-
-  const before=underline;
-  if(s.italic)cp.insertBefore(ctx.hdoc.createElementNS(HH,"hh:italic"),before);
-  if(s.bold)cp.insertBefore(ctx.hdoc.createElementNS(HH,"hh:bold"),before);
-
-  const optionalOrder=[["emboss",s.emboss],["engrave",s.engrave],["supscript",s.sup],["subscript",s.sub]];
-  optionalOrder.forEach(([name,on])=>{if(on)cp.appendChild(ctx.hdoc.createElementNS(HH,"hh:"+name));});
-
-  ctx.charProps.appendChild(cp);
-  ctx.charProps.setAttribute("itemCnt",String(ctx.charProps.getElementsByTagName("hh:charPr").length));
-  ctx.charMap.set(key,id);
-  return id;
-}
-function ensureParaPr(ctx,baseRef,style){
-  const s=cleanParaStyle(style);
-  if(!Object.keys(s).length)return String(baseRef);
-  const key=String(baseRef)+"|"+JSON.stringify(s);
-  if(ctx.paraMap.has(key))return ctx.paraMap.get(key);
-
-  const base=Array.from(ctx.paraProps.getElementsByTagName("hh:paraPr")).find(n=>n.getAttribute("id")===String(baseRef))
-    ||ctx.paraProps.getElementsByTagName("hh:paraPr")[0];
-  const pp=base.cloneNode(true),id=String(ctx.nextPara++);
-  pp.setAttribute("id",id);
-
-  const align=directChild(pp,"hh:align");
-  if(align&&s.align)align.setAttribute("horizontal",s.align.toUpperCase());
-  if(s.lineSpacing){
-    Array.from(pp.getElementsByTagName("hh:lineSpacing")).forEach(ls=>{
-      ls.setAttribute("type","PERCENT");ls.setAttribute("value",String(s.lineSpacing));ls.setAttribute("unit","HWPUNIT");
-    });
-  }
-  if(s.indent){
-    Array.from(pp.getElementsByTagName("hc:left")).forEach(n=>n.setAttribute("value",String(s.indent*1000)));
-  }
-
-  ctx.paraProps.appendChild(pp);
-  ctx.paraProps.setAttribute("itemCnt",String(ctx.paraProps.getElementsByTagName("hh:paraPr").length));
-  ctx.paraMap.set(key,id);
-  return id;
-}
-function recolorTemplateRedRuns(xdoc,ctx,color){
-  if(!/^#[0-9A-F]{6}$/i.test(color||""))return;
-  Array.from(xdoc.getElementsByTagName("hp:run")).forEach(run=>{
-    const ref=run.getAttribute("charPrIDRef");
-    if(ctx.redIds.has(ref))run.setAttribute("charPrIDRef",ensureCharPr(ctx,ref,{color}));
-  });
-}
-
-function addInlineRunImage(xdoc,p,ref,sh){
-  if(!sh)return;
-  let cw=Math.min(18000,sh.w*PX), chh=Math.round(cw*sh.h/sh.w);
-  if(chh>16000){chh=16000;cw=Math.round(chh*sh.w/sh.h);}
-  const run=xdoc.createElementNS(HP,"hp:run");
-  run.setAttribute("charPrIDRef",ref);
-  const frag=new DOMParser().parseFromString(picXml(sh.item,sh.w,sh.h,cw,chh),"application/xml");
-  run.appendChild(xdoc.importNode(frag.documentElement,true));
-  run.appendChild(xdoc.createElementNS(HP,"hp:t"));
-  p.appendChild(run);
-}
-function addInlineRunText(xdoc,p,ref,text,styleCtx,style){
-  if(!text)return;
-  const run=xdoc.createElementNS(HP,"hp:run");
-  run.setAttribute("charPrIDRef",ensureCharPr(styleCtx,ref,style,true));
-  const t=xdoc.createElementNS(HP,"hp:t");
-  t.appendChild(xdoc.createTextNode(text));
-  run.appendChild(t); p.appendChild(run);
-}
-function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyle={}){
-  const tc=findCell(tbl,row,col); if(!tc)return;
-  const sub=kids(tc,"hp:subList")[0]; if(!sub)return;
-  const ps=kids(sub,"hp:p"); if(!ps.length)return;
-  const base=ps[0];
-  const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
-  const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
-  ps.slice(1).forEach(p=>sub.removeChild(p));
-  const list=normalizeTokens(tokens,fallback);
-  const paragraphs=[[]];
-  list.forEach(tok=>{
-    if(tok.type==="image"){paragraphs[paragraphs.length-1].push(tok);return;}
-    String(tok.text??"").split("\n").forEach((part,i)=>{
-      if(i)paragraphs.push([]);
-      if(part)paragraphs[paragraphs.length-1].push({type:"text",text:part,style:tok.style});
-    });
-  });
-  if(!paragraphs.length)paragraphs.push([]);
-  paragraphs.forEach((parts,i)=>{
-    const p=i===0?base:base.cloneNode(true);
-    Array.from(p.getElementsByTagName("hp:run")).forEach(r=>r.parentNode.removeChild(r));
-    Array.from(p.getElementsByTagName("hp:linesegarray")).forEach(r=>r.parentNode.removeChild(r));
-    p.setAttribute("paraPrIDRef",ensureParaPr(styleCtx,baseParaRef,paraStyle));
-    parts.forEach(tok=>{
-      if(tok.type==="text")addInlineRunText(xdoc,p,ref,tok.text,styleCtx,tok.style);
-      else if(tok.type==="image")addInlineRunImage(xdoc,p,ref,itemMap[tok.id]);
-    });
-    if(i>0)sub.appendChild(p);
-  });
-}
-
-function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
-  const sharedMap={
-    "s:topic":[T1,1,1],
-    "s:weekly":[T1,2,1],
-    "s:period":[T1,4,1],
-    "s:hours":[T1,4,6],
-    "s:totalHours":[T1,4,6],
-    "s:progress":[T1,4,10],
-    "s:plan":[T1,6,1],
-    "s:meeting":[T1,7,1],
-    "s:next":[T1,8,1],
-    "s:mentor":[T1,9,1]
-  };
-  if(sharedMap[target]) return sharedMap[target];
-
-  let m=target.match(/^p:(\d+)$/);
-  if(m) return [TPBL,Number(m[1])+2,3];
-
-  m=target.match(/^m(\d+):(name|role|content)$/);
-  if(m){
-    const i=Number(m[1])-1, f=m[2];
-    if(i<0||i>=MEMBERS)return null;
-    if(f==="name")return [TMEM,i*2,0];
-    if(f==="role")return [TMEM,i*2+1,0];
-    return [TMEM,i*2,1];
-  }
-
-  m=target.match(/^l:(\d+):(date|content|note)$/);
-  if(m){
-    const r=Number(m[1]), col={date:0,content:1,note:2}[m[2]];
-    return [TLOG,r,col];
-  }
-  return null;
-}
-
-function exportRichForKey(key){
-  return richDataForKey(key);
-}
-
 $("#btn-export").onclick=async()=>{
-  const btn=$("#btn-export");
-  const w=weekMeta(weekId);
-  const suggestedName=`01_훈련생_프로젝트_활동일지_${TEAM_NAME}_${w.friday.replace(/-/g,"")}.hwpx`;
-  let fileHandle=null;
-
+  const btn=$("#btn-export"); btn.disabled=true; btn.textContent="만드는 중…";
   try{
-    // Chrome/Edge 등 File System Access API 지원 브라우저에서는
-    // 파일명과 저장 위치를 사용자가 직접 고를 수 있는 저장 팝업을 띄웁니다.
-    if("showSaveFilePicker" in window){
-      btn.textContent="저장 위치 선택…";
-      fileHandle=await window.showSaveFilePicker({
-        suggestedName,
-        types:[{
-          description:"한글 HWPX 문서",
-          accept:{"application/zip":[".hwpx"]}
-        }]
-      });
-    }
-
-    btn.disabled=true;
-    btn.textContent="만드는 중…";
-
     const buf=await (await fetch(TEMPLATE,{cache:"no-store"})).arrayBuffer();
     const zip=await JSZip.loadAsync(buf);
     const xdoc=new DOMParser().parseFromString(await zip.file("Contents/section0.xml").async("string"),"application/xml");
-    const hdoc=new DOMParser().parseFromString(await zip.file("Contents/header.xml").async("string"),"application/xml");
-    const styleCtx=createHwpStyleContext(hdoc);
     const [T1,TPBL,TMEM,TLOG]=Array.from(xdoc.getElementsByTagName("hp:tbl"));
-
-    // 큰 표는 페이지 경계에서 자연스럽게 이어지게 함.
-    // PBL 표(TPBL)는 1번 표 안에 들어가는 중첩 표라 그대로 두고,
-    // 바깥쪽 1번 표 / 훈련생별 표 / 프로젝트 일지만 흐름형으로 바꿉니다.
-    [T1,TMEM,TLOG].forEach(makeTableFlowAcrossPages);
-
-    const binFiles=[]; let imgNo=0;
-    const inlineItemMap={};
-    for(const [pid,sh] of Object.entries(inlinePhotos||{})){
-      if(sh.mode!=="inline"||!sh.data)continue;
-      let iw=sh.w,ih=sh.h;
-      if(!iw||!ih){
-        const im=new Image(); im.src=sh.data;
-        try{if(im.decode)await im.decode();}catch(e){}
-        iw=im.naturalWidth||800; ih=im.naturalHeight||600;
-      }
-      imgNo++;
-      const item="image"+imgNo;
-      binFiles.push({item,path:"BinData/"+item+".jpg",bytes:dataToBytes(sh.data)});
-      inlineItemMap[pid]={item,w:iw,h:ih};
-    }
+    const w=weekMeta(weekId);
 
     fillCell(xdoc,T1,0,1,TEAM_NAME);
     fillCell(xdoc,T1,1,1,shared.topic||"");
-    fillCellRich(xdoc,T1,2,1,shared.rich?.weekly,shared.weekly||"",inlineItemMap,styleCtx,shared.richPara?.weekly);
+    fillCell(xdoc,T1,2,1,shared.weekly||"");
     [1,2,3,5,7,9].forEach((c,i)=>{
-      const id="m"+(i+1);
-      const nm=((shared.absentNames||{})[id])||"";
-      fillCell(xdoc,T1,3,c,`${(shared.absent||{})[id]?"■":"□"} ${nm}`.trimEnd());
+      const nm=(members["m"+(i+1)]||{}).name||String(i+1);
+      fillCell(xdoc,T1,3,c,`${(shared.absent||{})["m"+(i+1)]?"■":"□"} ${nm}`);
     });
     fillCell(xdoc,T1,4,1,shared.period||"");
-    fillCell(xdoc,T1,4,6,`${shared.hours||"    "} / ${shared.totalHours||"110"}H`);
+    fillCell(xdoc,T1,4,6,`${shared.hours||"    "} / 110H`);
     fillCell(xdoc,T1,4,10,`${shared.progress||"    "} %`);
-    fillCellRich(xdoc,T1,6,1,shared.rich?.plan,shared.plan||"",inlineItemMap,styleCtx,shared.richPara?.plan);
-    fillCellRich(xdoc,T1,7,1,shared.rich?.meeting,shared.meeting||"",inlineItemMap,styleCtx,shared.richPara?.meeting);
-    fillCellRich(xdoc,T1,8,1,shared.rich?.next,shared.next||"",inlineItemMap,styleCtx,shared.richPara?.next);
-    fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap,styleCtx,shared.richPara?.mentor);
+    fillCell(xdoc,T1,6,1,shared.plan||"");
+    fillCell(xdoc,T1,7,1,shared.meeting||"");
+    fillCell(xdoc,T1,8,1,shared.next||"");
+    fillCell(xdoc,T1,9,1,shared.mentor||"");
 
-    PBL_STEPS.forEach((_,i)=>{const k="p"+i;fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,shared.richPblPara?.[k]);});
+    PBL_STEPS.forEach((_,i)=>fillCell(xdoc,TPBL,i+2,3,(shared.pbl||{})["p"+i]??(PBL_DEFAULT[i]||"")));
 
+    const binFiles=[]; let imgNo=0;
     for(let i=0;i<MEMBERS;i++){
       const id="m"+(i+1), m=members[id]||{};
       fillCell(xdoc,TMEM,i*2,0,"이름 : "+(m.name||""));
       fillCell(xdoc,TMEM,i*2+1,0,"역할 : "+(m.role||""));
-      fillCellRich(xdoc,TMEM,i*2,1,m.contentRich,m.content||"",inlineItemMap,styleCtx,m.contentPara);
+      fillCell(xdoc,TMEM,i*2,1,m.content||"");
       const shots=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([,p])=>p);
       const ready=[];
       for(const sh of shots){
@@ -2346,30 +902,9 @@ $("#btn-export").onclick=async()=>{
     for(let r=1;r<=LOG_ROWS;r++){
       const d=logs["r"+r]||{};
       fillCell(xdoc,TLOG,r,0,d.date||"");
-      fillCellRich(xdoc,TLOG,r,1,d.contentRich,d.content||"",inlineItemMap,styleCtx,d.contentPara);
-      fillCellRich(xdoc,TLOG,r,2,d.noteRich,d.note||"",inlineItemMap,styleCtx,d.notePara);
+      fillCell(xdoc,TLOG,r,1,d.content||"");
+      fillCell(xdoc,TLOG,r,2,d.note||"");
     }
-
-    // 현재 커서가 있던 입력칸에 추가한 사진도 HWPX의 같은 셀에 삽입
-    const inlineReady={};
-    const inlineList=Object.values(inlinePhotos||{}).sort((a,b)=>(a.at||0)-(b.at||0));
-    for(const sh of inlineList){
-      if(!sh.data||!sh.target||sh.mode==="inline")continue;
-      let iw=sh.w,ih=sh.h;
-      if(!iw||!ih){
-        const im=new Image(); im.src=sh.data;
-        try{if(im.decode)await im.decode();}catch(e){}
-        iw=im.naturalWidth||800; ih=im.naturalHeight||600;
-      }
-      imgNo++;
-      const item="image"+imgNo;
-      binFiles.push({item,path:"BinData/"+item+".jpg",bytes:dataToBytes(sh.data)});
-      (inlineReady[sh.target]||(inlineReady[sh.target]=[])).push({item,w:iw,h:ih});
-    }
-    Object.entries(inlineReady).forEach(([target,ready])=>{
-      const loc=inlineTargetCell(target,T1,TPBL,TMEM,TLOG);
-      if(loc)addPics(xdoc,loc[0],loc[1],loc[2],ready);
-    });
 
     const out=new JSZip();
     out.file("mimetype",await zip.file("mimetype").async("uint8array"),{compression:"STORE"});
@@ -2377,9 +912,6 @@ $("#btn-export").onclick=async()=>{
       let data;
       if(n==="Contents/section0.xml"){
         data=new XMLSerializer().serializeToString(xdoc);
-        if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
-      }else if(n==="Contents/header.xml"){
-        data=new XMLSerializer().serializeToString(hdoc);
         if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
       }else if(n==="Contents/content.hpf" && binFiles.length){
         const hpf=new DOMParser().parseFromString(await zip.file(n).async("string"),"application/xml");
@@ -2398,51 +930,16 @@ $("#btn-export").onclick=async()=>{
       out.file(n,data,{compression:"DEFLATE"});
     }
     binFiles.forEach(b=>out.file(b.path,b.bytes,{compression:"DEFLATE"}));
-    const blob=await out.generateAsync({type:"blob"});
-
-    if(fileHandle){
-      const writable=await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-    }else{
-      // 저장 팝업 API를 지원하지 않는 브라우저는 기존 다운로드 방식으로 대체합니다.
-      const a=el("a");
-      a.href=URL.createObjectURL(blob);
-      a.download=suggestedName;
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-    }
-
+    const a=el("a");
+    a.href=URL.createObjectURL(await out.generateAsync({type:"blob"}));
+    a.download=`01_훈련생_프로젝트_활동일지_${TEAM_NAME}_${w.friday.replace(/-/g,"")}.hwpx`;
+    a.click(); URL.revokeObjectURL(a.href);
     mark("내보냈습니다",true);
   }catch(e){
-    if(e&&e.name==="AbortError"){
-      mark("저장 취소됨",false);
-      return;
-    }
     console.error(e);
     alert("내보내기 실패: "+e.message+"\n\ntemplate.hwpx 가 index.html과 같은 폴더에 있는지 확인해 주세요.");
   }finally{ btn.disabled=false; btn.textContent="한글 파일 내보내기"; }
 };
-
-
-document.addEventListener("focusin",()=>{
-  const active=document.activeElement;
-  const activeKey=active?.dataset?.lockKey||null;
-  Array.from(myLocks).forEach(key=>{
-    if(key!==activeKey) releaseFieldLock(key);
-  });
-});
-
-window.addEventListener("pagehide",()=>{
-  try{
-    setDoc(presenceRef(),{
-      name:currentEditorName(),
-      field:null,
-      week:weekId,
-      at:Date.now()
-    },{merge:true});
-  }catch(e){}
-});
 
 boot();
 </script>
