@@ -368,14 +368,15 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp, runTransaction }
+import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
 const DEFAULT_TEAM={id:"jangwon",name:"장원급제"};
 const KNOWN_TEAMS=[
   DEFAULT_TEAM,
-  {id:"team-2",name:"2팀"}
+  {id:"team-2",name:"2팀"},
+  {id:"team-3",name:"3팀"}
 ];
 
 function validTeamId(id){
@@ -414,6 +415,16 @@ const FIREBASE_CONFIGS = {
     storageBucket: "jongwon-log-team-2.firebasestorage.app",
     messagingSenderId: "863440395387",
     appId: "1:863440395387:web:a4e117002b1ac81e3cd6de"
+  },
+
+  "team-3": {
+    apiKey: "AIzaSyCTzrKlUoD65N9ysRSXikaF1hTLIn_UJ3g",
+    authDomain: "hyundai-8966e.firebaseapp.com",
+    projectId: "hyundai-8966e",
+    storageBucket: "hyundai-8966e.firebasestorage.app",
+    messagingSenderId: "644939668093",
+    appId: "1:644939668093:web:315a0f0a82f8cf76626f14",
+    measurementId: "G-HC1SS5VYR2"
   }
 };
 const TEAM=resolveTeam(location.search);
@@ -425,7 +436,7 @@ const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
+let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},presenceAll={},presenceReady=false,focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
 const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
 const writeChains=new Map();
@@ -433,8 +444,8 @@ const localRichEdits=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
-const LOCK_TTL=20000;
-const LOCK_RENEW_MS=5000;
+const PRESENCE_HEARTBEAT_MS=30000;
+const PRESENCE_STALE_MS=70000;
 
 function currentEditorName(){
   if(slot){
@@ -444,26 +455,25 @@ function currentEditorName(){
   }
   return "다른 사용자";
 }
-function lockDocId(key){
-  return encodeURIComponent(String(key));
+function presenceRef(){
+  if(!uid)throw new Error("auth-not-ready");
+  return doc(db,"teams",TEAM_ID,"presence",uid);
 }
-function lockRef(key){
-  if(!weekId)throw new Error("week-not-ready");
-  return doc(db,"teams",TEAM_ID,"weeks",weekId,"locks",lockDocId(key));
+function activePresence(v){
+  return !!(v&&Number(v.at||0)>Date.now()-PRESENCE_STALE_MS);
 }
-function cleanLockMap(map){
-  const now=Date.now(),out={};
-  Object.entries(map&&typeof map==="object"?map:{}).forEach(([k,v])=>{
-    if(v&&Number(v.expiresAt||0)>now)out[k]=v;
-  });
-  return out;
+function presenceClaimsForField(key){
+  return Object.entries(presenceAll)
+    .filter(([,v])=>activePresence(v)&&v.week===weekId&&v.field===key)
+    .map(([owner,v])=>({owner,...v}))
+    .sort((a,b)=>String(a.owner).localeCompare(String(b.owner)));
 }
-function lockIsActive(v){
-  return !!(v&&Number(v.expiresAt||0)>Date.now());
+function winningPresenceForField(key){
+  return presenceClaimsForField(key)[0]||null;
 }
 function otherLock(key){
   const v=locks[key];
-  return lockIsActive(v)&&v.owner!==uid?v:null;
+  return v&&v.owner!==uid?v:null;
 }
 function setLockableNode(node,key,kind="plain",editable=true){
   if(!node||!editable)return;
@@ -478,7 +488,7 @@ function setLockableNode(node,key,kind="plain",editable=true){
       e.stopPropagation();
       const v=otherLock(key);
       if(v) mark(`${v.name||"다른 사용자"}님이 수정 중`,false);
-      else mark("편집 권한 확인 중…",false);
+      else mark("잠깐 후 다시 클릭해 주세요",false);
     }
   };
   node.addEventListener("beforeinput",stopUnauthorized);
@@ -512,147 +522,107 @@ function renderFieldLocks(){
     applyNodeLockState(node,node.dataset.lockKey);
   });
 }
+function rebuildLocksFromPresence(){
+  const next={};
+  const fields=new Set();
+
+  Object.values(presenceAll).forEach(v=>{
+    if(activePresence(v)&&v.week===weekId&&v.field)fields.add(v.field);
+  });
+
+  fields.forEach(key=>{
+    const winner=winningPresenceForField(key);
+    if(winner)next[key]=winner;
+  });
+
+  locks=next;
+
+  // 두 사람이 거의 동시에 같은 칸을 눌렀다면 uid 기준으로 한 명만 남깁니다.
+  // transaction/추가 읽기 없이 모든 클라이언트가 같은 승자를 계산합니다.
+  for(const key of Array.from(myLocks)){
+    const winner=next[key];
+    if(winner&&winner.owner!==uid){
+      myLocks.delete(key);
+      if(focusedField===key)focusedField=null;
+
+      const active=document.activeElement;
+      if(active?.dataset?.lockKey===key){
+        setTimeout(()=>active.blur(),0);
+      }
+      mark(`${winner.name||"다른 사용자"}님이 수정 중`,false);
+    }
+  }
+
+  renderFieldLocks();
+}
+let presenceWrite=Promise.resolve();
+function publishPresence(field=focusedField){
+  if(!uid||!weekId)return Promise.resolve();
+
+  const payload={
+    name:currentEditorName(),
+    field:field||null,
+    week:weekId,
+    at:Date.now()
+  };
+
+  // 한 사용자의 presence 쓰기만 순서대로 보냅니다.
+  presenceWrite=presenceWrite.catch(()=>{}).then(
+    ()=>setDoc(presenceRef(),payload,{merge:true})
+  ).catch(e=>{
+    console.warn("presence 저장 실패",e?.code,e?.message);
+    if(String(e?.code||"").includes("resource-exhausted")){
+      mark("Firebase 사용량 한도 초과",false);
+    }
+  });
+  return presenceWrite;
+}
 async function acquireFieldLock(key){
   if(!key||!uid||!weekId)return false;
   if(myLocks.has(key))return true;
-  if(lockPending.has(key))return lockPending.get(key);
 
-  const job=(async()=>{
-    const ref=lockRef(key);
-    const now=Date.now();
-    let denied=null;
+  // 이미 다른 사람이 잡고 있는 칸이면 네트워크 요청 없이 즉시 차단합니다.
+  const current=winningPresenceForField(key);
+  if(current&&current.owner!==uid){
+    locks[key]=current;
+    renderFieldLocks();
+    mark(`${current.name||"다른 사용자"}님이 수정 중`,false);
+    return false;
+  }
 
-    try{
-      await runTransaction(db,async tx=>{
-        const snap=await tx.get(ref);
-        const v=snap.exists()?snap.data():null;
+  // 즉시 로컬 편집 허용. 느린 transaction/권한확인 대기 없음.
+  myLocks.clear();
+  myLocks.add(key);
+  focusedField=key;
+  locks[key]={owner:uid,name:currentEditorName(),field:key,week:weekId,at:Date.now()};
+  renderFieldLocks();
 
-        if(v&&v.owner!==uid&&Number(v.expiresAt||0)>now){
-          denied=v;
-          throw new Error("field-locked");
-        }
+  // 서버에는 기존 presence 문서 하나만 갱신합니다.
+  publishPresence(key);
 
-        tx.set(ref,{
-          owner:uid,
-          name:currentEditorName(),
-          field:key,
-          expiresAt:Date.now()+LOCK_TTL,
-          updatedAt:Date.now()
-        });
-      });
-
-      const mine={
-        owner:uid,
-        name:currentEditorName(),
-        field:key,
-        expiresAt:Date.now()+LOCK_TTL
-      };
-      locks[key]=mine;
-      myLocks.add(key);
-      renderFieldLocks();
-      return true;
-
-    }catch(e){
-      if(denied){
-        locks[key]=denied;
-        renderFieldLocks();
-        mark(`${denied.name||"다른 사용자"}님이 수정 중`,false);
-        return false;
-      }
-
-      console.error("잠금 획득 실패",{
-        code:e?.code||"",
-        message:e?.message||String(e),
-        field:key
-      });
-
-      const code=String(e?.code||"unknown");
-      if(code.includes("permission-denied")){
-        mark("잠금 권한 설정 필요",false);
-      }else if(code.includes("unavailable")||code.includes("offline")){
-        mark("네트워크 연결 확인",false);
-      }else if(code.includes("aborted")){
-        mark("잠금 충돌 · 다시 클릭",false);
-      }else{
-        // 더 이상 모든 오류를 '연결 오류'라고 숨기지 않습니다.
-        mark(`잠금 오류: ${code}`,false);
-      }
-      return false;
-    }finally{
-      lockPending.delete(key);
-    }
-  })();
-
-  lockPending.set(key,job);
-  return job;
+  return true;
 }
-
 async function releaseFieldLock(key){
   if(!key)return;
 
-  if(lockPending.has(key)){
-    try{await lockPending.get(key);}catch(e){}
-  }
-
   myLocks.delete(key);
+
+  // 입력한 내용은 먼저 저장 완료시킵니다.
   try{await flushPending();}catch(e){}
 
-  try{
-    const ref=lockRef(key);
-    const snap=await getDoc(ref);
-    if(snap.exists()&&snap.data()?.owner===uid){
-      await deleteDoc(ref);
-    }
-  }catch(e){
-    console.warn("잠금 해제 실패",e?.code,e?.message);
-  }
-
+  if(focusedField===key)focusedField=null;
   if(locks[key]?.owner===uid)delete locks[key];
   renderFieldLocks();
-}
 
+  // 이미 다른 칸으로 이동한 경우 새 칸 claim을 null로 덮지 않습니다.
+  const activeKey=document.activeElement?.dataset?.lockKey||null;
+  if(!activeKey&&!focusedField)publishPresence(null);
+}
 async function releaseAllLocks(){
-  const keys=Array.from(new Set([...myLocks,...lockPending.keys()]));
-  await Promise.allSettled(keys.map(k=>releaseFieldLock(k)));
-}
-
-async function renewMyLocks(){
-  if(!uid||!weekId||!myLocks.size)return;
-
-  const until=Date.now()+LOCK_TTL;
-  const jobs=Array.from(myLocks).map(async key=>{
-    try{
-      const ref=lockRef(key);
-      const snap=await getDoc(ref);
-
-      // 서버에서 이미 다른 사람이 소유하게 된 잠금은 갱신하지 않습니다.
-      if(snap.exists()&&snap.data()?.owner!==uid){
-        myLocks.delete(key);
-        if(locks[key]?.owner===uid)delete locks[key];
-        return;
-      }
-
-      await setDoc(ref,{
-        owner:uid,
-        name:currentEditorName(),
-        field:key,
-        expiresAt:until,
-        updatedAt:Date.now()
-      },{merge:true});
-
-      locks[key]={
-        owner:uid,
-        name:currentEditorName(),
-        field:key,
-        expiresAt:until
-      };
-    }catch(e){
-      console.warn("잠금 갱신 실패",key,e?.code,e?.message);
-    }
-  });
-
-  await Promise.allSettled(jobs);
+  myLocks.clear();
+  focusedField=null;
   renderFieldLocks();
+  await publishPresence(null);
 }
 
 function setTeamName(name){
@@ -865,11 +835,9 @@ function track(n,key){
     document.querySelectorAll(".photo-target").forEach(x=>x.classList.remove("photo-target"));
     const host=n.closest("[data-key]");
     if(host) host.classList.add("photo-target");
-    beat();
   });
   n.addEventListener("blur",async()=>{
     focusedField=null;
-    beat();
     await releaseFieldLock(key);
   });
 }
@@ -1373,7 +1341,6 @@ function bindRichEditor(editor,key,editable=true){
     if(host) host.classList.add("rich-caret-target");
     captureRichRange(editor,key);
     updateFormatToolbar();
-    beat();
   };
   if(editable){
     editor.addEventListener("focus",async()=>{
@@ -1419,14 +1386,18 @@ function bindRichEditor(editor,key,editable=true){
       saveRichEditor(key,editor);
     });
     editor.addEventListener("blur",async()=>{
-      focusedField=null;
       captureRichRange(editor,key);
 
       if(myLocks.has(key)) saveRichEditor(key,editor,0);
-      beat();
 
       // 서식 도구를 누르는 동안에는 선택 영역과 잠금을 유지합니다.
-      if(formatBarInteracting)return;
+      if(formatBarInteracting){
+        focusedField=key;
+        publishPresence(key);
+        return;
+      }
+
+      focusedField=null;
       await releaseFieldLock(key);
     });
   }
@@ -1503,12 +1474,7 @@ function start(){
     finally{ sel.disabled=false; }
   };
   openWeek(now.id);
-  setInterval(beat,12000);
-  setInterval(renewMyLocks,LOCK_RENEW_MS);
-  setInterval(()=>{
-    locks=cleanLockMap(locks);
-    renderFieldLocks();
-  },2000);
+  setInterval(beat,PRESENCE_HEARTBEAT_MS);
 }
 function buildAbsent(){
   const tr=$("#abs-row");
@@ -1629,7 +1595,7 @@ function bindShared(){
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={}; photos={}; inlinePhotos={}; locks={};
+  unsub.forEach(u=>u()); unsub=[]; peers={}; presenceAll={}; presenceReady=false; photos={}; inlinePhotos={}; locks={};
   shared={}; members={}; logs={};
   localRichEdits.clear();
   weekId=id;
@@ -1657,38 +1623,34 @@ function openWeek(id){
     renderInlinePhotos(); refreshRichEditors();
   },fail));
 
-  // 잠금은 일반 작업 데이터와 완전히 분리된 전용 문서로 구독합니다.
-  // 필드마다 문서가 하나라 다른 칸의 입력/저장과 transaction이 충돌하지 않습니다.
-  unsub.push(onSnapshot(collection(wref,"locks"),s=>{
-    const next={};
-    const now=Date.now();
-    s.forEach(d=>{
-      const v=d.data()||{};
-      if(v.field&&Number(v.expiresAt||0)>now)next[v.field]=v;
-    });
-    // 내 잠금은 서버 snapshot이 잠깐 늦어도 로컬 상태를 유지
-    myLocks.forEach(key=>{
-      if(locks[key]?.owner===uid&&!next[key])next[key]=locks[key];
-    });
-    locks=next;
-    renderFieldLocks();
-  },e=>{
-    console.error("잠금 구독 실패",e?.code,e?.message);
-    if(String(e?.code||"").includes("permission-denied")){
-      mark("잠금 권한 설정 필요",false);
-    }
-  }));
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
       photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
     },fail));
   }
+  presenceReady=false;
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
-    peers={}; const now=Date.now();
-    s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
+    presenceAll={};
+    peers={};
+    const now=Date.now();
+
+    s.forEach(d=>{
+      const v=d.data()||{};
+      if(!v.at||now-v.at>=PRESENCE_STALE_MS)return;
+      presenceAll[d.id]=v;
+      if(d.id!==uid)peers[d.id]=v;
+    });
+
+    presenceReady=true;
+    rebuildLocksFromPresence();
     renderPeers();
-  },fail));
+  },e=>{
+    console.error("presence 구독 실패",e?.code,e?.message);
+    if(String(e?.code||"").includes("resource-exhausted")){
+      mark("Firebase 사용량 한도 초과",false);
+    }else fail(e);
+  }));
   mark("연결됨",true);
 }
 const fail=e=>{console.error(e);mark("저장 안 됨",false);};
@@ -1954,8 +1916,7 @@ $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
 async function beat(){
   if(!uid||!weekId)return;
-  try{ await setDoc(doc(db,"teams",TEAM_ID,"presence",uid),{
-    name:(members[slot]||{}).name||slot.replace("m","")+"번", field:focusedField, week:weekId, at:Date.now() }); }catch(e){}
+  await publishPresence(focusedField);
 }
 function renderPeers(){
   document.querySelectorAll(".peer").forEach(p=>p.remove());
@@ -2473,11 +2434,14 @@ document.addEventListener("focusin",()=>{
 });
 
 window.addEventListener("pagehide",()=>{
-  // 브라우저 종료 시 요청이 끝까지 가지 않을 수 있으므로 best-effort 정리.
-  // 실패해도 expiresAt TTL(20초)로 자동 해제됩니다.
-  Array.from(myLocks).forEach(key=>{
-    try{deleteDoc(lockRef(key));}catch(e){}
-  });
+  try{
+    setDoc(presenceRef(),{
+      name:currentEditorName(),
+      field:null,
+      week:weekId,
+      at:Date.now()
+    },{merge:true});
+  }catch(e){}
 });
 
 boot();
