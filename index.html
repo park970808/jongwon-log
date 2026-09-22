@@ -52,6 +52,10 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .formatbar button.fmt-toggle{min-width:29px;padding:4px 6px;font-weight:700}
 .formatbar button.fmt-toggle.on{background:#1D5FD6;border-color:#3E7DE0}
+.formatbar .fmt-color-btn{font-weight:700}
+.formatbar .fmt-color-btn[data-fmt-color="#000000"]{color:#fff}
+.formatbar .fmt-color-btn[data-fmt-color="#C00000"]{color:#ff7070}
+.formatbar .fmt-color-btn[data-fmt-color="#0000FF"]{color:#7ca5ff}
 .formatbar label{
   display:flex;align-items:center;gap:3px;color:#D7D7D7;white-space:nowrap;
 }
@@ -273,17 +277,6 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
           <option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
           <option>28</option><option>32</option><option>36</option>
         </select>
-        <select id="fmt-ratio" title="장평">
-          <option value="">장평</option>
-          <option value="80">80%</option><option value="90">90%</option><option value="100">100%</option>
-          <option value="110">110%</option><option value="120">120%</option><option value="130">130%</option>
-          <option value="150">150%</option>
-        </select>
-        <select id="fmt-spacing" title="자간">
-          <option value="">자간</option>
-          <option value="-20">-20</option><option value="-10">-10</option><option value="-5">-5</option>
-          <option value="0">0</option><option value="5">5</option><option value="10">10</option><option value="20">20</option>
-        </select>
       </div>
 
       <div class="fmt-sep"></div>
@@ -298,17 +291,11 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 
       <div class="fmt-sep"></div>
       <div class="fmt-group">
-        <button type="button" class="fmt-toggle" data-fmt-bool="outline" title="외곽선">윤곽</button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="shadow" title="그림자">그림자</button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="emboss" title="양각">양각</button>
-        <button type="button" class="fmt-toggle" data-fmt-bool="engrave" title="음각">음각</button>
-      </div>
-
-      <div class="fmt-sep"></div>
-      <div class="fmt-group">
-        <label>글자색 <input type="color" id="fmt-color" value="#000000"></label>
+        <span style="color:#D7D7D7">글자색</span>
+        <button type="button" class="fmt-color-btn" data-fmt-color="#000000" title="검은색">검정</button>
+        <button type="button" class="fmt-color-btn" data-fmt-color="#C00000" title="빨간색">빨강</button>
+        <button type="button" class="fmt-color-btn" data-fmt-color="#0000FF" title="파란색">파랑</button>
         <label>형광펜 <input type="color" id="fmt-bg" value="#fff59d"></label>
-        <button type="button" id="fmt-bg-none" title="형광펜 제거">배경없음</button>
       </div>
 
       <div class="fmt-sep"></div>
@@ -323,14 +310,10 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
           <option value="150">150%</option><option value="160">160%</option><option value="180">180%</option>
           <option value="200">200%</option>
         </select>
-        <button type="button" id="fmt-indent-dec" title="왼쪽 여백 줄이기">내어</button>
-        <button type="button" id="fmt-indent-inc" title="왼쪽 여백 늘리기">들여</button>
       </div>
 
       <div class="fmt-sep"></div>
       <div class="fmt-group">
-        <button type="button" id="fmt-clear">글자서식 지우기</button>
-        <button type="button" id="fmt-para-clear">문단서식 지우기</button>
         <label>빨간 라벨색 <input type="color" id="fmt-label-color" value="#c00000"></label>
       </div>
 
@@ -1230,23 +1213,18 @@ function initFormatToolbar(){
   document.addEventListener("pointerup",()=>setTimeout(()=>formatBarInteracting=false,0),true);
 
   bar.querySelectorAll("button").forEach(b=>{
-    b.addEventListener("mousedown",e=>{if(!["fmt-indent-dec","fmt-indent-inc"].includes(b.id))e.preventDefault();});
+    b.addEventListener("mousedown",e=>e.preventDefault());
   });
   bar.querySelectorAll("[data-fmt-bool]").forEach(b=>b.onclick=()=>toggleCharFormat(b.dataset.fmtBool));
   $("#fmt-font").onchange=e=>{if(e.target.value)applyCharFormat({font:e.target.value});e.target.value="";};
   $("#fmt-size").onchange=e=>{if(e.target.value)applyCharFormat({size:Number(e.target.value)});e.target.value="";};
-  $("#fmt-ratio").onchange=e=>{if(e.target.value)applyCharFormat({ratio:Number(e.target.value)});e.target.value="";};
-  $("#fmt-spacing").onchange=e=>{if(e.target.value!=="")applyCharFormat({spacing:Number(e.target.value)});e.target.value="";};
-  $("#fmt-color").onchange=e=>applyCharFormat({color:e.target.value});
+  bar.querySelectorAll("[data-fmt-color]").forEach(b=>{
+    b.onclick=()=>applyCharFormat({color:b.dataset.fmtColor});
+  });
   $("#fmt-bg").onchange=e=>applyCharFormat({bg:e.target.value});
-  $("#fmt-bg-none").onclick=()=>applyCharFormat({bg:null});
-  $("#fmt-clear").onclick=()=>applyCharFormat({__clear:true});
 
   bar.querySelectorAll("[data-fmt-align]").forEach(b=>b.onclick=()=>applyParaPatch({align:b.dataset.fmtAlign}));
   $("#fmt-line").onchange=e=>{if(e.target.value)applyParaPatch({lineSpacing:Number(e.target.value)});};
-  $("#fmt-indent-inc").onclick=()=>{const s=paraStyleForKey(formatTargetKey);applyParaPatch({indent:Math.min(8,(s.indent||0)+1)});};
-  $("#fmt-indent-dec").onclick=()=>{const s=paraStyleForKey(formatTargetKey);applyParaPatch({indent:Math.max(0,(s.indent||0)-1)});};
-  $("#fmt-para-clear").onclick=()=>saveParaStyle(formatTargetKey,{});
 
   $("#fmt-label-color").onchange=e=>{
     const color=e.target.value.toUpperCase();
