@@ -41,6 +41,30 @@ button,input,textarea,select{font:inherit;color:inherit}
 #save-status.on{color:#7FD6B4}
 #who-label{color:#B9B9B9}
 
+.formatbar{
+  flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  padding-top:7px;border-top:1px solid #454545;font-size:12px;
+}
+.formatbar .fmt-group{display:flex;align-items:center;gap:3px}
+.formatbar .fmt-sep{width:1px;height:26px;background:#555;margin:0 3px}
+.formatbar select,.formatbar button{
+  padding:4px 7px;min-height:28px;
+}
+.formatbar button.fmt-toggle{min-width:29px;padding:4px 6px;font-weight:700}
+.formatbar button.fmt-toggle.on{background:#1D5FD6;border-color:#3E7DE0}
+.formatbar label{
+  display:flex;align-items:center;gap:3px;color:#D7D7D7;white-space:nowrap;
+}
+.formatbar input[type="color"]{
+  width:29px;height:28px;padding:1px;border:1px solid #666;background:#333;border-radius:3px;cursor:pointer;
+}
+.formatbar .fmt-note{color:#AAA;margin-left:auto;font-size:11.5px}
+.rich-text-run{white-space:pre-wrap}
+.rich-editor.fmt-left{text-align:left}
+.rich-editor.fmt-center{text-align:center}
+.rich-editor.fmt-right{text-align:right}
+.rich-editor.fmt-justify{text-align:justify}
+
 /* ── 문서 ── */
 .desk{padding:22px 14px 70px;overflow-x:auto}
 .page{width:794px;margin:0 auto;background:#fff;padding:52px 50px 60px;box-shadow:0 2px 14px rgba(0,0,0,.35)}
@@ -234,6 +258,84 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <button id="btn-photo" title="긴 글 입력칸에서는 커서 위치에 사진이 삽입됩니다">사진 추가</button>
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
+
+    <div class="formatbar" id="formatbar" aria-label="글자 및 문단 서식">
+      <div class="fmt-group">
+        <select id="fmt-font" title="글꼴">
+          <option value="">글꼴</option>
+          <option value="맑은 고딕">맑은 고딕</option>
+          <option value="함초롬돋움">함초롬돋움</option>
+          <option value="함초롬바탕">함초롬바탕</option>
+        </select>
+        <select id="fmt-size" title="글자 크기">
+          <option value="">크기</option>
+          <option>8</option><option>9</option><option>10</option><option>11</option><option>12</option>
+          <option>14</option><option>16</option><option>18</option><option>20</option><option>24</option>
+          <option>28</option><option>32</option><option>36</option>
+        </select>
+        <select id="fmt-ratio" title="장평">
+          <option value="">장평</option>
+          <option value="80">80%</option><option value="90">90%</option><option value="100">100%</option>
+          <option value="110">110%</option><option value="120">120%</option><option value="130">130%</option>
+          <option value="150">150%</option>
+        </select>
+        <select id="fmt-spacing" title="자간">
+          <option value="">자간</option>
+          <option value="-20">-20</option><option value="-10">-10</option><option value="-5">-5</option>
+          <option value="0">0</option><option value="5">5</option><option value="10">10</option><option value="20">20</option>
+        </select>
+      </div>
+
+      <div class="fmt-sep"></div>
+      <div class="fmt-group">
+        <button type="button" class="fmt-toggle" data-fmt-bool="bold" title="진하게"><b>B</b></button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="italic" title="기울임"><i>I</i></button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="underline" title="밑줄"><u>U</u></button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="strike" title="취소선"><s>S</s></button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="sup" title="위 첨자">x²</button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="sub" title="아래 첨자">x₂</button>
+      </div>
+
+      <div class="fmt-sep"></div>
+      <div class="fmt-group">
+        <button type="button" class="fmt-toggle" data-fmt-bool="outline" title="외곽선">윤곽</button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="shadow" title="그림자">그림자</button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="emboss" title="양각">양각</button>
+        <button type="button" class="fmt-toggle" data-fmt-bool="engrave" title="음각">음각</button>
+      </div>
+
+      <div class="fmt-sep"></div>
+      <div class="fmt-group">
+        <label>글자색 <input type="color" id="fmt-color" value="#000000"></label>
+        <label>형광펜 <input type="color" id="fmt-bg" value="#fff59d"></label>
+        <button type="button" id="fmt-bg-none" title="형광펜 제거">배경없음</button>
+      </div>
+
+      <div class="fmt-sep"></div>
+      <div class="fmt-group">
+        <button type="button" data-fmt-align="left" title="왼쪽 정렬">왼쪽</button>
+        <button type="button" data-fmt-align="center" title="가운데 정렬">가운데</button>
+        <button type="button" data-fmt-align="right" title="오른쪽 정렬">오른쪽</button>
+        <button type="button" data-fmt-align="justify" title="양쪽 정렬">양쪽</button>
+        <select id="fmt-line" title="줄 간격">
+          <option value="">줄간격</option>
+          <option value="100">100%</option><option value="120">120%</option><option value="130">130%</option>
+          <option value="150">150%</option><option value="160">160%</option><option value="180">180%</option>
+          <option value="200">200%</option>
+        </select>
+        <button type="button" id="fmt-indent-dec" title="왼쪽 여백 줄이기">내어</button>
+        <button type="button" id="fmt-indent-inc" title="왼쪽 여백 늘리기">들여</button>
+      </div>
+
+      <div class="fmt-sep"></div>
+      <div class="fmt-group">
+        <button type="button" id="fmt-clear">글자서식 지우기</button>
+        <button type="button" id="fmt-para-clear">문단서식 지우기</button>
+        <label>빨간 라벨색 <input type="color" id="fmt-label-color" value="#c00000"></label>
+      </div>
+
+      <span class="fmt-note">긴 글 칸에서 텍스트를 선택한 뒤 서식을 적용하세요. 선택이 없으면 해당 칸 전체에 적용됩니다.</span>
+    </div>
   </div>
 
   <div class="desk"><div class="page">
@@ -359,7 +461,7 @@ const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
 
 let db,auth,uid,slot,weekId,started=false;
-let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},focusedField=null,photoTargetKey=null,richEditors={},richRanges={},timers={};
+let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
 const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
 const writeChains=new Map();
@@ -758,19 +860,51 @@ function track(n,key){
 }
 const RICH_SHARED=new Set(["weekly","plan","meeting","next","mentor"]);
 
+function cleanFmt(style){
+  const s=style&&typeof style==="object"?style:{}, o={};
+  const fonts=["맑은 고딕","함초롬돋움","함초롬바탕"];
+  if(fonts.includes(s.font))o.font=s.font;
+  const size=Number(s.size); if(size>=5&&size<=72)o.size=Math.round(size*10)/10;
+  const ratio=Number(s.ratio); if(ratio>=50&&ratio<=200&&ratio!==100)o.ratio=Math.round(ratio);
+  const spacing=Number(s.spacing); if(spacing>=-50&&spacing<=50&&spacing!==0)o.spacing=Math.round(spacing);
+  ["bold","italic","underline","strike","outline","shadow","emboss","engrave","sup","sub"].forEach(k=>{if(s[k])o[k]=true;});
+  if(/^#[0-9a-f]{6}$/i.test(s.color||""))o.color=s.color.toUpperCase();
+  if(/^#[0-9a-f]{6}$/i.test(s.bg||""))o.bg=s.bg.toUpperCase();
+  if(o.sup&&o.sub)delete o.sub;
+  return o;
+}
+function fmtKey(style){return JSON.stringify(cleanFmt(style));}
+function sameFmt(a,b){return fmtKey(a)===fmtKey(b);}
+function mergeFmt(base,patch){
+  const o=Object.assign({},cleanFmt(base));
+  if(patch&&patch.__clear)return {};
+  Object.entries(patch||{}).forEach(([k,v])=>{
+    if(k==="__clear")return;
+    if(v===null||v===false||v===""||(k==="ratio"&&Number(v)===100)||(k==="spacing"&&Number(v)===0))delete o[k];
+    else o[k]=v;
+  });
+  if(o.sup)delete o.sub;
+  if(o.sub)delete o.sup;
+  return cleanFmt(o);
+}
 function normalizeTokens(tokens,fallback=""){
-  if(Array.isArray(tokens)&&tokens.length) return tokens;
-  return fallback!==""?[{type:"text",text:String(fallback)}]:[];
+  if(Array.isArray(tokens)&&tokens.length) return tokens.map(t=>{
+    if(t?.type==="text")return {type:"text",text:String(t.text??""),style:cleanFmt(t.style)};
+    if(t?.type==="image"&&t.id)return {type:"image",id:String(t.id)};
+    return null;
+  }).filter(Boolean);
+  return fallback!==""?[{type:"text",text:String(fallback),style:{}}]:[];
 }
 function mergeTextTokens(tokens){
   const out=[];
-  for(const t of tokens){
+  for(const t of tokens||[]){
     if(!t)continue;
     if(t.type==="text"){
       const s=String(t.text??"").replace(/\u200B/g,"");
       if(!s)continue;
-      if(out.length&&out[out.length-1].type==="text") out[out.length-1].text+=s;
-      else out.push({type:"text",text:s});
+      const style=cleanFmt(t.style);
+      if(out.length&&out[out.length-1].type==="text"&&sameFmt(out[out.length-1].style,style))out[out.length-1].text+=s;
+      else out.push({type:"text",text:s,style});
     }else if(t.type==="image"&&t.id){
       out.push({type:"image",id:String(t.id)});
     }
@@ -780,10 +914,38 @@ function mergeTextTokens(tokens){
 function tokensPlain(tokens){
   return mergeTextTokens(tokens).filter(t=>t.type==="text").map(t=>t.text).join("");
 }
-function appendTextWithBreaks(parent,text){
-  // rich-editor는 white-space:pre-wrap 이므로 실제 \n 문자를 그대로 넣습니다.
-  // 이렇게 해야 저장 → Firebase 동기화 → 다시 렌더링 후에도 줄바꿈 위치가 정확히 유지됩니다.
-  parent.appendChild(document.createTextNode(String(text??"")));
+function applyFmtCss(node,style){
+  const s=cleanFmt(style);
+  node.style.fontFamily=s.font||"";
+  node.style.fontSize=s.size?`${s.size}pt`:"";
+  node.style.fontWeight=s.bold?"700":"";
+  node.style.fontStyle=s.italic?"italic":"";
+  const dec=[]; if(s.underline)dec.push("underline"); if(s.strike)dec.push("line-through");
+  node.style.textDecoration=dec.join(" ");
+  node.style.color=s.color||"";
+  node.style.backgroundColor=s.bg||"";
+  node.style.letterSpacing=s.spacing?`${s.spacing/100}em`:"";
+  node.style.fontStretch=s.ratio?`${s.ratio}%`:"";
+  node.style.verticalAlign=s.sup?"super":s.sub?"sub":"";
+  if(s.sup||s.sub)node.style.fontSize=s.size?`${Math.max(5,s.size*.78)}pt`:"0.78em";
+  let shadows=[];
+  if(s.shadow)shadows.push("1px 1px 1px rgba(0,0,0,.45)");
+  if(s.emboss)shadows.push("-1px -1px 0 #fff,1px 1px 0 #777");
+  if(s.engrave)shadows.push("1px 1px 0 #fff,-1px -1px 0 #777");
+  node.style.textShadow=shadows.join(",");
+  node.style.webkitTextStroke=s.outline?"0.45px currentColor":"";
+}
+function appendTextWithBreaks(parent,text,style={}){
+  const s=cleanFmt(style);
+  if(Object.keys(s).length===0){
+    parent.appendChild(document.createTextNode(String(text??"")));
+    return;
+  }
+  const span=el("span","rich-text-run");
+  span.dataset.fmt=JSON.stringify(s);
+  applyFmtCss(span,s);
+  span.appendChild(document.createTextNode(String(text??"")));
+  parent.appendChild(span);
 }
 function makeInlinePhotoNode(pid,p,editable=true){
   const wrap=el("span","inline-photo-node");
@@ -817,45 +979,50 @@ function makeInlinePhotoNode(pid,p,editable=true){
   }
   return wrap;
 }
-function renderRichEditor(editor,tokens,fallback,editable=true){
-  if(!editor||document.activeElement===editor)return;
+function renderRichContent(editor,tokens,fallback,editable=true){
   const list=normalizeTokens(tokens,fallback);
   editor.innerHTML="";
   list.forEach(t=>{
-    if(t.type==="text") appendTextWithBreaks(editor,t.text);
+    if(t.type==="text")appendTextWithBreaks(editor,t.text,t.style);
     else if(t.type==="image"){
       const p=inlinePhotos[t.id];
-      if(p?.data) editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
+      if(p?.data)editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
     }
   });
 }
+function renderRichEditor(editor,tokens,fallback,editable=true){
+  if(!editor||document.activeElement===editor)return;
+  renderRichContent(editor,tokens,fallback,editable);
+  applyParaStyleToEditor(editor,paraStyleForKey(editor.dataset.richKey));
+}
 function editorTokens(editor){
   const out=[];
-  function pushText(s){
+  function pushText(s,style={}){
     s=String(s??"").replace(/\u200B/g,"");
     if(!s)return;
-    out.push({type:"text",text:s});
+    out.push({type:"text",text:s,style:cleanFmt(style)});
   }
   function walk(node){
-    if(node.nodeType===Node.TEXT_NODE){ pushText(node.nodeValue||""); return; }
+    if(node.nodeType===Node.TEXT_NODE){pushText(node.nodeValue||"");return;}
     if(node.nodeType!==Node.ELEMENT_NODE)return;
     if(node.classList?.contains("inline-photo-node")){
       const id=node.dataset.photoId;
       if(id)out.push({type:"image",id});
       return;
     }
-    if(node.tagName==="BR"){ pushText("\n"); return; }
-
+    if(node.classList?.contains("rich-text-run")){
+      let style={};
+      try{style=JSON.parse(node.dataset.fmt||"{}");}catch(e){}
+      pushText(node.textContent||"",style);
+      return;
+    }
+    if(node.tagName==="BR"){pushText("\n");return;}
     const isBlock=["DIV","P"].includes(node.tagName);
     const before=out.length;
     Array.from(node.childNodes).forEach(walk);
-
     if(isBlock&&node!==editor){
       const last=out[out.length-1];
-      // 빈 DIV/P도 한 줄로 보존하고, 기존 브라우저 생성 DOM도 newline 하나로 정규화합니다.
-      if(out.length===before || !(last?.type==="text"&&last.text.endsWith("\n"))){
-        pushText("\n");
-      }
+      if(out.length===before||!(last?.type==="text"&&last.text.endsWith("\n")))pushText("\n");
     }
   }
   Array.from(editor.childNodes).forEach(walk);
@@ -880,6 +1047,223 @@ function richDataForKey(key){
     return {tokens:d[f+"Rich"],fallback:d[f]??""};
   }
   return {tokens:null,fallback:""};
+}
+function cleanParaStyle(style){
+  const s=style&&typeof style==="object"?style:{},o={};
+  if(["left","center","right","justify"].includes(s.align))o.align=s.align;
+  const ls=Number(s.lineSpacing); if(ls>=80&&ls<=300)o.lineSpacing=Math.round(ls);
+  const indent=Number(s.indent); if(indent>=0&&indent<=8&&indent!==0)o.indent=Math.round(indent);
+  return o;
+}
+function paraStyleForKey(key){
+  if(!key)return {};
+  let m;
+  if((m=key.match(/^s:(.+)$/)))return cleanParaStyle(shared.richPara?.[m[1]]);
+  if((m=key.match(/^p:(\d+)$/)))return cleanParaStyle(shared.richPblPara?.["p"+m[1]]);
+  if((m=key.match(/^(m\d+):content$/)))return cleanParaStyle((members[m[1]]||{}).contentPara);
+  if((m=key.match(/^l:(\d+):(content|note)$/))){
+    const d=logs["r"+m[1]]||{};return cleanParaStyle(d[m[2]+"Para"]);
+  }
+  return {};
+}
+function applyParaStyleToEditor(editor,style){
+  if(!editor)return;
+  const s=cleanParaStyle(style);
+  editor.style.textAlign=s.align||"";
+  editor.style.lineHeight=s.lineSpacing?String(s.lineSpacing/100):"";
+  editor.style.paddingLeft=`${7+(s.indent||0)*14}px`;
+}
+function saveParaStyle(key,style){
+  const s=cleanParaStyle(style),targetWeek=weekId;
+  let m;
+  if((m=key.match(/^s:(.+)$/))){
+    const f=m[1];shared.richPara=Object.assign({},shared.richPara,{[f]:s});
+  }else if((m=key.match(/^p:(\d+)$/))){
+    const k="p"+m[1];shared.richPblPara=Object.assign({},shared.richPblPara,{[k]:s});
+  }else if((m=key.match(/^(m\d+):content$/))){
+    const id=m[1];members[id]=Object.assign({},members[id]||{},{contentPara:s});
+  }else if((m=key.match(/^l:(\d+):(content|note)$/))){
+    const id="r"+m[1],f=m[2];logs[id]=Object.assign({},logs[id]||{},{[f+"Para"]:s});
+  }
+  const editor=richEditors[key];if(editor)applyParaStyleToEditor(editor,s);
+  scheduleWrite("para:"+key,async()=>{
+    let mm;
+    if((mm=key.match(/^s:(.+)$/))){
+      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
+      await setDoc(ref,{[`richPara.${mm[1]}`]:s},{merge:true});
+    }else if((mm=key.match(/^p:(\d+)$/))){
+      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
+      await setDoc(ref,{[`richPblPara.p${mm[1]}`]:s},{merge:true});
+    }else if((mm=key.match(/^(m\d+):content$/))){
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",mm[1]),{contentPara:s},{merge:true});
+    }else if((mm=key.match(/^l:(\d+):(content|note)$/))){
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+mm[1]),{[mm[2]+"Para"]:s},{merge:true});
+    }
+  },0);
+}
+function textLenWithoutPhotos(node){
+  if(!node)return 0;
+  if(node.nodeType===Node.TEXT_NODE)return (node.nodeValue||"").replace(/\u200B/g,"").length;
+  if(node.nodeType!==Node.ELEMENT_NODE)return 0;
+  if(node.classList?.contains("inline-photo-node"))return 0;
+  let n=0;Array.from(node.childNodes).forEach(c=>n+=textLenWithoutPhotos(c));return n;
+}
+function domPointOffset(root,target,targetOffset){
+  let total=0,done=false;
+  function walk(node){
+    if(done)return;
+    if(node===target){
+      if(node.nodeType===Node.TEXT_NODE)total+=(node.nodeValue||"").replace(/\u200B/g,"").slice(0,targetOffset).length;
+      else Array.from(node.childNodes).slice(0,targetOffset).forEach(c=>total+=textLenWithoutPhotos(c));
+      done=true;return;
+    }
+    if(node.nodeType===Node.TEXT_NODE){total+=(node.nodeValue||"").replace(/\u200B/g,"").length;return;}
+    if(node.nodeType!==Node.ELEMENT_NODE||node.classList?.contains("inline-photo-node"))return;
+    Array.from(node.childNodes).forEach(walk);
+  }
+  walk(root);return total;
+}
+function selectionOffsets(editor,key){
+  const sel=window.getSelection();
+  let r=null;
+  if(sel&&sel.rangeCount&&editor.contains(sel.getRangeAt(0).commonAncestorContainer))r=sel.getRangeAt(0);
+  else if(richRanges[key]&&editor.contains(richRanges[key].commonAncestorContainer))r=richRanges[key];
+  const total=tokensPlain(editorTokens(editor)).length;
+  if(!r)return {start:0,end:total,caret:total,collapsed:true};
+  const start=domPointOffset(editor,r.startContainer,r.startOffset);
+  const end=domPointOffset(editor,r.endContainer,r.endOffset);
+  return {start:Math.min(start,end),end:Math.max(start,end),caret:end,collapsed:r.collapsed};
+}
+function textPointAt(editor,offset){
+  let remain=Math.max(0,offset),last={node:editor,offset:editor.childNodes.length};
+  function walk(node){
+    if(node.nodeType===Node.TEXT_NODE){
+      const raw=node.nodeValue||"",len=raw.replace(/\u200B/g,"").length;
+      if(remain<=len){last={node,offset:Math.min(raw.length,remain)};return true;}
+      remain-=len;last={node,offset:raw.length};return false;
+    }
+    if(node.nodeType!==Node.ELEMENT_NODE||node.classList?.contains("inline-photo-node"))return false;
+    for(const c of Array.from(node.childNodes))if(walk(c))return true;
+    return false;
+  }
+  walk(editor);return last;
+}
+function restoreSelectionOffsets(editor,start,end=start){
+  const a=textPointAt(editor,start),b=textPointAt(editor,end);
+  const r=document.createRange();
+  try{r.setStart(a.node,a.offset);r.setEnd(b.node,b.offset);}catch(e){r.selectNodeContents(editor);r.collapse(false);}
+  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+  return r;
+}
+function styleAtTextOffset(tokens,offset){
+  let pos=0,first={};
+  for(const t of mergeTextTokens(tokens)){
+    if(t.type!=="text")continue;
+    if(!Object.keys(first).length)first=t.style||{};
+    const end=pos+t.text.length;
+    if(offset>=pos&&offset<=end)return cleanFmt(t.style);
+    pos=end;
+  }
+  return cleanFmt(first);
+}
+function applyStyleRange(tokens,start,end,patch){
+  const list=mergeTextTokens(tokens),total=tokensPlain(list).length;
+  if(start===end){start=0;end=total;}
+  let pos=0,out=[];
+  for(const t of list){
+    if(t.type!=="text"){out.push(t);continue;}
+    const a=pos,b=pos+t.text.length;
+    if(end<=a||start>=b){out.push(t);pos=b;continue;}
+    const l=Math.max(0,start-a),r=Math.min(t.text.length,end-a);
+    if(l>0)out.push({type:"text",text:t.text.slice(0,l),style:t.style});
+    out.push({type:"text",text:t.text.slice(l,r),style:mergeFmt(t.style,patch)});
+    if(r<t.text.length)out.push({type:"text",text:t.text.slice(r),style:t.style});
+    pos=b;
+  }
+  return mergeTextTokens(out);
+}
+async function applyCharFormat(patch){
+  const key=formatTargetKey,editor=key&&richEditors[key];
+  if(!editor){mark("먼저 긴 글 입력칸을 선택해 주세요",false);return;}
+  const ok=await acquireFieldLock(key);if(!ok)return;
+  const off=selectionOffsets(editor,key);
+  const tokens=editorTokens(editor);
+  const next=applyStyleRange(tokens,off.start,off.end,patch);
+  renderRichContent(editor,next,"",true);
+  applyParaStyleToEditor(editor,paraStyleForKey(key));
+  editor.focus({preventScroll:true});
+  const restoreStart=off.collapsed?off.caret:off.start;
+  const restoreEnd=off.collapsed?off.caret:off.end;
+  richRanges[key]=restoreSelectionOffsets(editor,restoreStart,restoreEnd).cloneRange();
+  saveRichEditor(key,editor,0);
+  updateFormatToolbar();
+}
+async function toggleCharFormat(prop){
+  const key=formatTargetKey,editor=key&&richEditors[key];
+  if(!editor)return mark("먼저 긴 글 입력칸을 선택해 주세요",false);
+  const off=selectionOffsets(editor,key),style=styleAtTextOffset(editorTokens(editor),off.start);
+  await applyCharFormat({[prop]:!style[prop]});
+}
+function updateFormatToolbar(){
+  const key=formatTargetKey,editor=key&&richEditors[key];
+  if(!editor)return;
+  const off=selectionOffsets(editor,key),style=styleAtTextOffset(editorTokens(editor),off.start);
+  document.querySelectorAll("[data-fmt-bool]").forEach(b=>b.classList.toggle("on",!!style[b.dataset.fmtBool]));
+  const para=paraStyleForKey(key);
+  $("#fmt-line").value=para.lineSpacing||"";
+}
+async function applyParaPatch(patch){
+  const key=formatTargetKey,editor=key&&richEditors[key];
+  if(!editor)return mark("먼저 긴 글 입력칸을 선택해 주세요",false);
+  const ok=await acquireFieldLock(key);if(!ok)return;
+  const next=Object.assign({},paraStyleForKey(key),patch||{});
+  Object.keys(next).forEach(k=>{if(next[k]===null||next[k]===""||(k==="indent"&&Number(next[k])===0))delete next[k];});
+  saveParaStyle(key,next);
+  editor.focus({preventScroll:true});
+  if(richRanges[key]){
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(richRanges[key]);
+  }
+}
+function initFormatToolbar(){
+  const bar=$("#formatbar");
+  bar.addEventListener("pointerdown",()=>{formatBarInteracting=true;},true);
+  document.addEventListener("pointerup",()=>setTimeout(()=>formatBarInteracting=false,0),true);
+
+  bar.querySelectorAll("button").forEach(b=>{
+    b.addEventListener("mousedown",e=>{if(!["fmt-indent-dec","fmt-indent-inc"].includes(b.id))e.preventDefault();});
+  });
+  bar.querySelectorAll("[data-fmt-bool]").forEach(b=>b.onclick=()=>toggleCharFormat(b.dataset.fmtBool));
+  $("#fmt-font").onchange=e=>{if(e.target.value)applyCharFormat({font:e.target.value});e.target.value="";};
+  $("#fmt-size").onchange=e=>{if(e.target.value)applyCharFormat({size:Number(e.target.value)});e.target.value="";};
+  $("#fmt-ratio").onchange=e=>{if(e.target.value)applyCharFormat({ratio:Number(e.target.value)});e.target.value="";};
+  $("#fmt-spacing").onchange=e=>{if(e.target.value!=="")applyCharFormat({spacing:Number(e.target.value)});e.target.value="";};
+  $("#fmt-color").onchange=e=>applyCharFormat({color:e.target.value});
+  $("#fmt-bg").onchange=e=>applyCharFormat({bg:e.target.value});
+  $("#fmt-bg-none").onclick=()=>applyCharFormat({bg:null});
+  $("#fmt-clear").onclick=()=>applyCharFormat({__clear:true});
+
+  bar.querySelectorAll("[data-fmt-align]").forEach(b=>b.onclick=()=>applyParaPatch({align:b.dataset.fmtAlign}));
+  $("#fmt-line").onchange=e=>{if(e.target.value)applyParaPatch({lineSpacing:Number(e.target.value)});};
+  $("#fmt-indent-inc").onclick=()=>{const s=paraStyleForKey(formatTargetKey);applyParaPatch({indent:Math.min(8,(s.indent||0)+1)});};
+  $("#fmt-indent-dec").onclick=()=>{const s=paraStyleForKey(formatTargetKey);applyParaPatch({indent:Math.max(0,(s.indent||0)-1)});};
+  $("#fmt-para-clear").onclick=()=>saveParaStyle(formatTargetKey,{});
+
+  $("#fmt-label-color").onchange=e=>{
+    const color=e.target.value.toUpperCase();
+    shared.labelColor=color;
+    document.documentElement.style.setProperty("--red",color);
+    save("labelColor",color,0);
+  };
+
+  document.addEventListener("selectionchange",()=>{
+    const a=document.activeElement;
+    if(a?.classList?.contains("rich-editor")){
+      const key=a.dataset.richKey;
+      formatTargetKey=key;
+      captureRichRange(a,key);
+      updateFormatToolbar();
+    }
+  });
 }
 function captureRichRange(editor,key){
   const sel=window.getSelection();
@@ -931,9 +1315,11 @@ function bindRichEditor(editor,key,editable=true){
     if(!editable||!myLocks.has(key))return;
     focusedField=key;
     photoTargetKey=key;
+    formatTargetKey=key;
     document.querySelectorAll(".photo-target,.rich-caret-target").forEach(x=>x.classList.remove("photo-target","rich-caret-target"));
     if(host) host.classList.add("rich-caret-target");
     captureRichRange(editor,key);
+    updateFormatToolbar();
     beat();
   };
   if(editable){
@@ -972,11 +1358,11 @@ function bindRichEditor(editor,key,editable=true){
       focusedField=null;
       captureRichRange(editor,key);
 
-      // 포커스를 떠나는 순간 현재 DOM을 한 번 더 저장합니다.
-      // 마지막 글자를 삭제한 상태(완전 빈 칸)도 확실히 Firebase에 반영됩니다.
       if(myLocks.has(key)) saveRichEditor(key,editor,0);
-
       beat();
+
+      // 서식 도구를 누르는 동안에는 선택 영역과 잠금을 유지합니다.
+      if(formatBarInteracting)return;
       await releaseFieldLock(key);
     });
   }
@@ -1035,7 +1421,7 @@ function refreshRichEditors(){
 
 function start(){
   $("#app").classList.remove("hide");
-  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared(); bindTeamName();
+  buildAbsent(); buildPbl(); buildMembers(); buildLogs(); bindShared(); bindTeamName(); initFormatToolbar();
   const sel=$("#week-sel");
   WEEKS.forEach(w=>{const o=el("option");o.value=w.id;o.textContent=w.label;sel.appendChild(o);});
   const now=WEEKS.find(w=>w.label.includes("이번 주"))||WEEKS[0];
@@ -1291,6 +1677,9 @@ function renderShared(){
     const n=$("#pbl-"+i), k="p"+i;
     if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
   });
+  const labelColor=shared.labelColor||"#C00000";
+  document.documentElement.style.setProperty("--red",labelColor);
+  const lc=$("#fmt-label-color");if(lc&&document.activeElement!==lc)lc.value=labelColor.toLowerCase();
   paintAbsent();
 }
 function renderMembers(){
@@ -1545,6 +1934,7 @@ function fillCell(xdoc,tbl,row,col,text){
   const ps=kids(sub,"hp:p"); if(!ps.length)return;
   const base=ps[0];
   const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
+  const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
   ps.slice(1).forEach(p=>sub.removeChild(p));
   String(text??"").split("\n").forEach((line,i)=>{
     const p=i===0?base:base.cloneNode(true);
@@ -1610,6 +2000,112 @@ function addPics(xdoc, tbl, row, col, shots){
     sub.appendChild(p);
   }
 }
+const HH="http://www.hancom.co.kr/hwpml/2011/head";
+const HWP_FONT_IDS={"맑은 고딕":"0","함초롬돋움":"1","함초롬바탕":"2"};
+
+function createHwpStyleContext(hdoc){
+  const charProps=hdoc.getElementsByTagName("hh:charProperties")[0];
+  const paraProps=hdoc.getElementsByTagName("hh:paraProperties")[0];
+  const charNodes=Array.from(charProps.getElementsByTagName("hh:charPr"));
+  const paraNodes=Array.from(paraProps.getElementsByTagName("hh:paraPr"));
+  const redIds=new Set(charNodes.filter(n=>/^#(?:FF0000|C00000)$/i.test(n.getAttribute("textColor")||"")).map(n=>n.getAttribute("id")));
+  return {
+    hdoc,charProps,paraProps,redIds,
+    nextChar:Math.max(...charNodes.map(n=>Number(n.getAttribute("id")||0)))+1,
+    nextPara:Math.max(...paraNodes.map(n=>Number(n.getAttribute("id")||0)))+1,
+    charMap:new Map(),paraMap:new Map()
+  };
+}
+function directChild(node,name){
+  return Array.from(node.children||[]).find(c=>c.tagName===name)||null;
+}
+function removeChildren(node,names){
+  Array.from(node.children||[]).forEach(c=>{if(names.includes(c.tagName))node.removeChild(c);});
+}
+function ensureCharPr(ctx,baseRef,style,forceBlackContent=false){
+  let s=cleanFmt(style);
+  if(forceBlackContent&&ctx.redIds.has(String(baseRef))&&!s.color)s=Object.assign({},s,{color:"#000000"});
+  if(!Object.keys(s).length)return String(baseRef);
+  const key=String(baseRef)+"|"+fmtKey(s);
+  if(ctx.charMap.has(key))return ctx.charMap.get(key);
+
+  const base=Array.from(ctx.charProps.getElementsByTagName("hh:charPr")).find(n=>n.getAttribute("id")===String(baseRef))
+    ||ctx.charProps.getElementsByTagName("hh:charPr")[0];
+  const cp=base.cloneNode(true),id=String(ctx.nextChar++);
+  cp.setAttribute("id",id);
+  if(s.size)cp.setAttribute("height",String(Math.round(s.size*100)));
+  if(s.color)cp.setAttribute("textColor",s.color);
+  if(s.bg)cp.setAttribute("shadeColor",s.bg);
+
+  const fontRef=directChild(cp,"hh:fontRef");
+  if(fontRef&&s.font&&HWP_FONT_IDS[s.font]!=null){
+    const fid=HWP_FONT_IDS[s.font];
+    ["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>fontRef.setAttribute(k,fid));
+  }
+  const ratio=directChild(cp,"hh:ratio");
+  if(ratio&&s.ratio)["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>ratio.setAttribute(k,String(s.ratio)));
+  const spacing=directChild(cp,"hh:spacing");
+  if(spacing&&s.spacing!=null)["hangul","latin","hanja","japanese","other","symbol","user"].forEach(k=>spacing.setAttribute(k,String(s.spacing)));
+
+  removeChildren(cp,["hh:italic","hh:bold","hh:emboss","hh:engrave","hh:supscript","hh:subscript"]);
+  const underline=directChild(cp,"hh:underline");
+  if(underline){
+    underline.setAttribute("type",s.underline?"BOTTOM":"NONE");
+    underline.setAttribute("shape","SOLID");
+    underline.setAttribute("color",s.color||"#000000");
+  }
+  const strike=directChild(cp,"hh:strikeout");
+  if(strike){strike.setAttribute("shape",s.strike?"SOLID":"NONE");strike.setAttribute("color",s.color||"#000000");}
+  const outline=directChild(cp,"hh:outline");if(outline)outline.setAttribute("type",s.outline?"SOLID":"NONE");
+  const shadow=directChild(cp,"hh:shadow");if(shadow){shadow.setAttribute("type",s.shadow?"DROP":"NONE");shadow.setAttribute("color","#808080");}
+
+  const before=underline;
+  if(s.italic)cp.insertBefore(ctx.hdoc.createElementNS(HH,"hh:italic"),before);
+  if(s.bold)cp.insertBefore(ctx.hdoc.createElementNS(HH,"hh:bold"),before);
+
+  const optionalOrder=[["emboss",s.emboss],["engrave",s.engrave],["supscript",s.sup],["subscript",s.sub]];
+  optionalOrder.forEach(([name,on])=>{if(on)cp.appendChild(ctx.hdoc.createElementNS(HH,"hh:"+name));});
+
+  ctx.charProps.appendChild(cp);
+  ctx.charProps.setAttribute("itemCnt",String(ctx.charProps.getElementsByTagName("hh:charPr").length));
+  ctx.charMap.set(key,id);
+  return id;
+}
+function ensureParaPr(ctx,baseRef,style){
+  const s=cleanParaStyle(style);
+  if(!Object.keys(s).length)return String(baseRef);
+  const key=String(baseRef)+"|"+JSON.stringify(s);
+  if(ctx.paraMap.has(key))return ctx.paraMap.get(key);
+
+  const base=Array.from(ctx.paraProps.getElementsByTagName("hh:paraPr")).find(n=>n.getAttribute("id")===String(baseRef))
+    ||ctx.paraProps.getElementsByTagName("hh:paraPr")[0];
+  const pp=base.cloneNode(true),id=String(ctx.nextPara++);
+  pp.setAttribute("id",id);
+
+  const align=directChild(pp,"hh:align");
+  if(align&&s.align)align.setAttribute("horizontal",s.align.toUpperCase());
+  if(s.lineSpacing){
+    Array.from(pp.getElementsByTagName("hh:lineSpacing")).forEach(ls=>{
+      ls.setAttribute("type","PERCENT");ls.setAttribute("value",String(s.lineSpacing));ls.setAttribute("unit","HWPUNIT");
+    });
+  }
+  if(s.indent){
+    Array.from(pp.getElementsByTagName("hc:left")).forEach(n=>n.setAttribute("value",String(s.indent*1000)));
+  }
+
+  ctx.paraProps.appendChild(pp);
+  ctx.paraProps.setAttribute("itemCnt",String(ctx.paraProps.getElementsByTagName("hh:paraPr").length));
+  ctx.paraMap.set(key,id);
+  return id;
+}
+function recolorTemplateRedRuns(xdoc,ctx,color){
+  if(!/^#[0-9A-F]{6}$/i.test(color||""))return;
+  Array.from(xdoc.getElementsByTagName("hp:run")).forEach(run=>{
+    const ref=run.getAttribute("charPrIDRef");
+    if(ctx.redIds.has(ref))run.setAttribute("charPrIDRef",ensureCharPr(ctx,ref,{color}));
+  });
+}
+
 function addInlineRunImage(xdoc,p,ref,sh){
   if(!sh)return;
   let cw=Math.min(18000,sh.w*PX), chh=Math.round(cw*sh.h/sh.w);
@@ -1621,15 +2117,15 @@ function addInlineRunImage(xdoc,p,ref,sh){
   run.appendChild(xdoc.createElementNS(HP,"hp:t"));
   p.appendChild(run);
 }
-function addInlineRunText(xdoc,p,ref,text){
+function addInlineRunText(xdoc,p,ref,text,styleCtx,style){
   if(!text)return;
   const run=xdoc.createElementNS(HP,"hp:run");
-  run.setAttribute("charPrIDRef",ref);
+  run.setAttribute("charPrIDRef",ensureCharPr(styleCtx,ref,style,true));
   const t=xdoc.createElementNS(HP,"hp:t");
   t.appendChild(xdoc.createTextNode(text));
   run.appendChild(t); p.appendChild(run);
 }
-function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap){
+function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyle={}){
   const tc=findCell(tbl,row,col); if(!tc)return;
   const sub=kids(tc,"hp:subList")[0]; if(!sub)return;
   const ps=kids(sub,"hp:p"); if(!ps.length)return;
@@ -1642,7 +2138,7 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap){
     if(tok.type==="image"){paragraphs[paragraphs.length-1].push(tok);return;}
     String(tok.text??"").split("\n").forEach((part,i)=>{
       if(i)paragraphs.push([]);
-      if(part)paragraphs[paragraphs.length-1].push({type:"text",text:part});
+      if(part)paragraphs[paragraphs.length-1].push({type:"text",text:part,style:tok.style});
     });
   });
   if(!paragraphs.length)paragraphs.push([]);
@@ -1650,8 +2146,9 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap){
     const p=i===0?base:base.cloneNode(true);
     Array.from(p.getElementsByTagName("hp:run")).forEach(r=>r.parentNode.removeChild(r));
     Array.from(p.getElementsByTagName("hp:linesegarray")).forEach(r=>r.parentNode.removeChild(r));
+    p.setAttribute("paraPrIDRef",ensureParaPr(styleCtx,baseParaRef,paraStyle));
     parts.forEach(tok=>{
-      if(tok.type==="text")addInlineRunText(xdoc,p,ref,tok.text);
+      if(tok.type==="text")addInlineRunText(xdoc,p,ref,tok.text,styleCtx,tok.style);
       else if(tok.type==="image")addInlineRunImage(xdoc,p,ref,itemMap[tok.id]);
     });
     if(i>0)sub.appendChild(p);
@@ -1723,6 +2220,9 @@ $("#btn-export").onclick=async()=>{
     const buf=await (await fetch(TEMPLATE,{cache:"no-store"})).arrayBuffer();
     const zip=await JSZip.loadAsync(buf);
     const xdoc=new DOMParser().parseFromString(await zip.file("Contents/section0.xml").async("string"),"application/xml");
+    const hdoc=new DOMParser().parseFromString(await zip.file("Contents/header.xml").async("string"),"application/xml");
+    const styleCtx=createHwpStyleContext(hdoc);
+    recolorTemplateRedRuns(xdoc,styleCtx,shared.labelColor||"#FF0000");
     const [T1,TPBL,TMEM,TLOG]=Array.from(xdoc.getElementsByTagName("hp:tbl"));
 
     // 큰 표는 페이지 경계에서 자연스럽게 이어지게 함.
@@ -1748,7 +2248,7 @@ $("#btn-export").onclick=async()=>{
 
     fillCell(xdoc,T1,0,1,TEAM_NAME);
     fillCell(xdoc,T1,1,1,shared.topic||"");
-    fillCellRich(xdoc,T1,2,1,shared.rich?.weekly,shared.weekly||"",inlineItemMap);
+    fillCellRich(xdoc,T1,2,1,shared.rich?.weekly,shared.weekly||"",inlineItemMap,styleCtx,shared.richPara?.weekly);
     [1,2,3,5,7,9].forEach((c,i)=>{
       const id="m"+(i+1);
       const nm=((shared.absentNames||{})[id])||"";
@@ -1757,18 +2257,18 @@ $("#btn-export").onclick=async()=>{
     fillCell(xdoc,T1,4,1,shared.period||"");
     fillCell(xdoc,T1,4,6,`${shared.hours||"    "} / ${shared.totalHours||"110"}H`);
     fillCell(xdoc,T1,4,10,`${shared.progress||"    "} %`);
-    fillCellRich(xdoc,T1,6,1,shared.rich?.plan,shared.plan||"",inlineItemMap);
-    fillCellRich(xdoc,T1,7,1,shared.rich?.meeting,shared.meeting||"",inlineItemMap);
-    fillCellRich(xdoc,T1,8,1,shared.rich?.next,shared.next||"",inlineItemMap);
-    fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap);
+    fillCellRich(xdoc,T1,6,1,shared.rich?.plan,shared.plan||"",inlineItemMap,styleCtx,shared.richPara?.plan);
+    fillCellRich(xdoc,T1,7,1,shared.rich?.meeting,shared.meeting||"",inlineItemMap,styleCtx,shared.richPara?.meeting);
+    fillCellRich(xdoc,T1,8,1,shared.rich?.next,shared.next||"",inlineItemMap,styleCtx,shared.richPara?.next);
+    fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap,styleCtx,shared.richPara?.mentor);
 
-    PBL_STEPS.forEach((_,i)=>{const k="p"+i;fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap);});
+    PBL_STEPS.forEach((_,i)=>{const k="p"+i;fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,shared.richPblPara?.[k]);});
 
     for(let i=0;i<MEMBERS;i++){
       const id="m"+(i+1), m=members[id]||{};
       fillCell(xdoc,TMEM,i*2,0,"이름 : "+(m.name||""));
       fillCell(xdoc,TMEM,i*2+1,0,"역할 : "+(m.role||""));
-      fillCellRich(xdoc,TMEM,i*2,1,m.contentRich,m.content||"",inlineItemMap);
+      fillCellRich(xdoc,TMEM,i*2,1,m.contentRich,m.content||"",inlineItemMap,styleCtx,m.contentPara);
       const shots=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([,p])=>p);
       const ready=[];
       for(const sh of shots){
@@ -1789,8 +2289,8 @@ $("#btn-export").onclick=async()=>{
     for(let r=1;r<=LOG_ROWS;r++){
       const d=logs["r"+r]||{};
       fillCell(xdoc,TLOG,r,0,d.date||"");
-      fillCellRich(xdoc,TLOG,r,1,d.contentRich,d.content||"",inlineItemMap);
-      fillCellRich(xdoc,TLOG,r,2,d.noteRich,d.note||"",inlineItemMap);
+      fillCellRich(xdoc,TLOG,r,1,d.contentRich,d.content||"",inlineItemMap,styleCtx,d.contentPara);
+      fillCellRich(xdoc,TLOG,r,2,d.noteRich,d.note||"",inlineItemMap,styleCtx,d.notePara);
     }
 
     // 현재 커서가 있던 입력칸에 추가한 사진도 HWPX의 같은 셀에 삽입
@@ -1820,6 +2320,9 @@ $("#btn-export").onclick=async()=>{
       let data;
       if(n==="Contents/section0.xml"){
         data=new XMLSerializer().serializeToString(xdoc);
+        if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
+      }else if(n==="Contents/header.xml"){
+        data=new XMLSerializer().serializeToString(hdoc);
         if(!data.startsWith("<?xml")) data='<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'+data;
       }else if(n==="Contents/content.hpf" && binFiles.length){
         const hpf=new DOMParser().parseFromString(await zip.file(n).async("string"),"application/xml");
