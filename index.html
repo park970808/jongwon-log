@@ -429,6 +429,7 @@ let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],pee
 const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
 const writeChains=new Map();
+const localRichEdits=new Map();
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
@@ -852,7 +853,10 @@ function mergeFmt(base,patch){
   return cleanFmt(o);
 }
 function normalizeTokens(tokens,fallback=""){
-  if(Array.isArray(tokens)&&tokens.length) return tokens.map(t=>{
+  // 배열이 존재하면 빈 배열([])도 "의도적으로 모두 삭제됨"을 뜻합니다.
+  // 예전에는 tokens.length가 0이면 fallback의 과거 글을 다시 보여줘서
+  // 삭제한 문장이 되살아나는 문제가 있었습니다.
+  if(Array.isArray(tokens)) return tokens.map(t=>{
     if(t?.type==="text")return {type:"text",text:String(t.text??""),style:cleanFmt(t.style)};
     if(t?.type==="image"&&t.id)return {type:"image",id:String(t.id)};
     return null;
@@ -956,10 +960,20 @@ function renderRichContent(editor,tokens,fallback,editable=true){
 }
 function renderRichEditor(editor,tokens,fallback,editable=true){
   if(!editor||document.activeElement===editor)return;
+  const key=editor.dataset.richKey;
+  const local=key?localRichEdits.get(key):null;
+  if(local){tokens=local.tokens;fallback=local.plain;}
   renderRichContent(editor,tokens,fallback,editable);
-  applyParaStyleToEditor(editor,paraStyleForKey(editor.dataset.richKey));
+  applyParaStyleToEditor(editor,paraStyleForKey(key));
 }
 function editorTokens(editor){
+  // contenteditable에서 모든 글자를 지워도 브라우저가 <br> 또는
+  // <div><br></div>를 남기는 경우가 있습니다. 사진도 없고 실제 텍스트도
+  // 하나도 없으면 무조건 완전한 빈 값([])으로 저장합니다.
+  const hasInlineImage=!!editor.querySelector(".inline-photo-node");
+  const visibleText=(editor.textContent||"").replace(/\u200B/g,"");
+  if(!hasInlineImage && visibleText==="") return [];
+
   const out=[];
   function pushText(s,style={}){
     s=String(s??"").replace(/\u200B/g,"");
@@ -992,7 +1006,50 @@ function editorTokens(editor){
   Array.from(editor.childNodes).forEach(walk);
   return mergeTextTokens(out);
 }
+function richStateSignature(plain,tokens){
+  return JSON.stringify({
+    plain:String(plain??""),
+    tokens:normalizeTokens(Array.isArray(tokens)?tokens:undefined,"")
+  });
+}
+function remoteRichStateForKey(key){
+  let m;
+  if((m=key.match(/^s:(.+)$/))){
+    const f=m[1];
+    return {plain:shared[f]??"",tokens:shared.rich?.[f]};
+  }
+  if((m=key.match(/^p:(\d+)$/))){
+    const k="p"+m[1];
+    return {plain:(shared.pbl||{})[k]??"",tokens:shared.richPbl?.[k]};
+  }
+  if((m=key.match(/^(m\d+):content$/))){
+    const d=members[m[1]]||{};
+    return {plain:d.content??"",tokens:d.contentRich};
+  }
+  if((m=key.match(/^l:(\d+):(content|note)$/))){
+    const d=logs["r"+m[1]]||{},f=m[2];
+    return {plain:d[f]??"",tokens:d[f+"Rich"]};
+  }
+  return null;
+}
+function reconcileLocalRichEdits(){
+  for(const [key,local] of localRichEdits){
+    const remote=remoteRichStateForKey(key);
+    if(!remote)continue;
+    // 서버가 우리가 마지막으로 저장한 정확한 값까지 따라왔을 때만
+    // 로컬 보호막을 해제합니다.
+    if(
+      Array.isArray(remote.tokens) &&
+      richStateSignature(remote.plain,remote.tokens)===richStateSignature(local.plain,local.tokens)
+    ){
+      localRichEdits.delete(key);
+    }
+  }
+}
 function richDataForKey(key){
+  const local=localRichEdits.get(key);
+  if(local)return {tokens:local.tokens,fallback:local.plain};
+
   let m;
   if((m=key.match(/^s:(.+)$/))){
     const f=m[1];
@@ -1285,6 +1342,17 @@ function bindRichEditor(editor,key,editable=true){
       activate();
     });
     editor.addEventListener("keydown",e=>{
+      if(e.key==="Backspace"||e.key==="Delete"){
+        if(!myLocks.has(key)){
+          e.preventDefault();
+          return;
+        }
+        // 기본 삭제가 DOM에 반영된 직후 정확한 상태를 즉시 저장합니다.
+        queueMicrotask(()=>{
+          if(myLocks.has(key))saveRichEditor(key,editor,0);
+        });
+        return;
+      }
       if(e.key!=="Enter")return;
       if(!myLocks.has(key)){
         e.preventDefault();
@@ -1315,6 +1383,10 @@ function bindRichEditor(editor,key,editable=true){
 }
 function saveRichEditor(key,editor,delay=700){
   const tokens=editorTokens(editor), plain=tokensPlain(tokens), targetWeek=weekId;
+
+  // 서버 snapshot이 늦게 도착해도 지금 사용자가 만든 상태(특히 완전 삭제)를
+  // 다시 덮어쓰지 못하도록 마지막 로컬 편집을 별도로 보관합니다.
+  localRichEdits.set(key,{plain,tokens:normalizeTokens(tokens,"")});
 
   // 화면의 최신 상태를 서버 응답보다 먼저 로컬 모델에도 반영합니다.
   // 특히 모든 글자를 지웠을 때 예전 snapshot이 잠깐 다시 보이는 현상을 막습니다.
@@ -1506,13 +1578,27 @@ function bindShared(){
 function openWeek(id){
   unsub.forEach(u=>u()); unsub=[]; peers={}; photos={}; inlinePhotos={}; locks={};
   shared={}; members={}; logs={};
+  localRichEdits.clear();
   weekId=id;
   renderShared(); renderMembers(); renderLogs(); renderInlinePhotos();
   for(let i=1;i<=MEMBERS;i++) renderPhotos("m"+i);
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
-  unsub.push(onSnapshot(wref,s=>{shared=s.data()||{};if(shared.teamName)setTeamName(shared.teamName);renderShared();},fail));
-  unsub.push(onSnapshot(collection(wref,"members"),s=>{members={};s.forEach(d=>members[d.id]=d.data());renderMembers();},fail));
-  unsub.push(onSnapshot(collection(wref,"logs"),s=>{logs={};s.forEach(d=>logs[d.id]=d.data());renderLogs();},fail));
+  unsub.push(onSnapshot(wref,s=>{
+    shared=s.data()||{};
+    if(shared.teamName)setTeamName(shared.teamName);
+    reconcileLocalRichEdits();
+    renderShared();
+  },fail));
+  unsub.push(onSnapshot(collection(wref,"members"),s=>{
+    members={};s.forEach(d=>members[d.id]=d.data());
+    reconcileLocalRichEdits();
+    renderMembers();
+  },fail));
+  unsub.push(onSnapshot(collection(wref,"logs"),s=>{
+    logs={};s.forEach(d=>logs[d.id]=d.data());
+    reconcileLocalRichEdits();
+    renderLogs();
+  },fail));
   unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
     inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
     renderInlinePhotos(); refreshRichEditors();
