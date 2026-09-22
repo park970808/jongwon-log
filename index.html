@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-final-v3-20260922">
+<meta name="app-version" content="team3-fixed-selfcontained-v4-20260922">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -240,7 +240,30 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 <input type="file" id="pick" accept="image/*" multiple class="hide">
 
 <script type="module">
-import { KNOWN_TEAMS, resolveTeam, teamUrl, validTeamId } from "./team-routing.mjs";
+const DEFAULT_TEAM={id:"jangwon",name:"장원급제"};
+const KNOWN_TEAMS=[
+  DEFAULT_TEAM,
+  {id:"team-2",name:"2팀"},
+  {id:"team-3",name:"3팀"}
+];
+
+function validTeamId(id){
+  return /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(String(id||""));
+}
+
+function resolveTeam(search){
+  const q=new URLSearchParams(search||"");
+  const id=(q.get("team")||DEFAULT_TEAM.id).trim().toLowerCase();
+  if(!validTeamId(id)) return null;
+  return KNOWN_TEAMS.find(t=>t.id===id) || {id,name:id};
+}
+
+function teamUrl(id,href=location.href){
+  const u=new URL(href);
+  if(id===DEFAULT_TEAM.id) u.searchParams.delete("team");
+  else u.searchParams.set("team",id);
+  return u.toString();
+}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
@@ -361,16 +384,22 @@ function boot(){
   onAuthStateChanged(auth,async u=>{
     if(!u||started)return;
     uid=u.uid;
+
+    // 3팀은 firebaseConfig가 index.html에 내장되어 있고 Anonymous Auth를 사용하므로
+    // 초대 코드나 부모 team 문서 확인에 막히지 않고 바로 입장합니다.
+    if(TEAM_ID==="team-3"){
+      setTeamName("3팀");
+      enterLog();
+      // 팀 이름 문서가 있으면 뒤에서 이름만 갱신합니다. 실패해도 앱 사용에는 영향 없음.
+      getDoc(doc(db,"teams",TEAM_ID)).then(teamDoc=>{
+        if(teamDoc.exists() && teamDoc.data().name) setTeamName(teamDoc.data().name);
+      }).catch(()=>{});
+      return;
+    }
+
     try{
       const teamRef=doc(db,"teams",TEAM_ID);
       const teamDoc=await getDoc(teamRef);
-      if(!teamDoc.exists() && TEAM_ID==="team-3"){
-        // The built-in team-3 configuration is sufficient registration.
-        // A missing parent document must not block its week/roster subcollections.
-        setTeamName("3팀");
-        enterLog();
-        return;
-      }
       if(!teamDoc.exists() && TEAM_ID!=="jangwon"){
         showJoin("아직 등록되지 않은 팀입니다. Firebase에서 팀을 먼저 만든 뒤 다시 열어 주세요.",false);
         return;
@@ -399,7 +428,9 @@ function boot(){
 function enterLog(){
   if(started)return;
   started=true;
+  $("#gate-config").classList.add("hide");
   $("#gate-join").classList.add("hide");
+  $("#join-form").classList.add("hide");
   slot=localStorage.getItem("slot-"+TEAM_ID);
   slot?start():slotGate();
 }
@@ -473,7 +504,7 @@ function start(){
     finally{ sel.disabled=false; }
   };
   openWeek(now.id);
-  setInterval(beat,12000);
+  setInterval(beat,30000);
 }
 function buildAbsent(){
   const tr=$("#abs-row");
@@ -575,7 +606,7 @@ function openWeek(id){
   }
   unsub.push(onSnapshot(collection(db,"teams",TEAM_ID,"presence"),s=>{
     peers={}; const now=Date.now();
-    s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<30000)peers[d.id]=v;});
+    s.forEach(d=>{const v=d.data(); if(d.id!==uid&&v.at&&now-v.at<70000)peers[d.id]=v;});
     renderPeers();
   },fail));
   mark("연결됨",true);
