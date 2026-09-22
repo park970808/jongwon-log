@@ -2075,6 +2075,7 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyl
   const ps=kids(sub,"hp:p"); if(!ps.length)return;
   const base=ps[0];
   const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
+  const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
   ps.slice(1).forEach(p=>sub.removeChild(p));
   const list=normalizeTokens(tokens,fallback);
   const paragraphs=[[]];
