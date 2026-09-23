@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="app-version" content="team3-history-v5-20260923">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -158,7 +159,8 @@ td.abs.on{color:var(--red)}
 table.pbl{width:calc(100% - 22px);margin:0 0 6px 22px;border-collapse:collapse;table-layout:fixed}
 table.pbl td{border:1px solid var(--line);font-size:11.5px;padding:1px 4px;height:19px}
 table.pbl .vert{text-align:center}
-table.pbl textarea.f{font-size:11.5px;padding:1px 4px;line-height:1.35}
+table.pbl textarea.f,table.pbl input.f{font-size:11.5px;padding:1px 4px;line-height:1.35}
+table.pbl input.pbl-meta{text-align:center;min-height:18px}
 
 table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-weight:700;padding:5px}
 
@@ -208,6 +210,22 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
 .gate .error{color:#B00020;margin-top:12px}
 .hide{display:none!important}
 .note{font-size:12px;color:#777;margin-top:12px}
+.history-panel{max-width:760px!important;padding:24px!important}
+.history-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+.history-head h2{flex:1;margin:0}
+.history-head button{border:0;background:#EEE;border-radius:3px;padding:7px 11px;cursor:pointer}
+.history-help{margin:-8px 0 16px!important}
+.history-list{display:grid;gap:10px;max-height:62vh;overflow:auto;padding-right:4px}
+.history-empty{border:1px dashed #BBB;padding:24px;text-align:center;color:#666}
+.history-item{border:1px solid #CCC;border-radius:4px;padding:12px;background:#FFF}
+.history-item.draft{border-color:#C78600;background:#FFF8E6}
+.history-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:7px}
+.history-meta strong{font-size:13px;color:#111}
+.history-preview{white-space:pre-wrap;overflow-wrap:anywhere;max-height:7.5em;overflow:auto;background:#F6F6F6;padding:9px;border-radius:3px;font-size:12.5px;line-height:1.5}
+.history-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}
+.history-actions button{border:1px solid #999;background:#FFF;border-radius:3px;padding:6px 10px;cursor:pointer}
+.history-actions button.restore{border-color:#1D5FD6;background:#1D5FD6;color:#FFF}
+#btn-history.has-drafts{background:#8B5A00;border-color:#C78600;color:#FFF}
 @media (max-width:860px){ .desk{padding:12px 0 60px} .page{padding:32px 28px 42px} }
 </style>
 </head>
@@ -264,6 +282,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <button id="btn-team">팀: <span id="toolbar-team">장원급제</span></button>
     <span id="who-label">–</span>
     <button id="btn-photo" title="긴 글 입력칸에서는 커서 위치에 사진이 삽입됩니다">사진 추가</button>
+    <button id="btn-history" title="저장된 수정 내용과 브라우저 초안을 확인합니다">수정 이력</button>
     <button id="btn-switch">자리 바꾸기</button>
     <button class="primary" id="btn-export">한글 파일 내보내기</button>
 
@@ -362,13 +381,29 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
   </div></div>
 </div>
 
+<div id="history-overlay" class="team-overlay hide" role="dialog" aria-modal="true" aria-labelledby="history-title">
+  <div class="gate history-panel">
+    <div class="history-head">
+      <div>
+        <h2 id="history-title">수정 이력</h2>
+        <p class="note" id="history-week"></p>
+      </div>
+      <button id="history-close" type="button">닫기</button>
+    </div>
+    <p class="history-help">저장된 버전을 확인하고 복원할 수 있습니다. 복원해도 기존 이력은 삭제되지 않습니다.</p>
+    <div class="history-list" id="history-list"></div>
+  </div>
+</div>
+
 <div id="lightbox" class="hide"><img alt=""></div>
 <input type="file" id="pick" accept="image/*" multiple class="hide">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, collection, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, serverTimestamp }
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  doc, collection, setDoc, onSnapshot, getDoc, getDocs,
+  serverTimestamp, writeBatch, FieldPath, query, orderBy, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
@@ -434,6 +469,7 @@ const PBL_STEPS=[["팀편성","10%"],["계획(20%)","20%"],["피드백","30%"],[
   ["수행","60%"],["피드백","70%"],["수행","80%"],["결과제출","90%"],["피드백","100%"]];
 const PBL_DEFAULT={ 9:"해커톤 평가 [외부 심사위원 5명]" };
 const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","plan","meeting","next","mentor"];
+const APP_VERSION=document.querySelector('meta[name="app-version"]')?.content||"unknown";
 
 let db,auth,uid,slot,weekId,started=false;
 let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},presenceAll={},presenceReady=false,focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
@@ -441,11 +477,16 @@ const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
 const writeChains=new Map();
 const localRichEdits=new Map();
+const richSaveBaselines=new Map();
+const editBaselines=new Map();
+const retryTimers=new Map();
+let historyPermission=true,draftNoticeWeek=null;
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 
-const PRESENCE_HEARTBEAT_MS=30000;
-const PRESENCE_STALE_MS=70000;
+// 접속자 표시에만 쓰입니다. 내용 자동 저장(700ms)과 실시간 구독에는 영향이 없습니다.
+const PRESENCE_HEARTBEAT_MS=60000;
+const PRESENCE_STALE_MS=130000;
 
 function currentEditorName(){
   if(slot){
@@ -637,10 +678,19 @@ function bindTeamName(){
   const input=$("#document-team");
   track(input,"team:name");
   input.addEventListener("input",()=>{
+    const previousName=editBaselines.get("team:name")??TEAM_NAME;
     const name=input.value;
     TEAM_NAME=name||TEAM?.name||TEAM_ID;
     $("#toolbar-team").textContent=TEAM_NAME;
     document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
+    if(TEAM_ID==="team-3"){
+      queueVersionedWrite("team:name",{
+        key:"team:name",week:weekId,targetPath:["teams",TEAM_ID,"weeks","__team__"],
+        entries:[{path:"name",value:name}],previousEntries:[{path:"name",value:previousName||""}],
+        preview:name,previousPreview:previousName||"",label:"팀명"
+      },700);
+      return;
+    }
     mark("입력 중…",false);
     scheduleWrite("team:name",async()=>{
       try{
@@ -721,7 +771,16 @@ function boot(){
   if(!cfg){ $("#gate-config").classList.remove("hide"); return; }
   console.info(`[팀 연결] ${TEAM_ID} → Firebase ${cfg.projectId}`);
   const app=initializeApp(cfg);
-  auth=getAuth(app); db=getFirestore(app);
+  auth=getAuth(app);
+  try{
+    // 새로고침·일시적인 오프라인에도 아직 전송되지 않은 쓰기를 보존합니다.
+    db=initializeFirestore(app,{
+      localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})
+    });
+  }catch(e){
+    console.warn("영구 오프라인 캐시를 사용할 수 없어 메모리 캐시로 전환합니다.",e);
+    db=getFirestore(app);
+  }
   signInAnonymously(auth).catch(e=>alert("로그인 실패: "+e.message+"\n\n익명 로그인이 켜져 있는지, 승인된 도메인에 이 주소가 등록됐는지 확인해 주세요."));
   onAuthStateChanged(auth,async u=>{
     if(!u||started)return;
@@ -847,6 +906,7 @@ function track(n,key){
 
     applyNodeLockState(n,key);
     focusedField=key;
+    if(!editBaselines.has(key))editBaselines.set(key,n.value??"");
     photoTargetKey=key;
     document.querySelectorAll(".photo-target").forEach(x=>x.classList.remove("photo-target"));
     const host=n.closest("[data-key]");
@@ -855,6 +915,7 @@ function track(n,key){
   n.addEventListener("blur",async()=>{
     focusedField=null;
     await releaseFieldLock(key);
+    editBaselines.delete(key);
   });
 }
 const RICH_SHARED=new Set(["weekly","plan","meeting","next","mentor"]);
@@ -972,7 +1033,10 @@ function makeInlinePhotoNode(pid,p,editable=true){
       const key=editor?.dataset.richKey;
       if(!confirm("이 사진을 지울까요?"))return;
       try{
-        await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));
+        await softDeletePhoto(
+          ["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+          `photo:inline:${pid}`,`삭제한 ${p?.name||"삽입 사진"}`
+        );
         wrap.remove();
         if(editor&&key) saveRichEditor(key,editor,0);
       }catch(e){fail(e);}
@@ -1129,31 +1193,30 @@ function applyParaStyleToEditor(editor,style){
   editor.style.paddingLeft=`${7+(s.indent||0)*14}px`;
 }
 function saveParaStyle(key,style){
+  const previousStyle=cleanParaStyle(paraStyleForKey(key));
   const s=cleanParaStyle(style),targetWeek=weekId;
-  let m;
+  let m,targetPath,entryPath;
   if((m=key.match(/^s:(.+)$/))){
     const f=m[1];shared.richPara=Object.assign({},shared.richPara,{[f]:s});
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek];entryPath=`richPara.${f}`;
   }else if((m=key.match(/^p:(\d+)$/))){
     const k="p"+m[1];shared.richPblPara=Object.assign({},shared.richPblPara,{[k]:s});
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek];entryPath=`richPblPara.${k}`;
   }else if((m=key.match(/^(m\d+):content$/))){
     const id=m[1];members[id]=Object.assign({},members[id]||{},{contentPara:s});
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"members",id];entryPath="contentPara";
   }else if((m=key.match(/^l:(\d+):(content|note)$/))){
     const id="r"+m[1],f=m[2];logs[id]=Object.assign({},logs[id]||{},{[f+"Para"]:s});
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"logs",id];entryPath=f+"Para";
   }
   const editor=richEditors[key];if(editor)applyParaStyleToEditor(editor,s);
-  scheduleWrite("para:"+key,async()=>{
-    let mm;
-    if((mm=key.match(/^s:(.+)$/))){
-      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-      await setDoc(ref,{[`richPara.${mm[1]}`]:s},{merge:true});
-    }else if((mm=key.match(/^p:(\d+)$/))){
-      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-      await setDoc(ref,{[`richPblPara.p${mm[1]}`]:s},{merge:true});
-    }else if((mm=key.match(/^(m\d+):content$/))){
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",mm[1]),{contentPara:s},{merge:true});
-    }else if((mm=key.match(/^l:(\d+):(content|note)$/))){
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+mm[1]),{[mm[2]+"Para"]:s},{merge:true});
-    }
+  if(!targetPath||!entryPath)return;
+  queueVersionedWrite("para:"+key,{
+    key:"para:"+key,week:targetWeek,targetPath,entries:[{path:entryPath,value:s}],
+    previousEntries:[{path:entryPath,value:previousStyle}],
+    preview:Object.keys(s).length?JSON.stringify(s):"기본 문단 서식",
+    previousPreview:Object.keys(previousStyle).length?JSON.stringify(previousStyle):"기본 문단 서식",
+    label:historyLabel("para:"+key)
   },0);
 }
 function textLenWithoutPhotos(node){
@@ -1372,6 +1435,10 @@ function bindRichEditor(editor,key,editable=true){
       }
 
       applyNodeLockState(editor,key);
+      if(!richSaveBaselines.has(key)){
+        const remote=remoteRichStateForKey(key)||{plain:"",tokens:[]};
+        richSaveBaselines.set(key,{plain:String(remote.plain??""),tokens:normalizeTokens(remote.tokens,remote.plain??"")});
+      }
       activate();
     });
     editor.addEventListener("keydown",e=>{
@@ -1415,11 +1482,17 @@ function bindRichEditor(editor,key,editable=true){
 
       focusedField=null;
       await releaseFieldLock(key);
+      richSaveBaselines.delete(key);
     });
   }
 }
 function saveRichEditor(key,editor,delay=700){
   const tokens=editorTokens(editor), plain=tokensPlain(tokens), targetWeek=weekId;
+  if(!richSaveBaselines.has(key)){
+    const remote=remoteRichStateForKey(key)||{plain:"",tokens:[]};
+    richSaveBaselines.set(key,{plain:String(remote.plain??""),tokens:normalizeTokens(remote.tokens,remote.plain??"")});
+  }
+  const baseline=richSaveBaselines.get(key);
 
   // 서버 snapshot이 늦게 도착해도 지금 사용자가 만든 상태(특히 완전 삭제)를
   // 다시 덮어쓰지 못하도록 마지막 로컬 편집을 별도로 보관합니다.
@@ -1444,27 +1517,33 @@ function saveRichEditor(key,editor,delay=700){
     logs[id]=Object.assign({},logs[id]||{},{[f]:plain,[f+"Rich"]:tokens});
   }
 
-  mark("입력 중…",false);
-  scheduleWrite("rich:"+key,async()=>{
-    try{
-      let m;
-      if((m=key.match(/^s:(.+)$/))){
-        const f=m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
-        await updateDoc(ref,{[f]:plain,[`rich.${f}`]:tokens});
-      }else if((m=key.match(/^p:(\d+)$/))){
-        const k="p"+m[1], ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-        await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
-        await updateDoc(ref,{[`pbl.${k}`]:plain,[`richPbl.${k}`]:tokens});
-      }else if((m=key.match(/^(m\d+):content$/))){
-        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",m[1]),{content:plain,contentRich:tokens},{merge:true});
-      }else if((m=key.match(/^l:(\d+):(content|note)$/))){
-        const f=m[2];
-        await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+m[1]),{[f]:plain,[f+"Rich"]:tokens},{merge:true});
-      }
-      mark("저장됨",true);
-    }catch(e){fail(e);throw e;}
-  },delay);
+  let m,targetPath,entries,previousEntries;
+  if((m=key.match(/^s:(.+)$/))){
+    const f=m[1];
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek];
+    entries=[{path:f,value:plain},{path:`rich.${f}`,value:tokens}];
+    previousEntries=[{path:f,value:baseline.plain},{path:`rich.${f}`,value:baseline.tokens}];
+  }else if((m=key.match(/^p:(\d+)$/))){
+    const k="p"+m[1];
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek];
+    entries=[{path:`pbl.${k}`,value:plain},{path:`richPbl.${k}`,value:tokens}];
+    previousEntries=[{path:`pbl.${k}`,value:baseline.plain},{path:`richPbl.${k}`,value:baseline.tokens}];
+  }else if((m=key.match(/^(m\d+):content$/))){
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"members",m[1]];
+    entries=[{path:"content",value:plain},{path:"contentRich",value:tokens}];
+    previousEntries=[{path:"content",value:baseline.plain},{path:"contentRich",value:baseline.tokens}];
+  }else if((m=key.match(/^l:(\d+):(content|note)$/))){
+    const f=m[2];
+    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"logs","r"+m[1]];
+    entries=[{path:f,value:plain},{path:f+"Rich",value:tokens}];
+    previousEntries=[{path:f,value:baseline.plain},{path:f+"Rich",value:baseline.tokens}];
+  }
+  if(targetPath){
+    queueVersionedWrite("rich:"+key,{
+      key,week:targetWeek,targetPath,entries,previousEntries,
+      preview:plain||"(빈 내용)",previousPreview:baseline.plain||"(빈 내용)",label:historyLabel(key)
+    },delay);
+  }
 }
 function refreshRichEditors(){
   Object.entries(richEditors).forEach(([key,editor])=>{
@@ -1513,7 +1592,7 @@ function buildAbsent(){
         const on=!((shared.absent||{})[id]);
         shared.absent=Object.assign({},shared.absent,{[id]:on});
         paintAbsent();
-        save(`absent.${id}`,on,0);
+        save(`absent.${id}`,on,0,!on);
         await flushPending();
       }finally{
         await releaseFieldLock(key);
@@ -1550,10 +1629,18 @@ function buildPbl(){
     <tr><td colspan="4">PBL 운영 일정</td></tr>
     <tr><td colspan="2">구분(단계)</td><td>일정</td><td>수행내용</td></tr>`;
   PBL_STEPS.forEach(([name,pct],i)=>{
+    const k="p"+i;
     const tr=el("tr");
     tr.innerHTML=(i===0?`<td class="vert" rowspan="10">프로젝트팀 활동</td>`:"")
-      +`<td>${name}</td><td>${pct}</td><td class="cell" data-key="p:${i}"><div class="f rich-editor" id="pbl-${i}" data-rich-key="p:${i}" contenteditable="true"></div></td>`;
+      +`<td class="cell" data-key="s:pblMeta.${k}.name"><input class="f pbl-meta" id="pbl-name-${i}" type="text" value="${name}"></td>
+        <td class="cell" data-key="s:pblMeta.${k}.pct"><input class="f pbl-meta" id="pbl-pct-${i}" type="text" value="${pct}"></td>
+        <td class="cell" data-key="p:${i}"><div class="f rich-editor" id="pbl-${i}" data-rich-key="p:${i}" contenteditable="true"></div></td>`;
     t.appendChild(tr);
+    const nameInput=$("#pbl-name-"+i),pctInput=$("#pbl-pct-"+i);
+    track(nameInput,`s:pblMeta.${k}.name`);
+    track(pctInput,`s:pblMeta.${k}.pct`);
+    nameInput.addEventListener("input",()=>save(`pblMeta.${k}.name`,nameInput.value));
+    pctInput.addEventListener("input",()=>save(`pblMeta.${k}.pct`,pctInput.value));
     const editor=$("#pbl-"+i);
     bindRichEditor(editor,"p:"+i,true);
   });
@@ -1615,6 +1702,8 @@ function openWeek(id){
   shared={}; members={}; logs={};
   localRichEdits.clear();
   weekId=id;
+  draftNoticeWeek=null;
+  refreshDraftBadge();
   renderShared(); renderMembers(); renderLogs(); renderInlinePhotos();
   for(let i=1;i<=MEMBERS;i++) renderPhotos("m"+i);
   const wref=doc(db,"teams",TEAM_ID,"weeks",weekId);
@@ -1623,6 +1712,7 @@ function openWeek(id){
     if(shared.teamName)setTeamName(shared.teamName);
     reconcileLocalRichEdits();
     renderShared();
+    setTimeout(reconcileStoredDrafts,0);
   },fail));
   unsub.push(onSnapshot(collection(wref,"members"),s=>{
     members={};s.forEach(d=>members[d.id]=d.data());
@@ -1635,14 +1725,14 @@ function openWeek(id){
     renderLogs();
   },fail));
   unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
-    inlinePhotos={}; s.forEach(d=>inlinePhotos[d.id]=d.data());
+    inlinePhotos={}; s.forEach(d=>{const v=d.data();if(!v.deleted)inlinePhotos[d.id]=v;});
     renderInlinePhotos(); refreshRichEditors();
   },fail));
 
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
     unsub.push(onSnapshot(collection(wref,"members",id,"photos"),s=>{
-      photos[id]={}; s.forEach(d=>photos[id][d.id]=d.data()); renderPhotos(id);
+      photos[id]={}; s.forEach(d=>{const v=d.data();if(!v.deleted)photos[id][d.id]=v;}); renderPhotos(id);
     },fail));
   }
   presenceReady=false;
@@ -1671,6 +1761,263 @@ function openWeek(id){
 }
 const fail=e=>{console.error(e);mark("저장 안 됨",false);};
 function mark(t,ok){const s=$("#save-status");s.textContent=t;s.classList.toggle("on",!!ok);}
+
+/* ── 영구 초안 + 수정 이력 ── */
+const HISTORY_LABELS={
+  "team:name":"팀명","s:topic":"프로젝트 주제","s:weekly":"주차 주요활동내용",
+  "s:period":"과제수행 기간","s:hours":"진행시간","s:totalHours":"총 진행시간",
+  "s:progress":"프로젝트 진행률","s:plan":"팀운영 계획","s:meeting":"팀 주요 회의내용",
+  "s:next":"차기 추진 예정 사항","s:mentor":"멘토 의견"
+};
+function historyLabel(key){
+  if(HISTORY_LABELS[key])return HISTORY_LABELS[key];
+  let m;
+  if((m=String(key).match(/^p:(\d+)$/)))return `PBL 일정 ${Number(m[1])+1}`;
+  if((m=String(key).match(/^s:pblMeta\.p(\d+)\.(name|pct)$/))){
+    return `PBL ${Number(m[1])+1}행 ${m[2]==="name"?"단계명":"진행률"}`;
+  }
+  if((m=String(key).match(/^m(\d+):(name|role|content)$/))){
+    const f={name:"이름",role:"역할",content:"주요활동"}[m[2]];return `${m[1]}번 ${f}`;
+  }
+  if((m=String(key).match(/^l:(\d+):(date|content|note)$/))){
+    const f={date:"날짜",content:"주요내용",note:"특이사항"}[m[2]];return `프로젝트 일지 ${m[1]}행 ${f}`;
+  }
+  if((m=String(key).match(/^abscheck:m(\d+)$/)))return `결시자 ${m[1]}번 체크`;
+  if((m=String(key).match(/^absname:m(\d+)$/)))return `결시자 ${m[1]}번 이름`;
+  if(String(key).startsWith("para:"))return `${historyLabel(String(key).slice(5))} 문단 서식`;
+  if(String(key).startsWith("photo:"))return "사진";
+  return String(key||"수정 내용");
+}
+function draftStorageKey(){return `jongwon-safe-drafts-v1:${TEAM_ID}`;}
+function readDraftStore(){
+  try{
+    const v=JSON.parse(localStorage.getItem(draftStorageKey())||"{}");
+    return v&&typeof v==="object"&&!Array.isArray(v)?v:{};
+  }catch(e){return {};}
+}
+function writeDraftStore(store){
+  try{localStorage.setItem(draftStorageKey(),JSON.stringify(store));}
+  catch(e){console.warn("브라우저 초안 저장 실패",e);mark("브라우저 백업 공간 부족",false);}
+  refreshDraftBadge();
+}
+function clientId(){
+  const k="jongwon-history-client-id";
+  let id=localStorage.getItem(k);
+  if(!id){id=(crypto.randomUUID?.()||(`c${Date.now()}${Math.random()}`)).replace(/[^a-zA-Z0-9_-]/g,"");localStorage.setItem(k,id);}
+  return id;
+}
+function makeHistoryId(){return `${clientId()}-${Date.now()}-${Math.floor(Math.random()*1000000)}`;}
+function safeClone(value){return JSON.parse(JSON.stringify(value));}
+function makeDraft({key,week,targetPath,entries,historyEntries,previousEntries=[],preview,previousPreview="",label,action="edit",sourceHistoryId=""}){
+  return {
+    id:makeHistoryId(),key:String(key),week:String(week),targetPath:safeClone(targetPath),
+    entries:safeClone(entries||[]),historyEntries:safeClone(historyEntries||entries||[]),
+    previousEntries:safeClone(previousEntries||[]),
+    preview:String(preview??"").slice(0,1200),previousPreview:String(previousPreview??"").slice(0,1200),
+    label:label||historyLabel(key),action,sourceHistoryId,
+    actorUid:uid||"",actorSlot:slot||"",actorName:currentEditorName(),clientAt:Date.now(),appVersion:APP_VERSION
+  };
+}
+function stageDraft(spec){
+  const draft=makeDraft(spec),store=readDraftStore();
+  draft.storeKey=`${draft.week}|${draft.key}`;
+  store[draft.storeKey]=draft;
+  writeDraftStore(store);
+  return draft;
+}
+function clearDraftIfCurrent(draft){
+  const store=readDraftStore(),cur=store[draft.storeKey];
+  if(cur?.id!==draft.id)return;
+  delete store[draft.storeKey];
+  writeDraftStore(store);
+}
+function draftsForWeek(id=weekId){
+  return Object.values(readDraftStore()).filter(d=>d&&d.week===id).sort((a,b)=>b.clientAt-a.clientAt);
+}
+function refreshDraftBadge(){
+  const b=$("#btn-history");if(!b)return;
+  const n=weekId?draftsForWeek(weekId).length:0;
+  b.textContent=n?`수정 이력 · 초안 ${n}`:"수정 이력";
+  b.classList.toggle("has-drafts",n>0);
+}
+function setNestedValue(root,path,value){
+  const parts=String(path).split("."),last=parts.pop();let node=root;
+  parts.forEach(p=>{if(!node[p]||typeof node[p]!=="object"||Array.isArray(node[p]))node[p]={};node=node[p];});
+  node[last]=value;
+}
+function valueAtPath(root,path){
+  return String(path).split(".").reduce((v,p)=>v==null?undefined:v[p],root);
+}
+function currentWriteData(entries){
+  const data={};
+  (entries||[]).forEach(e=>setNestedValue(data,e.path,e.value));
+  data.updatedAt=serverTimestamp();
+  return data;
+}
+function currentMergeFields(entries){
+  const seen=new Set(),out=[];
+  [...(entries||[]),{path:"updatedAt"}].forEach(e=>{
+    const path=String(e.path);if(seen.has(path))return;seen.add(path);
+    out.push(new FieldPath(...path.split(".")));
+  });
+  return out;
+}
+function validTargetPath(path){
+  return Array.isArray(path)&&path.length>=4&&path[0]==="teams"&&path[1]===TEAM_ID&&path.every(x=>typeof x==="string"&&x.length>0);
+}
+async function writeCurrentOnly(draft){
+  if(!validTargetPath(draft.targetPath))throw new Error("invalid-history-target");
+  await setDoc(doc(db,...draft.targetPath),currentWriteData(draft.entries),{mergeFields:currentMergeFields(draft.entries)});
+}
+async function commitVersioned(draft){
+  if(!validTargetPath(draft.targetPath))throw new Error("invalid-history-target");
+  const batch=writeBatch(db);
+  batch.set(
+    doc(db,...draft.targetPath),
+    currentWriteData(draft.entries),
+    {mergeFields:currentMergeFields(draft.entries)}
+  );
+  batch.set(doc(db,"teams",TEAM_ID,"weeks",draft.week,"history",draft.id),{
+    key:draft.key,label:draft.label,action:draft.action,preview:draft.preview,
+    previousPreview:draft.previousPreview,entries:draft.historyEntries,previousEntries:draft.previousEntries,
+    targetPath:draft.targetPath,
+    actorUid:draft.actorUid,actorSlot:draft.actorSlot,actorName:draft.actorName,
+    clientAt:draft.clientAt,serverAt:serverTimestamp(),appVersion:draft.appVersion,
+    ...(draft.sourceHistoryId?{sourceHistoryId:draft.sourceHistoryId}:{})
+  });
+  await batch.commit();
+}
+function scheduleDraftRetry(draft,attempt=1){
+  if(!draft.storeKey)return;
+  clearTimeout(retryTimers.get(draft.storeKey));
+  const delay=Math.min(60000,2000*Math.pow(2,Math.min(attempt-1,5)));
+  const timer=setTimeout(async()=>{
+    retryTimers.delete(draft.storeKey);
+    const current=readDraftStore()[draft.storeKey];
+    if(current?.id!==draft.id)return;
+    try{
+      await commitVersioned(draft);
+      clearDraftIfCurrent(draft);
+      mark("자동 재저장됨",true);
+    }catch(e){
+      console.warn("자동 재저장 실패",e);
+      scheduleDraftRetry(draft,attempt+1);
+    }
+  },delay);
+  retryTimers.set(draft.storeKey,timer);
+}
+async function persistDraft(draft){
+  try{
+    await commitVersioned(draft);
+    if(draft.storeKey)clearDraftIfCurrent(draft);
+    mark("저장됨 · 이력 보관",true);
+  }catch(e){
+    // 예전 1·2팀 규칙이 history 하위 컬렉션을 막아도 기존 저장 기능은 유지합니다.
+    if(String(e?.code||"").includes("permission-denied")){
+      try{
+        await writeCurrentOnly(draft);
+        historyPermission=false;
+        if(draft.storeKey)clearDraftIfCurrent(draft);
+        mark("저장됨 · 이력 권한 필요",true);
+        return;
+      }catch(fallbackError){e=fallbackError;}
+    }
+    fail(e);
+    scheduleDraftRetry(draft);
+    throw e;
+  }
+}
+function queueVersionedWrite(queueKey,spec,delay=700){
+  const draft=stageDraft(spec);
+  mark("입력 중…",false);
+  scheduleWrite(queueKey,()=>persistDraft(draft),delay);
+  return draft;
+}
+
+async function reconcileStoredDrafts(){
+  if(!weekId||draftNoticeWeek===weekId)return;
+  draftNoticeWeek=weekId;
+  const drafts=draftsForWeek(weekId);
+  if(!drafts.length){refreshDraftBadge();return;}
+  await Promise.all(drafts.map(async d=>{
+    try{
+      const s=await getDoc(doc(db,"teams",TEAM_ID,"weeks",d.week,"history",d.id));
+      if(s.exists())clearDraftIfCurrent(d);
+    }catch(e){}
+  }));
+  const left=draftsForWeek(weekId);
+  refreshDraftBadge();
+  if(left.length){
+    mark(`복구할 초안 ${left.length}개`,false);
+    const alertKey=`draft-alert:${TEAM_ID}:${weekId}`;
+    if(!sessionStorage.getItem(alertKey)){
+      sessionStorage.setItem(alertKey,"1");
+      alert(`이 브라우저에 서버 저장이 확인되지 않은 초안 ${left.length}개가 있습니다.\n\n상단의 ‘수정 이력’에서 내용을 확인하고 복구할 수 있습니다.`);
+    }
+  }
+}
+
+function historyDate(v){
+  const d=v?.serverAt?.toDate?.()||new Date(Number(v?.clientAt)||Date.now());
+  return new Intl.DateTimeFormat("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(d);
+}
+function appendHistoryItem(parent,data,{draft=false,id=""}={}){
+  const item=el("div","history-item"+(draft?" draft":""));
+  const meta=el("div","history-meta");
+  const title=el("strong");title.textContent=data.label||historyLabel(data.key);
+  const when=el("span");when.textContent=historyDate(data);
+  const who=el("span");who.textContent=data.actorName||"사용자";
+  const kind=el("span");kind.textContent=draft?"브라우저 초안":(data.action==="restore"?"복원 저장":"자동 백업");
+  meta.append(title,when,who,kind);
+  const preview=el("div","history-preview");preview.textContent=data.preview||"(내용 없음)";
+  const actions=el("div","history-actions");
+  const restoreEntries=async(entries,text,button)=>{
+    if(!validTargetPath(data.targetPath)){alert("이 이력의 저장 위치를 확인할 수 없습니다.");return;}
+    if(!confirm(`${data.label||historyLabel(data.key)}을(를) ${text} 복원할까요?\n\n복원 작업도 새 이력으로 기록됩니다.`))return;
+    button.disabled=true;
+    try{
+      await flushPending();
+      const restored=stageDraft({
+        key:data.key,week:data.week||weekId,targetPath:data.targetPath,entries:entries||[],
+        preview:text==="저장 전 내용으로"?(data.previousPreview||"저장 전 내용"):(data.preview||"복원 내용"),
+        label:data.label||historyLabel(data.key),action:"restore",sourceHistoryId:id||data.id||""
+      });
+      await persistDraft(restored);
+      if(draft&&data.storeKey)clearDraftIfCurrent(data);
+      await openHistory();
+    }catch(e){alert("복원하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.");}
+    finally{button.disabled=false;}
+  };
+  if(!draft&&Array.isArray(data.previousEntries)&&data.previousEntries.length){
+    const before=el("button");before.type="button";before.textContent="저장 전으로 복원";
+    before.onclick=()=>restoreEntries(data.previousEntries,"저장 전 내용으로",before);
+    actions.appendChild(before);
+  }
+  const restore=el("button","restore");restore.type="button";restore.textContent=draft?"초안 복구":"이 버전 복원";
+  restore.onclick=()=>restoreEntries(data.entries||[],draft?"초안으로":"이 버전으로",restore);
+  actions.appendChild(restore);item.append(meta,preview,actions);parent.appendChild(item);
+}
+async function openHistory(){
+  const overlay=$("#history-overlay"),list=$("#history-list");
+  overlay.classList.remove("hide");
+  $("#history-week").textContent=`${TEAM_NAME} · ${weekMeta(weekId).label}`;
+  list.innerHTML="";
+  draftsForWeek(weekId).forEach(d=>appendHistoryItem(list,d,{draft:true,id:d.id}));
+  const loading=el("div","history-empty");loading.textContent="저장 이력을 불러오는 중…";list.appendChild(loading);
+  try{
+    const q=query(collection(db,"teams",TEAM_ID,"weeks",weekId,"history"),orderBy("clientAt","desc"),limit(200));
+    const snap=await getDocs(q);loading.remove();
+    snap.forEach(s=>appendHistoryItem(list,{id:s.id,week:weekId,...s.data()},{id:s.id}));
+    if(!list.children.length){const empty=el("div","history-empty");empty.textContent="아직 저장된 수정 이력이 없습니다.";list.appendChild(empty);}
+  }catch(e){
+    loading.textContent=historyPermission?"수정 이력을 불러오지 못했습니다. 연결 상태를 확인해 주세요.":"이 팀의 Firebase 규칙에 수정 이력 읽기 권한을 추가해야 합니다.";
+  }
+  refreshDraftBadge();
+}
+$("#btn-history").onclick=openHistory;
+$("#history-close").onclick=()=>$("#history-overlay").classList.add("hide");
+$("#history-overlay").addEventListener("click",e=>{if(e.target===$("#history-overlay"))$("#history-overlay").classList.add("hide");});
+
 function enqueueWrite(key,write){
   // 같은 필드의 Firebase 쓰기는 반드시 순서대로 실행합니다.
   // 이전 저장이 네트워크에서 늦게 끝나더라도 최신 삭제/수정 내용을 덮어쓸 수 없습니다.
@@ -1703,38 +2050,54 @@ async function flushPending(){
 
   // 이미 전송 중인 예전 저장 + 방금 큐에 넣은 최신 저장까지 모두 끝날 때까지 기다립니다.
   const active=Array.from(writeChains.values());
-  if(active.length) await Promise.allSettled(active);
+  if(active.length){
+    const results=await Promise.allSettled(active);
+    const failed=results.find(r=>r.status==="rejected");
+    if(failed)throw failed.reason;
+  }
 }
 
-function save(path,value,delay=700){
+function save(path,value,delay=700,previousOverride){
   const targetWeek=weekId;
-  mark("입력 중…",false);
-  scheduleWrite("s:"+path,async()=>{
-    try{
-      const ref=doc(db,"teams",TEAM_ID,"weeks",targetWeek);
-      await setDoc(ref,{updatedAt:serverTimestamp()},{merge:true});
-      await updateDoc(ref,{[path]:value});
-      mark("저장됨",true);
-    }catch(e){fail(e);throw e;}
+  let key="s:"+path;
+  if(/^absent\.m\d+$/.test(path))key="abscheck:"+path.split(".")[1];
+  if(/^absentNames\.m\d+$/.test(path))key="absname:"+path.split(".")[1];
+  const modelPrevious=previousOverride!==undefined?previousOverride:valueAtPath(shared,path);
+  const previous=editBaselines.has(key)?editBaselines.get(key):(modelPrevious??(typeof value==="boolean"?false:""));
+  queueVersionedWrite("s:"+path,{
+    key,week:targetWeek,targetPath:["teams",TEAM_ID,"weeks",targetWeek],
+    entries:[{path,value}],previousEntries:[{path,value:previous}],
+    preview:typeof value==="boolean"?(value?"결시 체크":"결시 해제"):String(value??""),
+    previousPreview:typeof previous==="boolean"?(previous?"결시 체크":"결시 해제"):String(previous??""),
+    label:historyLabel(key)
   },delay);
 }
 function saveMember(field,value){
   const targetWeek=weekId, targetSlot=slot;
+  const key=targetSlot+":"+field;
+  const previous=editBaselines.get(key)??((members[targetSlot]||{})[field]??"");
+  const draft=stageDraft({
+    key,week:targetWeek,targetPath:["teams",TEAM_ID,"weeks",targetWeek,"members",targetSlot],
+    entries:[{path:field,value}],previousEntries:[{path:field,value:previous}],
+    preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key)
+  });
   mark("입력 중…",false);
   scheduleWrite("m:"+field,async()=>{
-    try{
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"members",targetSlot),{[field]:value},{merge:true});
-      if(field==="name") await setDoc(doc(db,"teams",TEAM_ID,"roster",targetSlot),{name:value},{merge:true});
-      mark("저장됨",true);
-    }catch(e){fail(e);throw e;}
+    await persistDraft(draft);
+    if(field==="name"){
+      try{await setDoc(doc(db,"teams",TEAM_ID,"roster",targetSlot),{name:value,updatedAt:serverTimestamp()},{merge:true});}
+      catch(e){console.warn("명단 보조 저장 실패",e);}
+    }
   },700);
 }
 function saveLog(row,field,value){
   const targetWeek=weekId;
-  mark("입력 중…",false);
-  scheduleWrite("l:"+row+":"+field,async()=>{
-    try{ await setDoc(doc(db,"teams",TEAM_ID,"weeks",targetWeek,"logs","r"+row),{[field]:value},{merge:true}); mark("저장됨",true); }
-    catch(e){fail(e);throw e;}
+  const key=`l:${row}:${field}`;
+  const previous=editBaselines.get(key)??((logs["r"+row]||{})[field]??"");
+  queueVersionedWrite(key,{
+    key,week:targetWeek,targetPath:["teams",TEAM_ID,"weeks",targetWeek,"logs","r"+row],
+    entries:[{path:field,value}],previousEntries:[{path:field,value:previous}],
+    preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key)
   },700);
 }
 
@@ -1750,7 +2113,10 @@ function renderShared(){
     }
   });
   PBL_STEPS.forEach((_,i)=>{
-    const n=$("#pbl-"+i), k="p"+i;
+    const n=$("#pbl-"+i), k="p"+i,meta=(shared.pblMeta||{})[k]||{};
+    const name=$("#pbl-name-"+i),pct=$("#pbl-pct-"+i);
+    if(name&&document.activeElement!==name)name.value=meta.name??PBL_STEPS[i][0];
+    if(pct&&document.activeElement!==pct)pct.value=meta.pct??PBL_STEPS[i][1];
     if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
   });
   document.documentElement.style.setProperty("--red","#C00000");
@@ -1781,6 +2147,26 @@ function renderLogs(){
 }
 /* ── 사진 ── */
 const MAX_SHOTS=6, MAX_BYTES=700000;
+async function savePhotoVersion({targetPath,photoData,key,preview}){
+  const draft=makeDraft({
+    key,week:weekId,targetPath,
+    entries:Object.entries(photoData).map(([path,value])=>({path,value})),
+    // 사진 원본은 대상 문서에 한 번만 보관합니다. 이력에서는 삭제 여부만 바꿔 복구합니다.
+    historyEntries:[{path:"deleted",value:false}],
+    previousEntries:[{path:"deleted",value:true}],
+    preview,previousPreview:"사진을 추가하기 전",label:"사진 추가"
+  });
+  await persistDraft(draft);
+}
+async function softDeletePhoto(targetPath,key,preview){
+  const draft=makeDraft({
+    key,week:weekId,targetPath,
+    entries:[{path:"deleted",value:true},{path:"deletedAt",value:Date.now()}],
+    previousEntries:[{path:"deleted",value:false}],
+    preview,previousPreview:"사진이 있던 상태",label:"사진 삭제"
+  });
+  await persistDraft(draft);
+}
 function renderPhotos(id){
   const box=$("#"+id+"-shots"); if(!box)return;
   const mine=(id===slot);
@@ -1792,7 +2178,12 @@ function renderPhotos(id){
     d.querySelector("img").onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=p.data; lb.classList.remove("hide"); };
     if(mine) d.querySelector("button").onclick=async()=>{
       if(!confirm("이 사진을 지울까요?")) return;
-      try{ await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",id,"photos",pid)); }catch(e){fail(e);}
+      try{
+        await softDeletePhoto(
+          ["teams",TEAM_ID,"weeks",weekId,"members",id,"photos",pid],
+          `photo:member:${id}:${pid}`,`삭제한 ${p.name||"활동 사진"}`
+        );
+      }catch(e){fail(e);}
     };
     box.appendChild(d);
   });
@@ -1816,7 +2207,12 @@ function renderInlinePhotos(){
       d.querySelector("img").onclick=()=>{const lb=$("#lightbox");lb.querySelector("img").src=p.data;lb.classList.remove("hide");};
       d.querySelector("button").onclick=async()=>{
         if(!confirm("이 사진을 지울까요?"))return;
-        try{await deleteDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid));}
+        try{
+          await softDeletePhoto(
+            ["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+            `photo:inline:${pid}`,`삭제한 ${p.name||"삽입 사진"}`
+          );
+        }
         catch(e){fail(e);}
       };
       box.appendChild(d);
@@ -1897,9 +2293,13 @@ $("#pick").onchange=async e=>{
         name:f.name||"",
         by:uid,
         at:Date.now(),
-        mode:richEditor?"inline":"attached"
+        mode:richEditor?"inline":"attached",
+        deleted:false
       };
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid),photoDoc);
+      await savePhotoVersion({
+        targetPath:["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+        photoData:photoDoc,key:`photo:inline:${pid}`,preview:`추가한 ${f.name||"사진"}`
+      });
       inlinePhotos[pid]=photoDoc;
 
       if(richEditor){
@@ -1954,11 +2354,30 @@ $("#btn-prev-copy").onclick=async()=>{
   try{
     const d=(await getDoc(doc(db,"teams",TEAM_ID,"weeks",prev.id))).data()||{};
     const carry={}; ["topic","period","plan"].forEach(f=>{ if(d[f])carry[f]=d[f]; });
-    if(Object.keys(carry).length) await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId),carry,{merge:true});
+    if(Object.keys(carry).length){
+      const draft=stageDraft({
+        key:"copy:shared",week:weekId,targetPath:["teams",TEAM_ID,"weeks",weekId],
+        entries:Object.entries(carry).map(([path,value])=>({path,value})),
+        previousEntries:Object.keys(carry).map(path=>({path,value:valueAtPath(shared,path)??""})),
+        preview:`${prev.label}에서 주제·기간·계획 가져오기`,previousPreview:"가져오기 전 공통 내용",
+        label:"지난 주 공통 내용 가져오기"
+      });
+      await persistDraft(draft);
+    }
     const ms=await getDocs(collection(db,"teams",TEAM_ID,"weeks",prev.id,"members"));
     for(const m of ms.docs){
       const v=m.data();
-      await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId,"members",m.id),{name:v.name||"",role:v.role||""},{merge:true});
+      const draft=stageDraft({
+        key:`copy:${m.id}`,week:weekId,targetPath:["teams",TEAM_ID,"weeks",weekId,"members",m.id],
+        entries:[{path:"name",value:v.name||""},{path:"role",value:v.role||""}],
+        previousEntries:[
+          {path:"name",value:(members[m.id]||{}).name||""},
+          {path:"role",value:(members[m.id]||{}).role||""}
+        ],
+        preview:`${v.name||m.id} · ${v.role||""}`,previousPreview:"가져오기 전 이름·역할",
+        label:`지난 주 ${m.id.replace("m","")}번 이름·역할 가져오기`
+      });
+      await persistDraft(draft);
     }
     mark("가져왔습니다",true);
   }catch(e){fail(e);}
@@ -2335,7 +2754,12 @@ $("#btn-export").onclick=async()=>{
     fillCellRich(xdoc,T1,8,1,shared.rich?.next,shared.next||"",inlineItemMap,styleCtx,shared.richPara?.next);
     fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap,styleCtx,shared.richPara?.mentor);
 
-    PBL_STEPS.forEach((_,i)=>{const k="p"+i;fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,shared.richPblPara?.[k]);});
+    PBL_STEPS.forEach((_,i)=>{
+      const k="p"+i,meta=(shared.pblMeta||{})[k]||{};
+      fillCell(xdoc,TPBL,i+2,1,meta.name??PBL_STEPS[i][0]);
+      fillCell(xdoc,TPBL,i+2,2,meta.pct??PBL_STEPS[i][1]);
+      fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,shared.richPblPara?.[k]);
+    });
 
     for(let i=0;i<MEMBERS;i++){
       const id="m"+(i+1), m=members[id]||{};
@@ -2450,6 +2874,8 @@ document.addEventListener("focusin",()=>{
 });
 
 window.addEventListener("pagehide",()=>{
+  // 브라우저가 전송을 끝내지 못해도 stageDraft가 localStorage에 먼저 남아 있습니다.
+  flushPending().catch(()=>{});
   try{
     setDoc(presenceRef(),{
       name:currentEditorName(),
@@ -2458,6 +2884,16 @@ window.addEventListener("pagehide",()=>{
       at:Date.now()
     },{merge:true});
   }catch(e){}
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden")flushPending().catch(()=>{});
+});
+
+window.addEventListener("beforeunload",e=>{
+  if(!pendingWrites.size&&!writeChains.size&&!draftsForWeek(weekId).length)return;
+  e.preventDefault();
+  e.returnValue="";
 });
 
 boot();
