@@ -1,0 +1,72 @@
+rules_version = '2';
+// New collaboration paths only. MERGE these matches into existing production rules;
+// do not replace the legacy application's rules with this file.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function member(team) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/teams/$(team)/collaborationMembers/$(request.auth.uid));
+    }
+    function editor(team) {
+      return member(team) && get(/databases/$(database)/documents/teams/$(team)/collaborationMembers/$(request.auth.uid)).data.role == 'editor';
+    }
+    match /teams/{team}/collaborationMembers/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false; // admin SDK/console manages membership
+    }
+    match /teams/{team}/documents/{documentId} {
+      allow read: if member(team);
+      allow create: if editor(team)
+        && request.resource.data.keys().hasOnly(['title','week','schema','createdBy','createdAt','seedId'])
+        && request.resource.data.schema == 1
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.title is string && request.resource.data.title.size() <= 150
+        && request.resource.data.week is string && request.resource.data.week.size() <= 20
+        && request.resource.data.seedId is string && request.resource.data.seedId.matches('^[a-f0-9]{64}$');
+      allow update, delete: if false;
+      match /updates/{updateId} {
+        allow read: if member(team);
+        allow create: if editor(team)
+          && existsAfter(/databases/$(database)/documents/teams/$(team)/documents/$(documentId))
+          && request.resource.data.keys().hasOnly(['schema','hash','author','session','codec','rawSize','chunks','createdAt'])
+          && request.resource.data.schema == 1 && request.resource.data.codec == 'deflate'
+          && request.resource.data.author == request.auth.uid
+          && request.resource.data.session is string && request.resource.data.session.size() <= 100
+          && updateId.matches('^[a-f0-9]{64}$') && request.resource.data.hash == updateId
+          && request.resource.data.rawSize is int && request.resource.data.rawSize >= 2 && request.resource.data.rawSize <= 100663296
+          && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 32
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+        match /chunks/{chunkId} {
+          function envelope() {
+            return getAfter(/databases/$(database)/documents/teams/$(team)/documents/$(documentId)/updates/$(updateId)).data;
+          }
+          allow read: if member(team);
+          allow create: if editor(team)
+            && envelope().author == request.auth.uid && envelope().createdAt == request.time
+            && chunkId.matches('^([0-9]|[12][0-9]|3[01])$')
+            && int(chunkId) < envelope().chunks
+            && request.resource.data.keys().hasOnly(['data'])
+            && request.resource.data.data is bytes && request.resource.data.data.size() <= 131072;
+          allow update, delete: if false;
+        }
+      }
+      match /presence/{session} {
+        allow read: if member(team);
+        allow create, update: if editor(team)
+          && request.resource.data.keys().hasOnly(['uid','name','anchor','active','updatedAt'])
+          && request.resource.data.uid == request.auth.uid
+          && (resource == null || resource.data.uid == request.auth.uid)
+          && request.resource.data.name is string && request.resource.data.name.size() <= 30
+          && request.resource.data.anchor is string && request.resource.data.anchor.size() <= 4096
+          && request.resource.data.active is bool && request.resource.data.updatedAt == request.time;
+        allow delete: if editor(team) && resource.data.uid == request.auth.uid;
+      }
+      match /checkpoints/{checkpointId}/{rest=**} {
+        allow read: if member(team);
+        allow write: if false;
+      }
+    }
+  }
+}
