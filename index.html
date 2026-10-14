@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-history-v9-20261014">
+<meta name="app-version" content="team3-history-v10-20261014">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -508,8 +508,9 @@ const APP_VERSION=document.querySelector('meta[name="app-version"]')?.content||"
 
 let db,auth,uid,slot,weekId,started=false;
 // 주차와 관계없이 팀 전체가 같이 쓰는 데이터(전체일정 표, 누적 프로젝트 일지)는
-// teams/{팀}/weeks/__team__ 문서와 그 아래 logs·inlinePhotos에 저장합니다.
-const TEAM_WEEK="__team__", SAFE_DOC_ID=/^[A-Za-z0-9_-]{1,100}$/;
+// teams/{팀}/weeks/team-shared 문서와 그 아래 logs·inlinePhotos에 저장합니다.
+// (Firestore는 "__team__"처럼 __로 시작하고 끝나는 ID를 예약어로 막아 둡니다.)
+const TEAM_WEEK="team-shared", LEGACY_TEAM_WEEK="__team__", SAFE_DOC_ID=/^[A-Za-z0-9_-]{1,100}$/;
 let teamShared={},teamInlinePhotos={},weekInlinePhotos={},teamUnsub=[],teamLogsLoaded=false;
 const logRowEls=new Map();
 let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},presenceAll={},presenceReady=false,focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
@@ -761,7 +762,7 @@ function setTeamName(name){
   if(input&&document.activeElement!==input) input.value=TEAM_NAME;
   document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
 }
-function teamMetaRef(){ return doc(db,"teams",TEAM_ID,"weeks","__team__"); }
+function teamMetaRef(){ return doc(db,"teams",TEAM_ID,"weeks",TEAM_WEEK); }
 function bindTeamName(){
   const input=$("#document-team");
   track(input,"team:name");
@@ -773,7 +774,7 @@ function bindTeamName(){
     document.title=`${TEAM_NAME} · 훈련생 프로젝트 활동일지`;
     if(TEAM_ID==="team-3"){
       queueVersionedWrite("team:name",{
-        key:"team:name",week:weekId,targetPath:["teams",TEAM_ID,"weeks","__team__"],
+        key:"team:name",week:TEAM_WEEK,targetPath:["teams",TEAM_ID,"weeks",TEAM_WEEK],
         entries:[{path:"name",value:name}],previousEntries:[{path:"name",value:previousName||""}],
         preview:name,previousPreview:previousName||"",label:"팀명"
       },700);
@@ -785,7 +786,7 @@ function bindTeamName(){
         await setDoc(teamMetaRef(),{name,updatedAt:serverTimestamp()},{merge:true});
         mark("저장됨",true);
       }catch(e){
-        // 구형 1팀 규칙에서 __team__ 문서가 막힌 경우 현재 주차 문서에도 보조 저장
+        // 팀 공용 문서 저장이 막힌 경우 현재 주차 문서에도 보조 저장
         if(weekId){
           await setDoc(doc(db,"teams",TEAM_ID,"weeks",weekId),{teamName:name},{merge:true});
           mark("저장됨",true);
@@ -2070,7 +2071,7 @@ function prepareTeamData(){
   migrateTeamData()
     .catch(e=>{
       console.warn("이전 주차 데이터 모으기 실패",e?.code,e?.message);
-      mark(String(e?.code||"").includes("permission")?"팀 공용 칸 저장 권한 확인 필요":"이전 일지를 모으지 못했습니다",false);
+      mark(String(e?.code||"").includes("permission")?"팀 공용 칸 저장 권한 확인 필요 (permission-denied)":`이전 일지를 모으지 못했습니다 (${e?.code||"오류"})`,false);
     })
     .finally(startTeamSubscriptions);
 }
@@ -2079,7 +2080,7 @@ function startTeamSubscriptions(){
   const tref=teamMetaRef();
   const warn=what=>e=>{
     console.warn(`${what} 구독 실패`,e?.code,e?.message);
-    mark(`${what}을(를) 불러오지 못했습니다`,false);
+    mark(`${what}을(를) 불러오지 못했습니다 (${e?.code||"오류"})`,false);
   };
   teamUnsub.push(onSnapshot(tref,s=>{
     teamShared=s.exists()?(s.data()||{}):{};
@@ -2240,6 +2241,17 @@ function draftStorageKey(){return `jongwon-safe-drafts-v1:${TEAM_ID}`;}
 function readDraftStore(){
   try{
     const v=JSON.parse(localStorage.getItem(draftStorageKey())||"{}");
+    let moved=false;
+    if(v&&typeof v==="object"&&!Array.isArray(v)){
+      for(const [k,d] of Object.entries(v)){
+        if(!d||(d.week!==LEGACY_TEAM_WEEK&&!(Array.isArray(d.targetPath)&&d.targetPath[3]===LEGACY_TEAM_WEEK)))continue;
+        d.week=TEAM_WEEK;
+        if(Array.isArray(d.targetPath)&&d.targetPath[3]===LEGACY_TEAM_WEEK)d.targetPath[3]=TEAM_WEEK;
+        d.storeKey=`${TEAM_WEEK}|${d.key}`;
+        delete v[k]; v[d.storeKey]=d; moved=true;
+      }
+      if(moved)try{localStorage.setItem(draftStorageKey(),JSON.stringify(v));}catch(e){}
+    }
     return v&&typeof v==="object"&&!Array.isArray(v)?v:{};
   }catch(e){return {};}
 }
