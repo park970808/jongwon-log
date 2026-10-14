@@ -2040,7 +2040,8 @@ if (new URLSearchParams(location.search).has('collaboration')) {
             const pasted=JSON.parse(wasm.pasteInternalInCellByPath(sec,parent,JSON.stringify(path),position.charOffset));
             if(!pasted.ok)throw new Error('그림을 선택한 셀에 넣지 못했습니다.');
             if(originalCell){
-              const cellHeight=originalCell.height+height+originalCell.paddingTop+originalCell.paddingBottom;
+              // Reserve two text lines around the inline image as well as its full height.
+              const cellHeight=originalCell.height+height+4000+originalCell.paddingTop+originalCell.paddingBottom;
               if(!wasm.setCellProperties(sec,parent,path[0].controlIndex,path[0].cellIndex,{height:cellHeight}).ok)throw new Error('그림에 맞춰 셀 높이를 조절하지 못했습니다.');
             }
           }
