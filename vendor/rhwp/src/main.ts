@@ -1935,6 +1935,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   let blocked = false;
   let composing = false;
   const changes = new Set<() => void>();
+  let imageInsertionFactory: (() => any) | null = null;
   let undoCallback: (() => void) | null = null;
   let redoCallback: (() => void) | null = null;
   // Browser events can arrive while the asynchronous renderer replaces the document.
@@ -2003,6 +2004,52 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       await initPromise; applying = true;
       try { await loadBytes(bytes,name,null,undefined,{skipRecent:true,suppressDialogs:true}); }
       finally { applying = false; }
+    },
+    setImageInsertionFactory(factory: () => any) { imageInsertionFactory=factory; },
+    prepareImageInsertion() { return imageInsertionFactory?.(); },
+    insertImage(position: any, data: Uint8Array, ext: string, naturalWidth: number, naturalHeight: number, fileName: string) {
+      if (applying || blocked || !inputHandler) throw new Error('편집기를 준비한 뒤 다시 그림을 넣어 주세요.');
+      const handler=inputHandler as any, path=position.cellPath || [];
+      if (position.isTextBox) throw new Error('글상자 그림 삽입은 아직 지원하지 않습니다.');
+      const sec=position.sectionIndex, parent=path.length ? position.parentParaIndex : position.paragraphIndex;
+      const page=wasm.getPageDef(sec);
+      let available=page.width-page.marginLeft-page.marginRight;
+      let originalCell: any = null;
+      if (path.length===1) {
+        const cell=wasm.getCellProperties(sec,parent,path[0].controlIndex,path[0].cellIndex);
+        originalCell=cell;
+        available=Math.min(available,cell.width-cell.paddingLeft-cell.paddingRight);
+      } else if(path.length>1) {
+        const box=wasm.getTableCellBboxesByPath(sec,parent,JSON.stringify(path)).find(b=>b.cellIdx===path.at(-1).cellIndex);
+        if(!box)throw new Error('사진을 넣을 셀의 크기를 확인하지 못했습니다.');
+        available=Math.min(available,box.w*75-600);
+      }
+      const scale=Math.min(1,Math.max(75,available)/(naturalWidth*75),Math.max(75,page.height-page.marginTop-page.marginBottom)/(naturalHeight*75));
+      const width=Math.max(75,Math.round(naturalWidth*75*scale)),height=Math.max(75,Math.round(naturalHeight*75*scale));
+      const backup=wasm.exportHwpx();
+      handler.executeOperation({kind:'snapshot',operationType:'insertPicture',operation:()=>{
+        try {
+          // The native insertPicture API creates a page-floating sibling, even for cells.
+          // Convert it to an inline control and paste that control into the actual cell.
+          const result=wasm.insertPicture(sec,parent,position.charOffset,'',data,width,height,naturalWidth,naturalHeight,ext,fileName);
+          if(!result.ok)throw new Error('그림 삽입에 실패했습니다.');
+          if(!wasm.setPictureProperties(sec,result.paraIdx,result.controlIdx,{treatAsChar:true}).ok)throw new Error('그림 배치를 설정하지 못했습니다.');
+          if(path.length){
+            if(!JSON.parse(wasm.copyControl(sec,result.paraIdx,result.controlIdx)).ok)throw new Error('그림을 셀로 옮기지 못했습니다.');
+            if(!wasm.deletePictureControl(sec,result.paraIdx,result.controlIdx).ok)throw new Error('임시 그림을 옮기지 못했습니다.');
+            const pasted=JSON.parse(wasm.pasteInternalInCellByPath(sec,parent,JSON.stringify(path),position.charOffset));
+            if(!pasted.ok)throw new Error('그림을 선택한 셀에 넣지 못했습니다.');
+            if(originalCell){
+              // Reserve two text lines around the inline image as well as its full height.
+              const cellHeight=originalCell.height+height+4000+originalCell.paddingTop+originalCell.paddingBottom;
+              if(!wasm.setCellProperties(sec,parent,path[0].controlIndex,path[0].cellIndex,{height:cellHeight}).ok)throw new Error('그림에 맞춰 셀 높이를 조절하지 못했습니다.');
+            }
+          }
+          handler.cursor.clearSelection();
+          return {...position,charOffset:position.charOffset+1};
+        }catch(error){wasm.loadDocument(backup,wasm.fileName);throw error;}
+      }});
+      handler.active=true;handler.focus();
     },
     exportHwpx: () => wasm.exportHwpx(),
     composing: () => composing,

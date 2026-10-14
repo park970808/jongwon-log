@@ -56,6 +56,19 @@ export class EditorBinding {
    this.adoptNativeBaseline();
    this.off=this.studio.subscribe(()=>{if(this.applying||this.stopped)return;this.dirty=true;clearTimeout(this.captureTimer);this.captureTimer=setTimeout(()=>this.capture(),100);});
    this.studio.setUndo(()=>void this.history('undo'),()=>void this.history('redo'));
+   this.studio.setImageInsertionFactory?.(()=>{
+     this.capture();const anchor=this.anchor();
+     return async(...args)=>{
+       const deadline=Date.now()+15000;
+       while(this.applying||this.studio.composing()){if(Date.now()>deadline)throw new Error('문서 갱신 후 그림을 다시 선택해 주세요.');await new Promise(r=>setTimeout(r,20));}
+       if(this.stopped)throw new Error('문서 편집이 중단되어 그림을 넣지 않았습니다.');
+       await this.applyRemote();
+       if(this.stopped)throw new Error('문서를 갱신하지 못해 그림을 넣지 않았습니다.');
+       if(!anchor?.key||!paragraphs(snapshotParts(this.mirror)).some(p=>p.node.key===anchor.key))throw new Error('선택한 문단이 삭제되었습니다. 삽입 위치를 다시 선택해 주세요.');
+       this.studio.insertImage(this.resolveAnchor(anchor,this.mirror),...args);
+       this.capture();
+     };
+   });
  }
  adoptNativeBaseline(){
    const current=readHwpx(this.studio.exportHwpx()),reference=snapshotParts(this.mirror);
