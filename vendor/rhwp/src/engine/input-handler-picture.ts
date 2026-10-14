@@ -791,6 +791,26 @@ function calcResizedBboxRotated(
   return { x: newCx - newW / 2, y: newCy - newH / 2, width: newW, height: newH };
 }
 
+// Inline cell photos must stay within their container when a handle is dragged.
+function fitCellPictureResize(this:any,state:any,bbox:{x:number;y:number;width:number;height:number}) {
+  const ref=state.ref;
+  if(ref?.type!=='image'||!hasCellPath(ref)||!getObjectProperties.call(this,ref).treatAsChar)return bbox;
+  const path=ref.cellPath,entry=path[path.length-1];
+  let width:number;
+  if(path.length===1){
+    const cell=this.wasm.getCellProperties(ref.sec,ref.ppi,entry.controlIndex??entry.controlIdx,entry.cellIndex??entry.cellIdx);
+    width=(cell.width-cell.paddingLeft-cell.paddingRight)/PX_TO_HWP;
+  }else{
+    const cell=this.wasm.getTableCellBboxesByPath(ref.sec,ref.ppi,JSON.stringify(path)).find((b:any)=>b.cellIdx===(entry.cellIndex??entry.cellIdx));
+    if(!cell)return bbox;
+    width=cell.w-8;
+  }
+  const page=this.wasm.getPageDef(ref.sec);
+  const height=Math.min((page.height-page.marginTop-page.marginBottom)/PX_TO_HWP-80,(page.height-page.marginBottom)/PX_TO_HWP-state.bbox.y-32);
+  const scale=Math.min(1,Math.max(1,width)/bbox.width,Math.max(1,height)/bbox.height);
+  return {x:state.bbox.x,y:state.bbox.y,width:bbox.width*scale,height:bbox.height*scale};
+}
+
 export function updatePictureResizeDrag(this: any, e: MouseEvent): void {
   if (!this.pictureResizeState || !this.pictureObjectRenderer) return;
   const zoom = this.viewportManager.getZoom();
@@ -805,7 +825,7 @@ export function updatePictureResizeDrag(this: any, e: MouseEvent): void {
   const rotAngle = (state.rotationAngle ?? 0) as number;
   const newBbox = state.multiRefs
     ? this.calcResizedBbox(e, zoom)
-    : calcResizedBboxRotated(state, e, zoom);
+    : fitCellPictureResize.call(this,state,calcResizedBboxRotated(state,e,zoom));
 
   // 모든 경우에 점선 프리뷰만 갱신하여 앵커는 제자리에 머물게 함
   this.pictureObjectRenderer.renderDragPreview(
@@ -943,7 +963,7 @@ export function finishPictureResizeDrag(this: any, e: MouseEvent): void {
   }
 
   // 단일 선택 리사이즈 (회전 반영: pivot 고정, 위치도 갱신)
-  const newBbox = calcResizedBboxRotated(state, e, zoom);
+  const newBbox = fitCellPictureResize.call(this,state,calcResizedBboxRotated(state,e,zoom));
   const rotAngle = (state.rotationAngle ?? 0) as number;
   const rotatedFrame = usesRotatedPictureFrame(state, rotAngle);
   const resizedFrame = frameFromActualPictureBbox(newBbox, rotAngle, rotatedFrame);
@@ -984,6 +1004,7 @@ export function finishPictureResizeDrag(this: any, e: MouseEvent): void {
     }
     if (Object.keys(updated).length > 0) {
       setObjectProperties.call(this, state.ref, updated);
+      if(state.ref.type==='image'&&hasCellPath(state.ref))this.wasm.ensureCellPictureHeight(state.ref.sec,state.ref.ppi,state.ref.cellPath,state.ref.ci);
       this.executeOperation({
         kind: 'record',
         command: new ResizeObjectCommand([{ sec: state.ref.sec, ppi: state.ref.ppi, ci: state.ref.ci, type: state.ref.type, cellPath: state.ref.cellPath, before, after: updated }]),

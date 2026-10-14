@@ -1,3 +1,4 @@
+import {assertPictureGeometry} from './picture-geometry.mjs';
 import {chromium} from '@playwright/test';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -27,8 +28,8 @@ try{
   assert.equal(pic.getElementsByTagName('hp:pos')[0].getAttribute('treatAsChar'),'1');
   assert.ok(Number(cell.getElementsByTagName('hp:cellSz')[0].getAttribute('height'))>Number(pic.getElementsByTagName('hp:sz')[0].getAttribute('height')),'cell must grow to fit the full photo');
   assert.ok(pic.getElementsByTagName('hp:sz')[0].getAttribute('width')<=cell.getElementsByTagName('hp:cellSz')[0].getAttribute('width')*1);
-  const para=pic.parentNode.parentNode,order=Array.from(para.getElementsByTagName('hp:run')).flatMap(r=>Array.from(r.childNodes).filter(n=>n.nodeType===1).map(n=>n.nodeName==='hp:pic'?'[사진]':n.nodeName==='hp:t'?n.textContent:'')).join('');
-  assert.equal(order,'동료앞[사진]뒤','image must follow the original relative cursor');assert.equal(await p.locator('#error').isVisible(),false);
+  const para=pic.parentNode.parentNode;assert.equal(Array.from(para.getElementsByTagName('hp:t')).map(n=>n.textContent).join(''),'','photo occupies its own paragraph');const order=Array.from(cell.getElementsByTagName('hp:run')).flatMap(r=>Array.from(r.childNodes).filter(n=>n.nodeType===1).map(n=>n.nodeName==='hp:pic'?'[사진]':n.nodeName==='hp:t'?n.textContent:'')).join('');
+  assert.equal(order,'동료앞[사진]뒤','separate image paragraph must follow the original relative cursor');assert.equal(await p.locator('#error').isVisible(),false);
  }
  console.log('PASS toolbar file selection: inline image inside original cell, relative cursor preserved during peer edit, width fitted');
  // Inspect actual paint operations as well as saved XML (the duplicate was visual only).
@@ -40,6 +41,7 @@ try{
   }return {controls,paints};
  });
  if(renderCounts)assert.deepEqual(renderCounts,{controls:1,paints:1},'one saved picture must be painted once');
+ await assertPictureGeometry(a);await assertPictureGeometry(b);
 
 
  await a.bringToFront();
@@ -53,6 +55,15 @@ try{
  const before=await size(a);await a.mouse.move(handle.x,handle.y);await a.mouse.down();await a.mouse.move(handle.x-80,handle.y-10,{steps:6});await a.mouse.up();await a.waitForTimeout(1200);
  const after=await size(a);assert.ok(after.width<before.width&&after.height<before.height);assert.ok(Math.abs(after.width/after.height-before.width/before.height)<.002,'corner resize preserves aspect ratio');assert.deepEqual(await size(b),after);
  console.log('PASS rendered photo selection and real corner drag: proportional resize synchronized to peer');
+ await a.mouse.click(box.left+12,box.top+12);
+ const largeHandle=await a.evaluate(()=>{const f=document.querySelector('#studio'),r=f.getBoundingClientRect(),points=[...f.contentWindow.document.querySelectorAll('.table-object-layer>div')].filter(e=>e.style.width==='8px'&&e.style.height==='8px').map(e=>e.getBoundingClientRect());const h=points.sort((a,b)=>b.bottom-a.bottom||b.right-a.right)[0];if(!h)throw Error('No enlargement handle');return{x:r.x+h.x+h.width/2,y:r.y+h.y+h.height/2};});
+ await a.keyboard.down('Shift');await a.mouse.move(largeHandle.x,largeHandle.y);await a.mouse.down();await a.mouse.move(largeHandle.x+250,largeHandle.y,{steps:6});await a.mouse.up();await a.keyboard.up('Shift');await a.waitForTimeout(1200);
+ const enlarged=await size(a),enlargedXml=await exported(a),enlargedPic=enlargedXml.getElementsByTagName('hp:pic')[0];let enlargedCell=enlargedPic;while(enlargedCell.nodeName!=='hp:tc')enlargedCell=enlargedCell.parentNode;
+ const margin=enlargedCell.getElementsByTagName('hp:cellMargin')[0],cellWidth=+enlargedCell.getElementsByTagName('hp:cellSz')[0].getAttribute('width');
+ assert.ok(enlarged.width<=cellWidth-(+margin.getAttribute('left'))-(+margin.getAttribute('right'))+1,'oversize drag must stop at cell inner width');
+ assert.ok(enlarged.width>after.width,'enlargement drag must actually change size');assert.deepEqual(await size(b),enlarged);await assertPictureGeometry(a);await assertPictureGeometry(b);
+ console.log('PASS oversize drag stops inside cell with no text overlap');
+
  await a.bringToFront();await a.reload();await a.waitForFunction(()=>!document.querySelector('#download').disabled,null,{timeout:45000});await waitPictures(a,1);console.log('PASS image remains inside cell after reload');
  const pending=a.waitForEvent('download');await a.locator('#download').click();const download=await pending;assert.ok((await fs.promises.stat(await download.path())).size>1000);
  fs.mkdirSync('.test-output',{recursive:true});await a.evaluate(pos=>{const w=document.querySelector('#studio').contentWindow,r=w.jongwonStudio.caretRect(pos);if(r&&r.y>700)w.document.querySelector('#scroll-container').scrollTop+=r.y-350;},position);await a.waitForTimeout(300);await a.screenshot({path:'.test-output/image-button.png',fullPage:true});assert.deepEqual(errors,[]);

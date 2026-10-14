@@ -2009,7 +2009,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     prepareImageInsertion() { return imageInsertionFactory?.(); },
     insertImage(position: any, data: Uint8Array, ext: string, naturalWidth: number, naturalHeight: number, fileName: string) {
       if (applying || blocked || !inputHandler) throw new Error('편집기를 준비한 뒤 다시 그림을 넣어 주세요.');
-      const handler=inputHandler as any, path=position.cellPath || [];
+      const handler=inputHandler as any, path=(position.cellPath || []).map((entry:any)=>({...entry}));
       if (position.isTextBox) throw new Error('글상자 그림 삽입은 아직 지원하지 않습니다.');
       const sec=position.sectionIndex, parent=path.length ? position.parentParaIndex : position.paragraphIndex;
       const page=wasm.getPageDef(sec);
@@ -2024,11 +2024,18 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         if(!box)throw new Error('사진을 넣을 셀의 크기를 확인하지 못했습니다.');
         available=Math.min(available,box.w*75-600);
       }
-      const scale=Math.min(1,Math.max(75,available)/(naturalWidth*75),Math.max(75,page.height-page.marginTop-page.marginBottom)/(naturalHeight*75));
+      // A photo in a table gets its own paragraph and a readable initial height.
+      const maxHeight=path.length ? Math.min(27000,(page.height-page.marginTop-page.marginBottom)*0.4) : page.height-page.marginTop-page.marginBottom;
+      const scale=Math.min(1,Math.max(75,available)/(naturalWidth*75),Math.max(75,maxHeight)/(naturalHeight*75));
       const width=Math.max(75,Math.round(naturalWidth*75*scale)),height=Math.max(75,Math.round(naturalHeight*75*scale));
       const backup=wasm.exportHwpx();
       handler.executeOperation({kind:'snapshot',operationType:'insertPicture',operation:()=>{
         try {
+          if(path.length && position.charOffset>0){
+            const split=JSON.parse(wasm.splitParagraphInCellByPath(sec,parent,JSON.stringify(path),position.charOffset));
+            if(!split.ok)throw new Error('그림 앞의 문단을 나누지 못했습니다.');
+            path.at(-1).cellParaIndex=split.cellParaIndex;
+          }
           // The native insertPicture API creates a page-floating sibling, even for cells.
           // Convert it to an inline control and paste that control into the actual cell.
           const result=wasm.insertPicture(sec,parent,position.charOffset,'',data,width,height,naturalWidth,naturalHeight,ext,fileName);
@@ -2037,15 +2044,28 @@ if (new URLSearchParams(location.search).has('collaboration')) {
           if(path.length){
             if(!JSON.parse(wasm.copyControl(sec,result.paraIdx,result.controlIdx)).ok)throw new Error('그림을 셀로 옮기지 못했습니다.');
             if(!wasm.deletePictureControl(sec,result.paraIdx,result.controlIdx).ok)throw new Error('임시 그림을 옮기지 못했습니다.');
-            const pasted=JSON.parse(wasm.pasteInternalInCellByPath(sec,parent,JSON.stringify(path),position.charOffset));
+            const pasted=JSON.parse(wasm.pasteInternalInCellByPath(sec,parent,JSON.stringify(path),0));
             if(!pasted.ok)throw new Error('그림을 선택한 셀에 넣지 못했습니다.');
+            // Native inline pictures do not wrap reliably beside existing text.
+            // Split after the control so surrounding text stays in separate paragraphs.
+            const split=JSON.parse(wasm.splitParagraphInCellByPath(sec,parent,JSON.stringify(path),1));
+            if(!split.ok)throw new Error('그림 뒤의 문단을 나누지 못했습니다.');
+            if(path.length===1){
+              const formatted=JSON.parse(wasm.applyParaFormatInCell(sec,parent,path[0].controlIndex,path[0].cellIndex,path[0].cellParaIndex,JSON.stringify({alignment:'left',indent:0,marginLeft:0,marginRight:0,lineSpacingType:'Percent',lineSpacing:100})));
+              if(!formatted.ok)throw new Error('그림 문단의 간격을 설정하지 못했습니다.');
+            }
             if(originalCell){
-              // Reserve two text lines around the inline image as well as its full height.
+              // Reserve text space around the image as well as its full height.
               const cellHeight=originalCell.height+height+4000+originalCell.paddingTop+originalCell.paddingBottom;
-              if(!wasm.setCellProperties(sec,parent,path[0].controlIndex,path[0].cellIndex,{height:cellHeight}).ok)throw new Error('그림에 맞춰 셀 높이를 조절하지 못했습니다.');
+              if(!wasm.setCellProperties(sec,parent,path[0].controlIndex,path[0].cellIndex,{height:cellHeight,verticalAlign:0}).ok)throw new Error('그림에 맞춰 셀 높이를 조절하지 못했습니다.');
+              wasm.ensureCellPictureHeight(sec,parent,path,0);
             }
           }
           handler.cursor.clearSelection();
+          if(path.length){
+            path.at(-1).cellParaIndex+=1;
+            return {...position,cellPath:path,cellParaIndex:path[0].cellParaIndex,paragraphIndex:path.at(-1).cellParaIndex,charOffset:0};
+          }
           return {...position,charOffset:position.charOffset+1};
         }catch(error){wasm.loadDocument(backup,wasm.fileName);throw error;}
       }});
