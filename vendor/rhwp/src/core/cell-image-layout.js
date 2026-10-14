@@ -35,3 +35,20 @@ export function removeDuplicateCellImagePaint(tree,duplicates){
   for(const {node}of images)node.ops=node.ops.filter(op=>!removed.has(op));
   return tree;
 }
+
+// A split table row can have less space on its continuation page than its stored
+// cell height suggests. Measure content in the actual cell fragment, not the row.
+export function cellPictureOverflow(tree,control,padding=4){
+  const cells=[];
+  function walk(node,cell=null){
+    if(node.groupKind?.kind==='tableCell'){cell={bounds:node.bounds,ops:[]};cells.push(cell);}
+    for(const op of node.ops||[])if(cell&&(op.type==='image'||(op.type==='textRun'&&op.text?.trim())))cell.ops.push(op);
+    for(const child of node.children||[])walk(child,cell);
+    if(node.child)walk(node.child,cell);
+  }
+  walk(tree.root);
+  const cell=cells.find(c=>c.ops.some(op=>op.type==='image'&&matches(op,control)));
+  if(!cell)return 0;
+  const bottom=Math.max(...cell.ops.map(op=>op.bbox.y+op.bbox.height));
+  return Math.max(0,bottom+padding-cell.bounds.y-cell.bounds.height);
+}

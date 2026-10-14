@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeCellImageLayout,removeDuplicateCellImagePaint} from '../vendor/rhwp/src/core/cell-image-layout.js';
+import {normalizeCellImageLayout,removeDuplicateCellImagePaint,cellPictureOverflow} from '../vendor/rhwp/src/core/cell-image-layout.js';
 const control=(x,id=0,cell=24)=>({type:'image',secIdx:0,paraIdx:1,controlIdx:id,cellPath:[{controlIndex:0,cellIndex:cell,cellParaIndex:3}],x,y:58.6,w:158.9,h:474});
 const paint=x=>({type:'image',base64:'same-photo',bbox:{x,y:58.6,width:158.9,height:474}});
 function cell(a,b){return {groupKind:{kind:'tableCell'},children:[{groupKind:{kind:'textLine'},ops:[a]},{ops:[b]}]};}
@@ -18,4 +18,11 @@ test('does not remove same source paint from another cell',()=>{
  const original=paint(390),other=paint(183),root={children:[{groupKind:{kind:'tableCell'},children:[{groupKind:{kind:'textLine'},ops:[original]}]},{groupKind:{kind:'tableCell'},ops:[other]}]};
  removeDuplicateCellImagePaint({root},normalizeCellImageLayout([control(390),control(183)]).duplicates);
  assert.deepEqual(root.children[1].ops,[other]);
+});
+
+test('continued cell height includes text after the picture and bottom padding',()=>{
+ const photo=paint(390),text={type:'textRun',text:'caption',bbox:{x:390,y:540,width:70,height:20}};
+ const tree={root:{groupKind:{kind:'tableCell'},bounds:{x:180,y:50,width:600,height:480},ops:[photo,text]}};
+ assert.equal(cellPictureOverflow(tree,control(390),6),36);
+ tree.root.bounds.height+=36;assert.equal(cellPictureOverflow(tree,control(390),6),0);
 });

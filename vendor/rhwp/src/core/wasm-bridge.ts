@@ -1,4 +1,4 @@
-import {normalizeCellImageLayout,removeDuplicateCellImagePaint} from './cell-image-layout.js';
+import {normalizeCellImageLayout,removeDuplicateCellImagePaint,cellPictureOverflow} from './cell-image-layout.js';
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
 import * as wasmExports from '@wasm/rhwp.js';
 import { blake3 } from '@noble/hashes/blake3.js';
@@ -2209,6 +2209,23 @@ export class WasmBridge {
         sec, parentPara, JSON.stringify(cellPath), innerControlIdx, JSON.stringify(props),
       )
     );
+  }
+
+  /** Grow a continued cell until its rendered photo and surrounding text fit. */
+  ensureCellPictureHeight(sec:number,parentPara:number,path:CellPathLike,ci:number):void {
+    if(path.length!==1)return;
+    const entry=path[0] as any,control=entry.controlIndex??entry.controlIdx,cell=entry.cellIndex??entry.cellIdx;
+    const para=entry.cellParaIndex??entry.cellParaIdx;
+    for(let attempt=0;attempt<4;attempt++){
+      const props=this.getCellProperties(sec,parentPara,control,cell);
+      let overflow=0;
+      for(let page=0;page<this.pageCount;page++){
+        const picture=this.getPageControlLayout(page).controls.find(c=>c.type==='image'&&c.secIdx===sec&&c.paraIdx===parentPara&&c.controlIdx===ci&&c.cellPath?.length===1&&c.outerTableControlIdx===control&&c.cellIdx===cell&&c.cellParaIdx===para);
+        if(picture)overflow=Math.max(overflow,cellPictureOverflow(this.getPageLayerTreeObject(page),picture,props.paddingBottom/75+4));
+      }
+      if(overflow<=0.2)return;
+      if(!this.setCellProperties(sec,parentPara,control,cell,{height:props.height+Math.ceil(overflow*75)+75}).ok)throw new Error('그림 셀의 높이를 조절하지 못했습니다.');
+    }
   }
 
   // ── 차트 데이터 API (#4694) ───────────────────────────
