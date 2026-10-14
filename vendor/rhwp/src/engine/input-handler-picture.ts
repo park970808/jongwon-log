@@ -676,11 +676,6 @@ function isCornerResizeDir(dir: string): boolean {
   return dir === 'nw' || dir === 'ne' || dir === 'sw' || dir === 'se';
 }
 
-function isRotatedImageCornerResize(state: any, angleDeg: number): boolean {
-  const normalized = ((angleDeg % 360) + 360) % 360;
-  return state.ref?.type === 'image' && isCornerResizeDir(state.dir) && normalized !== 0;
-}
-
 function usesRotatedPictureFrame(state: any, angleDeg: number): boolean {
   const normalized = ((angleDeg % 360) + 360) % 360;
   return state.ref?.type === 'image' && normalized !== 0;
@@ -764,7 +759,7 @@ function calcResizedBboxRotated(
 
   // 최종 출력용 크기는 절대값 사용 (최소 크기는 아주 작게만 제한)
   const MIN = 1; 
-  if (isRotatedImageCornerResize(state, angleDeg)) {
+  if (state.ref?.type === 'image' && isCornerResizeDir(dir) && !e.shiftKey) {
     const signX = dir.includes('e') ? 1 : -1;
     const signY = dir.includes('s') ? 1 : -1;
     const diagonal = Math.hypot(w0, h0) || 1;
@@ -873,11 +868,10 @@ export function updatePictureResizeDrag(this: any, e: MouseEvent): void {
     const beforeHorzOffset = state.origHorzOffset ?? origHorzOffset;
     const beforeVertOffset = state.origVertOffset ?? origVertOffset;
     try {
+      const inline=getObjectProperties.call(this,state.ref).treatAsChar;
       setObjectProperties.call(this, state.ref, {
-        width: newW,
-        height: newH,
-        horzOffset: beforeHorzOffset + (newHorzOffset - origHorzOffset),
-        vertOffset: beforeVertOffset + (newVertOffset - origVertOffset),
+        width: newW, height: newH,
+        ...(inline?{}:{horzOffset:beforeHorzOffset+(newHorzOffset-origHorzOffset),vertOffset:beforeVertOffset+(newVertOffset-origVertOffset)}),
       });
       this.eventBus.emit('document-changed');
     } catch { /* ignore */ }
@@ -979,11 +973,12 @@ export function finishPictureResizeDrag(this: any, e: MouseEvent): void {
     //  다중 선택 리사이즈 경로와 동일한 델타 방식 — 본문 그림은 before≈orig 이므로 동작 불변.)
     const deltaHorz = newHorzOffset - origHorzOffset;
     const deltaVert = newVertOffset - origVertOffset;
-    if (deltaHorz !== 0) {
+    const inline=getObjectProperties.call(this,state.ref).treatAsChar;
+    if (!inline && deltaHorz !== 0) {
       updated['horzOffset'] = beforeHorzOffset + deltaHorz;
       before['horzOffset'] = beforeHorzOffset;
     }
-    if (deltaVert !== 0) {
+    if (!inline && deltaVert !== 0) {
       updated['vertOffset'] = beforeVertOffset + deltaVert;
       before['vertOffset'] = beforeVertOffset;
     }

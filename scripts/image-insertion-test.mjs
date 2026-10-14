@@ -31,6 +31,28 @@ try{
   assert.equal(order,'동료앞[사진]뒤','image must follow the original relative cursor');assert.equal(await p.locator('#error').isVisible(),false);
  }
  console.log('PASS toolbar file selection: inline image inside original cell, relative cursor preserved during peer edit, width fitted');
+ // Inspect actual paint operations as well as saved XML (the duplicate was visual only).
+ const renderCounts=await a.evaluate(()=>{
+  const h=document.querySelector('#studio').contentWindow.__inputHandler;if(!h)return null;
+  let controls=0,paints=0;for(let i=0;i<h.wasm.pageCount;i++){
+   controls+=h.wasm.getPageControlLayout(i).controls.filter(c=>c.type==='image').length;
+   const walk=n=>{paints+=(n.ops||[]).filter(o=>o.type==='image').length;for(const c of n.children||[])walk(c);if(n.child)walk(n.child);};walk(h.wasm.getPageLayerTreeObject(i).root);
+  }return {controls,paints};
+ });
+ if(renderCounts)assert.deepEqual(renderCounts,{controls:1,paints:1},'one saved picture must be painted once');
+
+
+ await a.bringToFront();
+ // Find the synthetic green picture in actual rendered pixels, including production builds.
+ const screen=(await a.screenshot()).toString('base64');
+ const box=await a.evaluate(async data=>{const img=new Image();img.src='data:image/png;base64,'+data;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);const d=x.getImageData(0,0,c.width,c.height).data;let left=c.width,top=c.height,right=0,bottom=0;for(let y=0;y<c.height;y++)for(let px=0;px<c.width;px++){const i=(y*c.width+px)*4;if(Math.abs(d[i]-24)<4&&Math.abs(d[i+1]-118)<4&&Math.abs(d[i+2]-82)<4){left=Math.min(left,px);right=Math.max(right,px);top=Math.min(top,y);bottom=Math.max(bottom,y);}}return{left,right,top,bottom};},screen);
+ assert.ok(box.right>box.left,'synthetic picture must be visible');
+ await a.mouse.click((box.left+box.right)/2,(box.top+box.bottom)/2);
+ const handle=await a.evaluate(()=>{const f=document.querySelector('#studio'),w=f.contentWindow,rect=f.getBoundingClientRect();const points=[...w.document.querySelectorAll('.table-object-layer>div')].filter(e=>e.style.width==='8px'&&e.style.height==='8px').map(e=>e.getBoundingClientRect());const h=points.sort((a,b)=>b.bottom-a.bottom||b.right-a.right)[0];if(!h)throw Error('No visible photo resize handle');return{x:rect.x+h.x+h.width/2,y:rect.y+h.y+h.height/2};});
+ const size=async p=>{const pic=(await exported(p)).getElementsByTagName('hp:pic')[0],s=pic.getElementsByTagName('hp:sz')[0];return{width:+s.getAttribute('width'),height:+s.getAttribute('height')};};
+ const before=await size(a);await a.mouse.move(handle.x,handle.y);await a.mouse.down();await a.mouse.move(handle.x-80,handle.y-10,{steps:6});await a.mouse.up();await a.waitForTimeout(1200);
+ const after=await size(a);assert.ok(after.width<before.width&&after.height<before.height);assert.ok(Math.abs(after.width/after.height-before.width/before.height)<.002,'corner resize preserves aspect ratio');assert.deepEqual(await size(b),after);
+ console.log('PASS rendered photo selection and real corner drag: proportional resize synchronized to peer');
  await a.bringToFront();await a.reload();await a.waitForFunction(()=>!document.querySelector('#download').disabled,null,{timeout:45000});await waitPictures(a,1);console.log('PASS image remains inside cell after reload');
  const pending=a.waitForEvent('download');await a.locator('#download').click();const download=await pending;assert.ok((await fs.promises.stat(await download.path())).size>1000);
  fs.mkdirSync('.test-output',{recursive:true});await a.evaluate(pos=>{const w=document.querySelector('#studio').contentWindow,r=w.jongwonStudio.caretRect(pos);if(r&&r.y>700)w.document.querySelector('#scroll-container').scrollTop+=r.y-350;},position);await a.waitForTimeout(300);await a.screenshot({path:'.test-output/image-button.png',fullPage:true});assert.deepEqual(errors,[]);

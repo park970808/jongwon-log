@@ -60,7 +60,7 @@ export class EditorBinding {
      this.capture();const anchor=this.anchor();
      return async(...args)=>{
        const deadline=Date.now()+15000;
-       while(this.applying||this.studio.composing()){if(Date.now()>deadline)throw new Error('문서 갱신 후 그림을 다시 선택해 주세요.');await new Promise(r=>setTimeout(r,20));}
+       while(this.applying||this.studio.composing()||this.studio.interacting?.()){if(Date.now()>deadline)throw new Error('문서 갱신 후 그림을 다시 선택해 주세요.');await new Promise(r=>setTimeout(r,20));}
        if(this.stopped)throw new Error('문서 편집이 중단되어 그림을 넣지 않았습니다.');
        await this.applyRemote();
        if(this.stopped)throw new Error('문서를 갱신하지 못해 그림을 넣지 않았습니다.');
@@ -77,7 +77,7 @@ export class EditorBinding {
  }
  fail(error){this.stopped=true;this.studio.setBlocked(true);this.onError(error);}
  capture(){
-   if(this.applying||this.stopped||this.studio.composing()||!this.dirty)return;
+   if(this.applying||this.stopped||this.studio.composing()||this.studio.interacting?.()||!this.dirty)return;
    try{
      const next=readHwpx(this.studio.exportHwpx());
      // Yjs transactions do not roll back exceptions. Stage + validate in an isolated clone,
@@ -115,7 +115,7 @@ export class EditorBinding {
  }
  async applyRemote(){
    if(this.stopped)return;
-   if(this.applying||this.studio.composing()){this.scheduleRemote();return;}
+   if(this.applying||this.studio.composing()||this.studio.interacting?.()){this.scheduleRemote();return;}
    this.capture();if(this.stopped)return;
    const anchor=this.anchor();this.applying=true;
    try{
@@ -128,7 +128,7 @@ export class EditorBinding {
    }catch(error){this.fail(error);}finally{this.applying=false;if(!this.stopped)this.studio.flushInput?.();}
  }
  async history(action){
-   if(this.stopped||this.applying||this.studio.composing())return;
+   if(this.stopped||this.applying||this.studio.composing()||this.studio.interacting?.())return;
    this.capture();this.undo.stopCapturing();this.undo[action]();await this.applyRemote();this.onChange();
  }
  dispose(){this.capture();clearTimeout(this.captureTimer);clearTimeout(this.remoteTimer);this.off?.();this.doc.off('update',this.liveUpdate);this.undo.destroy();this.mirror.destroy();}

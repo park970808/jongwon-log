@@ -2053,6 +2053,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     },
     exportHwpx: () => wasm.exportHwpx(),
     composing: () => composing,
+    interacting: () => {const h=inputHandler as any;return !!(h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging);},
     position: () => inputHandler?.getCursorPosition(),
     subscribe(fn: () => void) { changes.add(fn); return () => changes.delete(fn); },
     setUndo(undo: () => void, redo: () => void) { undoCallback=undo; redoCallback=redo; },

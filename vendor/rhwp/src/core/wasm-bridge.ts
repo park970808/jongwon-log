@@ -1,3 +1,4 @@
+import {normalizeCellImageLayout,removeDuplicateCellImagePaint} from './cell-image-layout.js';
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
 import * as wasmExports from '@wasm/rhwp.js';
 import { blake3 } from '@noble/hashes/blake3.js';
@@ -1082,6 +1083,8 @@ export class WasmBridge {
         `[WasmBridge] PageLayerTree profile 불일치 (page=${pageNum}): requested=${profile}, actual=${String(tree.profile)}`,
       );
     }
+    const rawLayout=JSON.parse(this.doc.getPageControlLayout(pageNum));
+    removeDuplicateCellImagePaint(tree,normalizeCellImageLayout(rawLayout.controls).duplicates);
     const outputOptions = tree.outputOptions ?? {};
     const buildOptions = tree.buildOptions ?? {};
     buildOptions.showTransparentBorders ??= outputOptions.showTransparentBorders ?? false;
@@ -2100,7 +2103,9 @@ export class WasmBridge {
   // ── 그림 속성 API ─────────────────────────────────────
   getPageControlLayout(pageNum: number): { controls: import('./types').ControlLayoutItem[] } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getPageControlLayout(pageNum));
+    const layout=JSON.parse(this.doc.getPageControlLayout(pageNum));
+    layout.controls=normalizeCellImageLayout(layout.controls).controls;
+    return layout;
   }
 
   getPictureProperties(sec: number, para: number, ci: number): import('./types').PictureProperties {
