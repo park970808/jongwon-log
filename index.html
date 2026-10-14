@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-history-v13-20261014">
+<meta name="app-version" content="team3-history-v14-20261014">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -129,6 +129,31 @@ table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-hei
 .inline-photo-node.sized{max-width:100%}
 .inline-photo-node.sized img{max-width:100%;max-height:none}
 .inline-photo-node.fit{width:100%;margin:4px 0}
+/* 사진 자르기 */
+.inline-photo-node button.photo-crop-btn{right:auto;left:2px;font-size:12px}
+#crop-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}
+.crop-panel{display:flex;flex-direction:column;gap:12px;max-width:100%;max-height:100%}
+.crop-stage{position:relative;overflow:hidden;line-height:0;touch-action:none;user-select:none;-webkit-user-select:none;align-self:center}
+.crop-stage img{display:block;max-width:min(92vw,1100px);max-height:calc(100vh - 120px);width:auto;height:auto;pointer-events:none}
+.crop-box{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
+.crop-box::before,.crop-box::after{content:"";position:absolute;pointer-events:none;border:0 dashed rgba(255,255,255,.55)}
+.crop-box::before{top:0;bottom:0;left:33.33%;right:33.33%;border-left-width:1px;border-right-width:1px}
+.crop-box::after{left:0;right:0;top:33.33%;bottom:33.33%;border-top-width:1px;border-bottom-width:1px}
+.crop-box span{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;background:#fff;border:1px solid #1D5FD6;border-radius:2px}
+.crop-box span[data-h="nw"]{left:0;top:0;cursor:nwse-resize}
+.crop-box span[data-h="n"]{left:50%;top:0;cursor:ns-resize}
+.crop-box span[data-h="ne"]{left:100%;top:0;cursor:nesw-resize}
+.crop-box span[data-h="e"]{left:100%;top:50%;cursor:ew-resize}
+.crop-box span[data-h="se"]{left:100%;top:100%;cursor:nwse-resize}
+.crop-box span[data-h="s"]{left:50%;top:100%;cursor:ns-resize}
+.crop-box span[data-h="sw"]{left:0;top:100%;cursor:nesw-resize}
+.crop-box span[data-h="w"]{left:0;top:50%;cursor:ew-resize}
+@media (hover:none){.crop-box span{width:26px;height:26px;margin:-13px 0 0 -13px}}
+.crop-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Pretendard,sans-serif;color:#DDD;font-size:13px}
+.crop-bar .grow{flex:1}
+.crop-bar button{border:1px solid #777;background:#333;color:#EEE;border-radius:3px;padding:8px 14px;cursor:pointer;font-family:Pretendard,sans-serif}
+.crop-bar button.primary{background:#1D5FD6;border-color:#1D5FD6;color:#fff;font-weight:600}
+.crop-bar button:disabled{opacity:.5;cursor:wait}
 .inline-photo-node button.photo-resize-handle{
   top:auto;bottom:-1px;right:-1px;width:16px;height:16px;border-radius:3px 0 0 0;
   background:#1D5FD6;color:#fff;font-size:10px;line-height:16px;cursor:nwse-resize;
@@ -449,6 +474,23 @@ table.log tr.log-empty td{color:#888;text-align:center;padding:16px 8px;font-siz
   </div>
 </div>
 
+<div id="crop-overlay" class="hide" role="dialog" aria-modal="true" aria-label="사진 자르기">
+  <div class="crop-panel">
+    <div class="crop-stage" id="crop-stage">
+      <img id="crop-img" alt="">
+      <div class="crop-box" id="crop-box">
+        <span data-h="nw"></span><span data-h="n"></span><span data-h="ne"></span><span data-h="e"></span>
+        <span data-h="se"></span><span data-h="s"></span><span data-h="sw"></span><span data-h="w"></span>
+      </div>
+    </div>
+    <div class="crop-bar">
+      <span id="crop-info"></span><span class="grow"></span>
+      <button type="button" id="crop-reset">원본 전체</button>
+      <button type="button" id="crop-cancel">취소</button>
+      <button type="button" id="crop-apply" class="primary">자르기 적용</button>
+    </div>
+  </div>
+</div>
 <div id="lightbox" class="hide"><img alt=""></div>
 <input type="file" id="pick" accept="image/*" multiple class="hide">
 
@@ -1175,6 +1217,11 @@ function makeInlinePhotoNode(pid,p,editable=true,size=null){
       }catch(e){fail(e);}
     };
     wrap.appendChild(del);
+    const cropBtn=el("button","photo-crop-btn");
+    cropBtn.type="button"; cropBtn.textContent="✂"; cropBtn.title="사진 자르기";
+    cropBtn.setAttribute("aria-label","사진 자르기");
+    cropBtn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();openCrop(wrap);};
+    wrap.appendChild(cropBtn);
     const handle=el("button","photo-resize-handle");
     handle.type="button"; handle.textContent="⤡";
     handle.title="끌어서 크기 조절 · 두 번 누르면 칸 너비에 맞춤";
@@ -2809,7 +2856,8 @@ function renderLogs(){
   if(changed){renderFieldLocks();renderInlinePhotos();if(uid&&slot)renderPeers();}
 }
 /* ── 사진 ── */
-const MAX_SHOTS=6, MAX_BYTES=700000;
+// 이전 제출본은 한 칸에 사진 13장 → 한도를 넉넉히. 자르기 전 원본은 세지 않습니다.
+const MAX_SHOTS=20, MAX_BYTES=700000;
 async function savePhotoVersion({targetPath,photoData,key,preview}){
   const draft=makeDraft({
     key,week:targetPath[3]||weekId,targetPath,
@@ -2939,7 +2987,9 @@ $("#pick").onchange=async e=>{
     return;
   }
   const btn=$("#btn-photo"); btn.disabled=true;
-  const current=Object.values(inlinePhotos||{}).filter(p=>p.target===target).length;
+  const current=richEditors[target]
+    ? mergeTextTokens(editorTokens(richEditors[target])).filter(t=>t.type==="image").length
+    : Object.values(inlinePhotos||{}).filter(p=>p.target===target&&p.mode!=="inline").length;
   const room=MAX_SHOTS-current;
   const picked=files.slice(0,Math.max(room,0));
   const bad=[];
@@ -3431,8 +3481,15 @@ $("#btn-export").onclick=async()=>{
 
     const binFiles=[]; let imgNo=0;
     const inlineItemMap={};
+    // 글 속에서 지웠거나 잘라서 바뀐 원본 사진은 한글 파일에 넣지 않아 용량을 줄입니다.
+    const usedPhotoIds=new Set();
+    const collectPhotos=arr=>(Array.isArray(arr)?arr:[]).forEach(t=>{if(t?.type==="image"&&t.id)usedPhotoIds.add(String(t.id));});
+    Object.values(shared.rich||{}).forEach(collectPhotos);
+    Object.values(teamShared.richPbl||{}).forEach(collectPhotos);
+    Object.values(members||{}).forEach(m=>collectPhotos(m?.contentRich));
+    visibleLogRows().forEach(([,d])=>{collectPhotos(d.contentRich);collectPhotos(d.noteRich);});
     for(const [pid,sh] of Object.entries(inlinePhotos||{})){
-      if(sh.mode!=="inline"||!safeImageSrc(sh.data))continue;
+      if(sh.mode!=="inline"||!safeImageSrc(sh.data)||!usedPhotoIds.has(pid))continue;
       let iw=sh.w,ih=sh.h;
       if(!iw||!ih){
         const im=new Image(); im.src=sh.data;
@@ -3582,6 +3639,147 @@ document.addEventListener("focusin",()=>{
     if(key!==activeKey) releaseFieldLock(key);
   });
 });
+
+/* ════════ 사진 자르기 ════════
+   ✂ 버튼 → 자르기 창에서 영역을 고르고 "자르기 적용".
+   잘린 부분을 새 사진으로 저장하고 글 속 사진을 그것으로 바꿉니다. 원본은 지우지 않아서
+   - 다시 ✂를 누르면 원본 위에서 범위를 넓히거나 바꿀 수 있고("원본 전체" → 원래 사진으로 복귀)
+   - 수정 이력의 "저장 전으로 복원"으로도 되돌릴 수 있습니다. 크기 설정(칸 맞춤 등)은 그대로 유지. */
+let cropState=null;
+const CROP_MIN=0.04;
+const clamp01=(v,a,b)=>Math.min(b,Math.max(a,v));
+function cleanCrop(c){
+  const x=clamp01(Number(c?.x)||0,0,1-CROP_MIN), y=clamp01(Number(c?.y)||0,0,1-CROP_MIN);
+  const w=clamp01(Number(c?.w)||1,CROP_MIN,1-x), h=clamp01(Number(c?.h)||1,CROP_MIN,1-y);
+  return {x,y,w,h};
+}
+function isFullCrop(r){return r.x<=0.002&&r.y<=0.002&&r.w>=0.998&&r.h>=0.998;}
+async function openCrop(wrap){
+  const editor=wrap.closest(".rich-editor"),key=editor?.dataset.richKey,pid=wrap.dataset.photoId;
+  if(!key||!editor.dataset.lockKey||!pid)return;
+  const a=document.activeElement;
+  if(a?.dataset?.lockKey&&a.dataset.lockKey!==key)a.blur();
+  if(!myLocks.has(key)&&!(await acquireFieldLock(key))){alert("다른 사용자가 이 칸을 수정 중입니다.");return;}
+  const p=inlinePhotos[pid]; if(!p?.data)return;
+  // 이미 자른 사진이면 원본 위에서 다시 고르게 합니다.
+  const rootId=p.cropOf&&inlinePhotos[p.cropOf]?.data?p.cropOf:pid;
+  const root=inlinePhotos[rootId];
+  const rect=rootId!==pid&&p.crop?cleanCrop(p.crop):{x:0,y:0,w:1,h:1};
+  cropState={wrap,editor,key,pid,rootId,root,rect,drag:null};
+  const img=$("#crop-img");
+  img.src=safeImageSrc(root.data);
+  $("#crop-overlay").classList.remove("hide");
+  try{if(img.decode)await img.decode();}catch(e){}
+  layoutCropBox();
+}
+function layoutCropBox(){
+  const s=cropState; if(!s)return;
+  const img=$("#crop-img"),b=$("#crop-box"),W=img.clientWidth,H=img.clientHeight,r=s.rect;
+  b.style.left=r.x*W+"px"; b.style.top=r.y*H+"px";
+  b.style.width=r.w*W+"px"; b.style.height=r.h*H+"px";
+  const nw=img.naturalWidth||0,nh=img.naturalHeight||0;
+  $("#crop-info").textContent=nw?`${Math.round(r.w*nw)} × ${Math.round(r.h*nh)} 픽셀`:"";
+}
+async function closeCrop(){
+  const s=cropState; cropState=null;
+  $("#crop-overlay").classList.add("hide");
+  $("#crop-img").removeAttribute("src");
+  if(s)await releasePhotoDragLock({editor:s.editor,key:s.key});
+}
+async function cropToJpeg(src,r){
+  const img=new Image(); img.src=src;
+  if(img.decode)await img.decode(); else await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;});
+  const nw=img.naturalWidth,nh=img.naturalHeight;
+  const sx=Math.round(r.x*nw),sy=Math.round(r.y*nh);
+  const sw=Math.max(1,Math.min(nw-sx,Math.round(r.w*nw))),sh=Math.max(1,Math.min(nh-sy,Math.round(r.h*nh)));
+  let max=1200;
+  for(let pass=0;pass<4;pass++){
+    let w=sw,h=sh;
+    if(Math.max(w,h)>max){const k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k);}
+    const c=el("canvas"); c.width=w; c.height=h;
+    const ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h);
+    for(let q=0.82;q>=0.4;q-=0.12){
+      const url=c.toDataURL("image/jpeg",q);
+      if(url.length<=MAX_BYTES)return {data:url,w,h};
+    }
+    max=Math.round(max*0.7);
+  }
+  throw new Error("사진 용량이 너무 큽니다");
+}
+async function applyCrop(){
+  const s=cropState; if(!s)return;
+  const btn=$("#crop-apply"); btn.disabled=true; btn.textContent="자르는 중…";
+  try{
+    let newId;
+    if(isFullCrop(s.rect)){
+      if(s.rootId===s.pid){await closeCrop();return;}  // 바뀐 것 없음
+      newId=s.rootId;                                   // 원본 전체로 되돌리기
+    }else{
+      const out=await cropToJpeg(s.root.data,s.rect);
+      newId="p"+Date.now()+Math.floor(Math.random()*99999);
+      const photoDoc={
+        target:s.key,data:out.data,w:out.w,h:out.h,name:(s.root.name||"사진")+" (자름)",
+        by:uid,at:Date.now(),mode:"inline",deleted:false,cropOf:s.rootId,crop:{...s.rect}
+      };
+      await savePhotoVersion({
+        targetPath:["teams",TEAM_ID,"weeks",photoScopeWeekForTarget(s.key),"inlinePhotos",newId],
+        photoData:photoDoc,key:`photo:inline:${newId}`,preview:`자른 사진: ${s.root.name||"사진"}`
+      });
+      inlinePhotos[newId]=photoDoc;
+      if(isTeamScopedKey(s.key))teamInlinePhotos[newId]=photoDoc; else weekInlinePhotos[newId]=photoDoc;
+    }
+    if(!myLocks.has(s.key)&&!(await acquireFieldLock(s.key))){alert("다른 사용자가 이 칸을 수정 중이라 적용하지 못했습니다.");return;}
+    const editor=richEditors[s.key]||s.editor;
+    // 글 속 사진만 바꿔 끼우고 크기 설정은 유지합니다.
+    const tokens=mergeTextTokens(editorTokens(editor))
+      .map(t=>t.type==="image"&&t.id===s.pid?photoToken(newId,t.size):t);
+    renderRichContent(editor,tokens,"",true);
+    applyParaStyleToEditor(editor,paraStyleForKey(s.key));
+    saveRichEditor(s.key,editor,0);
+    await closeCrop();
+  }catch(e){
+    fail(e);
+    alert("사진을 자르지 못했습니다: "+(e?.message||e));
+  }finally{
+    btn.disabled=false; btn.textContent="자르기 적용";
+  }
+}
+(()=>{
+  const box=$("#crop-box");
+  box.addEventListener("pointerdown",e=>{
+    const s=cropState; if(!s)return;
+    e.preventDefault();
+    const img=$("#crop-img");
+    s.drag={h:e.target.dataset.h||"move",pointerId:e.pointerId,sx:e.clientX,sy:e.clientY,
+      start:{...s.rect},W:img.clientWidth||1,H:img.clientHeight||1};
+    try{box.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  box.addEventListener("pointermove",e=>{
+    const s=cropState,d=s?.drag; if(!d||e.pointerId!==d.pointerId)return;
+    e.preventDefault();
+    const dx=(e.clientX-d.sx)/d.W, dy=(e.clientY-d.sy)/d.H, st=d.start;
+    if(d.h==="move"){
+      s.rect={...st,x:clamp01(st.x+dx,0,1-st.w),y:clamp01(st.y+dy,0,1-st.h)};
+    }else{
+      let x1=st.x,y1=st.y,x2=st.x+st.w,y2=st.y+st.h;
+      if(d.h.includes("w"))x1=clamp01(x1+dx,0,x2-CROP_MIN);
+      if(d.h.includes("e"))x2=clamp01(x2+dx,x1+CROP_MIN,1);
+      if(d.h.includes("n"))y1=clamp01(y1+dy,0,y2-CROP_MIN);
+      if(d.h.includes("s"))y2=clamp01(y2+dy,y1+CROP_MIN,1);
+      s.rect={x:x1,y:y1,w:x2-x1,h:y2-y1};
+    }
+    layoutCropBox();
+  });
+  const end=e=>{if(cropState?.drag&&e.pointerId===cropState.drag.pointerId)cropState.drag=null;};
+  box.addEventListener("pointerup",end);
+  box.addEventListener("pointercancel",end);
+  $("#crop-reset").onclick=()=>{if(cropState){cropState.rect={x:0,y:0,w:1,h:1};layoutCropBox();}};
+  $("#crop-cancel").onclick=()=>closeCrop();
+  $("#crop-apply").onclick=()=>applyCrop();
+  window.addEventListener("resize",layoutCropBox);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&cropState)closeCrop();});
+})();
 
 /* ════════ 글 속 사진 크기 조절 ════════
    사진 오른쪽 아래 파란 손잡이를 끌면 비율을 유지한 채 크기가 바뀝니다.
