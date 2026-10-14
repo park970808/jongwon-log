@@ -1,0 +1,4 @@
+# Keep upstream source/license formatting and collapse it in GitHub reviews.
+vendor/rhwp/** linguist-vendored -whitespace
+public/licenses/** linguist-vendored -whitespace
+public/fonts/** linguist-vendored

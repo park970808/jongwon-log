@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/edwardkim/rhwp",
+  "tag": "v0.8.6",
+  "commit": "f1f9c6ae58344ee9368996d3543f76b9345cf227",
+  "wasmSource": "alhangeul-macos-0.2.2.dmg",
+  "wasmSHA256": "d9f5000578b82349289ee85c3f680c7050dfc9b6af1605707560c21ee988f9b4",
+  "modifications": [
+    "src/main.ts: same-origin collaboration runtime bridge",
+    "pkg/rhwp.js: matching bundled wasm-bindgen module exports restored, local WASM URL"
+  ],
+  "license": "MIT",
+  "bindingsSource": "Recovered matching wasm-bindgen module from provided DMG rhwp-studio/assets/index-DYLUfso_.js; standalone DMG rhwp.js has incompatible WASM imports."
+}
