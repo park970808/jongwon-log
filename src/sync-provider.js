@@ -25,7 +25,7 @@ export function decodeEnvelope(e) {
 export class SyncProvider {
   constructor({doc,backend,outbox,author,session,onStatus=()=>{},onError=()=>{},batchMs=300}) {
     Object.assign(this,{doc,backend,outbox,author,session,onStatus,onError,batchMs});
-    this.buffer=[];this.seen=new Set();this.ready=false;this.disposed=false;this.sending=false;this.retry=0;this.pending=new Map();
+    this.serverDoc=new Y.Doc({gc:false});this.buffer=[];this.seen=new Set();this.ready=false;this.disposed=false;this.sending=false;this.retry=0;this.pending=new Map();
     this.onUpdate=(u,origin)=>{if(origin===REMOTE || this.disposed)return;this.buffer.push(u);this.status('saving');if(!this.timer)this.timer=setTimeout(()=>{this.timer=null;void this.flush();},batchMs);};
     doc.on('update',this.onUpdate);
   }
@@ -34,7 +34,7 @@ export class SyncProvider {
     for(const e of await this.outbox.list())this.pending.set(e.id,e);
     this.unsubscribe=this.backend.listen(async e=>{
       if(this.disposed||this.seen.has(e.id))return;
-      try { const u=decodeEnvelope(e);Y.applyUpdate(this.doc,u,REMOTE);this.seen.add(e.id); }
+      try { const u=decodeEnvelope(e);Y.applyUpdate(this.serverDoc,u,REMOTE);Y.applyUpdate(this.doc,u,REMOTE);this.seen.add(e.id); }
       catch(error){this.fatal=true;this.ready=false;this.status('error');this.onError(error);throw error;}
     },()=>{if(this.fatal)return;this.ready=true;void this.flush();},error=>{this.status('error');this.onError(error);});
     this.status('connecting');
@@ -58,6 +58,7 @@ export class SyncProvider {
       if(this.disposed)return;
       try{
         await this.backend.append(e);
+        Y.applyUpdate(this.serverDoc,decodeEnvelope(e),REMOTE);
         await this.outbox.remove(e.id);this.pending.delete(e.id);this.seen.add(e.id);this.retry=0;
       }catch(error){
         const denied=/permission-denied|unauthenticated|invalid-argument/.test(error.code||'');
@@ -69,8 +70,8 @@ export class SyncProvider {
     if(this.buffer.length){this.timer ||= setTimeout(()=>{this.timer=null;void this.flush();},this.batchMs);this.status('saving');}
     else this.status('saved');
   }
-  async recoverLocalState(){this.buffer.push(Y.encodeStateAsUpdate(this.doc));return this.flush();}
-  async dispose(){await this.flush();this.disposed=true;clearTimeout(this.timer);clearTimeout(this.retryTimer);this.unsubscribe?.();this.doc.off('update',this.onUpdate);}
+  async recoverLocalState(){const delta=Y.encodeStateAsUpdate(this.doc,Y.encodeStateVector(this.serverDoc));if(delta.length>2)this.buffer.push(delta);return this.flush();}
+  async dispose(){await this.flush();this.disposed=true;clearTimeout(this.timer);clearTimeout(this.retryTimer);this.unsubscribe?.();this.doc.off('update',this.onUpdate);this.serverDoc.destroy();}
 }
 
 export class MemoryOutbox {

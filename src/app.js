@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import {IndexeddbPersistence} from 'y-indexeddb';
 import {initializeApp,getApps} from 'firebase/app';
 import {getAuth,signInAnonymously,connectAuthEmulator} from 'firebase/auth';
-import {getFirestore,connectFirestoreEmulator,doc as firestoreDoc,getDoc} from 'firebase/firestore';
+import {getFirestore,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp} from 'firebase/firestore';
 import {FIREBASE_CONFIGS} from './firebase-config.js';
 import {FirestoreBackend} from './firestore-backend.js';
 import {DemoBackend} from './demo-backend.js';
@@ -11,6 +11,8 @@ import {importParts,readHwpx,writeHwpx} from './document-model.js';
 import {EditorBinding} from './editor-binding.js';
 
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);
+const invitation=new URLSearchParams(location.hash.slice(1)).get('invite')||'';
+if(invitation)$('#invite-code').value=invitation;
 const session=crypto.randomUUID();let active=null,connection=null,busy=false;
 const statusLabels={connecting:'Firestore 연결 중…',saving:'저장 중…',saved:'Firestore에 저장됨',offline:'연결 끊김 · 이 기기에 보관됨',error:'저장 상태를 확인해 주세요'};
 function isoWeek(d){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));const n=Math.ceil((((x-new Date(Date.UTC(x.getUTCFullYear(),0,1)))/86400000)+1)/7);return `${x.getUTCFullYear()}-W${String(n).padStart(2,'0')}`;}
@@ -50,8 +52,20 @@ async function connect(){
  connection={db,uid:user.uid,team,id,backend:new FirestoreBackend(db,team,id)};
  return connection;
 }
+async function ensureMembership(c){
+ const ref=firestoreDoc(c.db,'teams',c.team,'collaborationMembers',c.uid);
+ const current=await getDoc(ref);
+ if(current.data()?.role==='editor'){$('#join-options').hidden=true;return true;}
+ const code=$('#invite-code').value.trim();
+ if(!code){$('#join-options').hidden=false;return false;}
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code));
+ const inviteHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+ await setDoc(ref,{role:'editor',inviteHash,joinedAt:serverTimestamp()});
+ $('#join-options').hidden=true;
+ return true;
+}
 async function openFirestore(){
- const c=await connect();const meta=await c.backend.metadata();
+ const c=await connect();if(!await ensureMembership(c))return;const meta=await c.backend.metadata();
  $('#connection-info').textContent=`Firebase 연결됨 · 사용자 UID: ${c.uid}`;
  if(!meta){$('#create-options').hidden=false;return;}
  const membership=await getDoc(firestoreDoc(c.db,'teams',c.team,'collaborationMembers',c.uid));
@@ -59,7 +73,7 @@ async function openFirestore(){
  await launch({backend:c.backend,author:c.uid,meta,demo:false});
 }
 async function createFirestore(){
- const c=await connect(),who=identity(),studio=await getStudio();
+ const c=await connect();if(!await ensureMembership(c))return;const who=identity(),studio=await getStudio();
  $('#workspace').hidden=false;$('#loading').hidden=false;$('#loading').textContent='문서 양식을 준비하고 있습니다…';
  const file=$('#import-file').files[0];const bytes=file?new Uint8Array(await file.arrayBuffer()):new Uint8Array(await (await fetch('./template.hwpx')).arrayBuffer());
  readHwpx(bytes);await studio.open(bytes,file?.name||'활동일지.hwpx');
@@ -134,9 +148,9 @@ function startPresence(a){
 }
 async function action(fn){if(busy)return;busy=true;$('#error').hidden=true;const controls=Array.from($('#open-form').querySelectorAll('button'));controls.forEach(b=>b.disabled=true);try{await fn();}catch(e){error(e);if(!active){$('#workspace').hidden=true;$('#welcome').hidden=false;}}finally{busy=false;controls.forEach(b=>b.disabled=false);}}
 $('#open-form').onsubmit=e=>{e.preventDefault();void action(openFirestore);};
-$('#create').onclick=()=>void action(createFirestore);$('#demo').onclick=()=>void action(openDemo);
+$('#create').onclick=()=>void action(createFirestore);$('#join-team').onclick=()=>void action(openFirestore);$('#demo').onclick=()=>void action(openDemo);
 $('#download').onclick=()=>{try{active.binding.capture();download(active.studio.exportHwpx(),`${active.who.week}-활동일지.hwpx`);}catch(e){error(e);}};
-$('#share').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('#share').textContent='복사됨';setTimeout(()=>$('#share').textContent='링크 복사',2000);}catch(e){error(e);}};
+$('#share').onclick=async()=>{try{const url=new URL(location.href);const invite=$('#invite-code').value.trim();if(invite)url.hash=new URLSearchParams({invite}).toString();url.searchParams.delete('name');await navigator.clipboard.writeText(url.href);$('#share').textContent='복사됨';setTimeout(()=>$('#share').textContent='링크 복사',2000);}catch(e){error(e);}};
 $('#retry').onclick=()=>void active?.provider.flush();
 $('#recovery').onclick=()=>{if(!active)return;download(Y.encodeStateAsUpdate(active.doc),`${active.who.id}-공동문서-복구.yjs`);try{download(active.studio.exportHwpx(),`${active.who.id}-화면복구.hwpx`);}catch{}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden){active?.binding?.capture();void active?.provider?.flush();}});

@@ -110,6 +110,7 @@ export function readHwpx(bytes) {
 }
 
 function createNode(ast, registry) {
+  if(ast.reuseKey && registry.has(ast.reuseKey)){const key=ast.reuseKey;reconcileNode(snapshotNode(key,registry),ast,registry);return key;}
   const id = crypto.randomUUID();
   const n = new Y.Map(); registry.set(id, n);
   n.set('tag', ast.tag); n.set('attrs', new Y.Map(Object.entries(ast.attrs)));
@@ -130,7 +131,7 @@ function signature(ast) {
   if (identity(ast)) return identity(ast);
   if (ast.tag.endsWith(':tc')) {
     const address = ast.children.find(x => x.tag.endsWith(':cellAddr'));
-    if (address) return `${ast.tag}:${JSON.stringify(address.attrs)}`;
+    if (address) return `${ast.tag}:${address.attrs.colAddr}`;
   }
   return ast.tag;
 }
@@ -225,7 +226,41 @@ export function importParts(doc, parts, origin = 'import') {
   }, origin);
   return parts;
 }
+// Native merge drops empty donor paragraphs. Keep their shared identities so an
+// offline peer's text in that formerly empty cell survives the merge.
+function preserveMergedParagraphs(before,after) {
+  const allTables=n=>{const result=[];function walk(x){if(x.tag==='hp:tbl')result.push(x);for(const c of [...x.children,...(x.rich||[]).filter(o=>typeof o.insert!=='string').map(o=>o.insert.node)])walk(c);}walk(n);return result;};
+  const child=(n,tag)=>n.children.filter(x=>x.tag===tag);
+  const cells=t=>child(t,'hp:tr').flatMap(r=>child(r,'hp:tc'));
+  const bounds=c=>{const a=child(c,'hp:cellAddr')[0]?.attrs,s=child(c,'hp:cellSpan')[0]?.attrs;return a&&s?{r:+a.rowAddr,c:+a.colAddr,rs:+s.rowSpan,cs:+s.colSpan}:null;};
+  let changed=false;
+  const previous=new Map(allTables(before).map(t=>[identity(t),t]));
+  for(const table of allTables(after)){
+    const old=previous.get(identity(table));if(!old||child(old,'hp:tr').length!==child(table,'hp:tr').length)continue;
+    for(const cell of cells(table)){
+      const b=bounds(cell);if(!b)continue;
+      const donors=cells(old).filter(c=>{const a=bounds(c);return a&&a.r>=b.r&&a.c>=b.c&&a.r+a.rs<=b.r+b.rs&&a.c+a.cs<=b.c+b.cs;});
+      if(donors.length<2)continue;
+      const list=child(cell,'hp:subList')[0];if(!list)continue;
+      const paras=donors.flatMap(c=>child(c,'hp:subList').flatMap(l=>child(l,'hp:p')));
+      const native=child(list,'hp:p');let at=0;
+      const moved=paras.map(p=>{
+        let target;
+        if(native[at]&&fingerprint(p)===fingerprint(native[at]))target=native[at++];
+        else if(p.rich?.length===0){target=structuredClone(p);changed=true;}
+        else throw new Error('셀 병합 문단을 안전하게 대응할 수 없습니다. 병합 전 내용을 복구본으로 보존해 주세요.');
+        target.reuseKey=p.key;return target;
+      });
+      if(at!==native.length)throw new Error('셀 병합 중 예상하지 못한 문단 변경을 발견했습니다.');
+      list.children=moved;
+    }
+  }
+  return changed;
+}
+
 export function reconcileParts(doc, before, after, origin) {
+  let normalized=false;
+  for(const [name,part] of Object.entries(after))if(part.xml&&before[name]?.xml)normalized=preserveMergedParagraphs(before[name].xml,part.xml)||normalized;
   // Validate representation changes before mutation (Yjs transactions are not rollback transactions).
   function check(a,b) {
     if (!!a.rich !== !!b.rich) throw new Error('이 개체 편집은 아직 공동 편집에서 지원하지 않습니다. 복구본을 내려받아 주세요.');
@@ -242,6 +277,19 @@ export function reconcileParts(doc, before, after, origin) {
     }
     for (const name of Object.keys(before)) if (!after[name]) { roots.delete(name); blobs.delete(name); }
   }, origin);
+  return {normalized};
+}
+// Concurrent identical cell merges can insert the same moved paragraph reference twice.
+// Keep the first reference in CRDT order; both refer to the very same text object.
+export function deduplicateMovedParagraphs(doc) {
+  doc.transact(()=>{
+    for(const node of doc.getMap('nodes').values()) {
+      if(node.get('tag')!=='hp:subList')continue;
+      const children=node.get('children'),seen=new Set(),duplicates=[];
+      children.toArray().forEach((key,i)=>{if(seen.has(key))duplicates.push(i);else seen.add(key);});
+      for(const i of duplicates.reverse())children.delete(i,1);
+    }
+  },'normalize-moved-paragraphs');
 }
 function snapshotNode(key, nodes, seen = new Set()) {
   if (seen.has(key) || seen.size > 96) throw new Error('문서 구조가 순환하거나 너무 깊습니다.');

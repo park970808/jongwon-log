@@ -12,3 +12,10 @@ test('failed write remains in durable outbox and retry cannot lose it',async()=>
 test('corrupt and oversized envelopes rejected before applying',()=>{
  const a=new Y.Doc();a.getText('t').insert(0,'검증');const e=encodeEnvelope(Y.encodeStateAsUpdate(a),'u','s');assert.doesNotThrow(()=>decodeEnvelope(e));assert.throws(()=>decodeEnvelope({...e,hash:'0'.repeat(64)}));assert.throws(()=>decodeEnvelope({...e,rawSize:1024**3}));
 });
+test('reload recovery sends only missing local edits, not the whole saved document',async()=>{
+ const back=backend(),server=new Y.Doc();server.getText('t').insert(0,'기존 본문'.repeat(10000));await back.append(encodeEnvelope(Y.encodeStateAsUpdate(server),'u','old'));
+ const doc=new Y.Doc();Y.applyUpdate(doc,Y.encodeStateAsUpdate(server));doc.getText('t').insert(0,'기기복구');
+ const provider=new SyncProvider({doc,backend:back,outbox:new MemoryOutbox(),author:'u',session:'new'});await provider.start();await tick();await provider.recoverLocalState();await tick();
+ assert.equal(back.log.size,2);const last=[...back.log.values()].at(-1);assert.ok(decodeEnvelope(last).length<200);
+ const recovered=new Y.Doc();for(const e of back.log.values())Y.applyUpdate(recovered,decodeEnvelope(e));assert.equal(recovered.getText('t').toString(),doc.getText('t').toString());await provider.dispose();
+});

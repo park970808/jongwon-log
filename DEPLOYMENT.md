@@ -1,6 +1,6 @@
 # 배포와 기존 문서 이전
 
-이 브랜치는 공동 편집 **시험판**입니다. 웹 빌드와 Firestore 설정은 별개입니다. GitHub에 소스만 올려도 기존 Firebase 규칙/팀 권한이 자동 변경되지는 않습니다.
+3팀 공동 편집은 `hyundai-8966e`의 실제 Firestore에 연결합니다. 2026-10-14 운영 규칙과 팀 초대를 적용했습니다. 웹 빌드와 Firestore 설정은 별개입니다. 초대 코드는 저장소에 포함하지 않습니다.
 
 ## 1. Firebase 프로젝트 확인
 
@@ -18,7 +18,7 @@
 
 Firebase Console → 해당 프로젝트 → Firestore → Rules에서 현재 규칙을 먼저 보관합니다. `firestore.collaboration.rules`의 함수와 `teams/...` 경로를 기존 `match /databases/{database}/documents` 안에 병합합니다.
 
-**파일 전체로 기존 규칙을 덮어쓰면 기존 일지 접근이 끊길 수 있습니다.** 반대로 기존 규칙이 `match /{document=**}`에서 모든 쓰기를 허용하면 새 권한 제한도 무력화됩니다. 기존 규칙을 실제 기존 컬렉션에 한정하고 새 `teams/{team}/documents` 경로는 제공된 규칙으로 보호해야 합니다. 현재 운영 규칙은 이번 작업에서 읽거나 수정하지 않았습니다.
+**파일 전체로 기존 규칙을 덮어쓰면 기존 일지 접근이 끊길 수 있습니다.** 반대로 기존 규칙이 `match /{document=**}`에서 모든 쓰기를 허용하면 새 권한 제한도 무력화됩니다. 기존 규칙을 실제 기존 컬렉션에 한정하고 새 `teams/{team}/documents` 경로는 제공된 규칙으로 보호해야 합니다. `firestore.production.rules`는 기존 3팀 일지 경로 접근을 유지하면서 `documents`, `collaborationMembers`, `collaborationInvites`만 별도 보호하도록 병합한 운영 규칙입니다. 이 파일을 `firebase.production.json`으로 3팀 프로젝트에 배포했습니다. 다른 두 프로젝트는 관리자 연결이 없어 새 화면에서 선택을 막았습니다.
 
 새 구조:
 
@@ -33,14 +33,15 @@ teams/{team}/documents/{docID}                  제목·주차·스키마·체�
 
 `firestore.indexes.json`도 기존 인덱스 설정에 병합합니다. 청크 바이트/커서의 불필요한 인덱스를 제외하고 선택적 체크포인트 검색용 `documents.schema` collection-group 인덱스를 추가합니다.
 
-## 3. 팀원 등록
+## 3. 초대 링크로 팀원 등록
 
-1. 팀원이 사이트에서 팀·이름을 입력하고 **Firestore 문서 열기**를 누릅니다.
-2. 권한 안내에 표시된 **사용자 UID**를 관리자에게 전달합니다.
-3. 관리자가 Firebase Console의 Firestore 데이터 화면에서 `teams/{team}/collaborationMembers/{UID}` 문서를 만들고 문자열 `role`을 `editor`로 지정합니다.
-4. 팀원이 문서 열기를 다시 누릅니다. 문서가 없다면 **새 공동 문서 만들기**로 시작합니다.
+1. 관리자가 전달한 **초대 링크**를 엽니다.
+2. 이름·주차·문서 ID를 입력하고 **Firestore 문서 열기**를 누릅니다.
+3. 처음 접속한 브라우저는 초대 코드의 SHA-256 해시로 가입합니다. Firestore 규칙이 활성 초대를 확인한 뒤 본인 UID의 editor 권한만 생성합니다.
+4. 문서가 없다면 **새 공동 문서 만들기**를 누릅니다. 빈 양식 또는 가져온 HWPX로 시작합니다.
+5. 초대 링크로 연 문서의 **링크 복사**에는 초대 코드가 포함됩니다. 팀원에게만 전달합니다. 새 기기/시크릿 창/사이트 데이터 삭제 후에는 원래 초대 링크를 다시 엽니다.
 
-UID는 해당 브라우저 프로필에 저장됩니다. 다른 기기/시크릿 창/사이트 데이터 삭제 후에는 새 UID를 등록해야 합니다. URL을 아는 것만으로는 편집 권한이 생기지 않습니다. 첫 버전에는 영구 계정 로그인·초대 관리 화면이 없습니다.
+초대 코드 원문은 URL fragment에만 들어가며 서버에는 해시만 저장합니다. 초대 문서는 클라이언트가 읽을 수 없습니다. 초대 링크를 가진 사람은 가입할 수 있으므로 공개 저장소에 올리지 않습니다. 관리자만 `teams/team-3/collaborationInvites/{SHA256}`의 `enabled`를 변경합니다. 초대를 비활성화해도 이미 가입한 멤버 권한은 남으며, 멤버 문서를 별도로 제거해야 합니다. 영구 계정 로그인·초대 관리 화면은 아직 없습니다.
 
 ## 4. GitHub Pages
 
@@ -55,7 +56,7 @@ npm run build
 
 1. GitHub 저장소 Settings → Pages → Source를 **GitHub Actions**로 설정합니다.
 2. 사용하려는 브랜치에 워크플로가 반영된 뒤 Actions → **Deploy collaboration trial** → Run workflow를 실행합니다.
-3. 이 작업은 선택한 커밋의 빌드를 현재 Pages 주소에 배포합니다. 기존 운영 화면은 `/legacy/index.html`에서 열립니다. 본 브랜치 작성 중에는 실제 Pages 배포를 실행하지 않았습니다.
+3. 이 작업은 선택한 커밋의 빌드를 현재 Pages 주소에 배포합니다. 기존 운영 화면은 `/legacy/index.html`에서 열립니다. 배포 결과는 Actions 실행 기록에서 확인합니다.
 
 공식 설명: [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 

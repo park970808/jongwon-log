@@ -8,18 +8,19 @@
 <div id="peers" aria-label="함께 편집 중인 사람"></div>
 <nav class="actions" aria-label="문서 작업"><button id="share" disabled>링크 복사</button><button id="download" disabled>HWPX 내려받기</button><a id="legacy-link" href="./legacy/index.html">기존 일지</a></nav>
 </header>
-<div class="notice"><span>공동 편집 시험판</span> 같은 칸도 함께 작성할 수 있습니다. 복잡한 표 구조의 동시 변경은 아직 검증 중입니다.</div>
+<div class="notice"><span>공동 편집 시험판</span> 같은 칸도 함께 작성할 수 있습니다. 문서를 정기적으로 HWPX로 내려받아 보관하세요.</div>
 <section id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">저장 재시도</button><button id="recovery">복구 데이터 받기</button></section>
 <main>
 <section id="welcome" class="welcome">
 <div class="welcome-intro"><p class="eyebrow">팀 프로젝트 / 활동일지</p><h1>같은 문서에서<br>이어서 작성하세요.</h1><p>알한글 편집기에서 문서를 열고,<br>Firestore로 팀원들의 변경 사항을 공유합니다.</p></div>
 <form id="open-form">
-<label>팀<select id="team"><option value="team-3">3팀</option><option value="jangwon">장원급제</option><option value="team-2">2팀</option></select></label>
+<label>팀<select id="team"><option value="team-3">3팀</option><option value="jangwon" disabled>장원급제 · 연결 준비 중</option><option value="team-2" disabled>2팀 · 연결 준비 중</option></select></label>
 <div class="form-row"><label>작성자 이름<input id="name" required maxlength="30" autocomplete="name" placeholder="팀원에게 표시할 이름"></label><label>활동 주차<input id="week" type="week" required></label></div>
 <label>문서 ID<input id="doc-id" required pattern="[A-Za-z0-9_-]{1,100}" maxlength="100" placeholder="예: 2026-W42"></label>
 <button type="submit" class="primary">Firestore 문서 열기</button>
+<div id="join-options" hidden><p>팀 초대 링크로 접속하거나 초대 코드를 입력해 주세요.</p><label>팀 초대 코드<input id="invite-code" type="password" autocomplete="off" placeholder="관리자에게 받은 초대 코드"></label><button type="button" id="join-team">팀에 참여하기</button></div>
 <div id="create-options" hidden><p>아직 공동 문서가 없습니다. 기존 일지에서 내려받은 HWPX를 가져오거나 빈 활동일지 양식으로 시작하세요.</p><label class="file-label">가져올 HWPX<input id="import-file" type="file" accept=".hwpx"></label><button type="button" id="create">새 공동 문서 만들기</button></div>
-<p id="connection-info" class="hint">기존 Firebase 프로젝트를 사용합니다. 최초 연결에는 공동 문서 접근 규칙과 팀 편집 권한 설정이 필요합니다.</p>
+<p id="connection-info" class="hint">팀 초대 링크로 참여하면 팀원들과 같은 문서를 편집할 수 있습니다.</p>
 <div class="demo-entry"><button type="button" id="demo">기기 내 체험</button><p>같은 브라우저의 두 탭에서 확인합니다.<br>Firestore나 다른 컴퓨터에는 전송하지 않습니다.</p></div>
 </form></section>
 <section id="workspace" hidden aria-label="공동 문서 편집기"><iframe id="studio" title="알한글 문서 편집기" src="./studio.html?collaboration=1&amp;embed=1"></iframe><div id="remote-cursors" aria-hidden="true"></div><div id="loading" role="status">편집기를 준비하고 있습니다…</div></section>

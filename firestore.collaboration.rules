@@ -12,7 +12,17 @@ service cloud.firestore {
     }
     match /teams/{team}/collaborationMembers/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
-      allow list, write: if false; // admin SDK/console manages membership
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['role','inviteHash','joinedAt'])
+        && request.resource.data.role == 'editor'
+        && request.resource.data.joinedAt == request.time
+        && request.resource.data.inviteHash is string
+        && request.resource.data.inviteHash.matches('^[a-f0-9]{64}$')
+        && get(/databases/$(database)/documents/teams/$(team)/collaborationInvites/$(request.resource.data.inviteHash)).data.enabled == true;
+      allow list, update, delete: if false; // only admin can change a membership
+    }
+    match /teams/{team}/collaborationInvites/{inviteId} {
+      allow read, write: if false;
     }
     match /teams/{team}/documents/{documentId} {
       allow read: if member(team);

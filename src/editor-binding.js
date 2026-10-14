@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import {cloneDoc,snapshotParts,readHwpx,reconcileParts,writeHwpx} from './document-model.js';
+import {cloneDoc,deduplicateMovedParagraphs,snapshotParts,readHwpx,reconcileParts,writeHwpx} from './document-model.js';
 import {LOCAL,REMOTE} from './sync-provider.js';
 const is=(n,name)=>n.tag?.split(':').at(-1)===name;
 const child=(n,name)=>n.children.filter(c=>is(c,name));
@@ -44,7 +44,7 @@ function bindKeys(reference,native){
 
 export class EditorBinding {
  constructor({doc,studio,onError=()=>{},onChange=()=>{}}){
-   Object.assign(this,{doc,studio,onError,onChange});this.mirror=cloneDoc(doc);this.baseline=snapshotParts(this.mirror);this.applying=false;this.stopped=false;this.dirty=false;
+   Object.assign(this,{doc,studio,onError,onChange});deduplicateMovedParagraphs(doc);this.mirror=cloneDoc(doc);this.baseline=snapshotParts(this.mirror);this.applying=false;this.stopped=false;this.dirty=false;
    const writer=new Y.Doc();this.writerId=writer.clientID;writer.destroy();
    this.undo=new Y.UndoManager([doc.getMap('nodes'),doc.getMap('parts'),doc.getMap('blobs')],{trackedOrigins:new Set([LOCAL]),captureTimeout:500});
    this.mirror.on('update',(u,origin)=>{if(origin===LOCAL)Y.applyUpdate(this.doc,u,LOCAL);});
@@ -72,7 +72,8 @@ export class EditorBinding {
      const candidate=cloneDoc(this.mirror);
      candidate.clientID=this.writerId;
      try{
-       reconcileParts(candidate,this.baseline,next,LOCAL);
+       const {normalized}=reconcileParts(candidate,this.baseline,next,LOCAL);
+       if(normalized)this.scheduleRemote();
        writeHwpx(candidate);
        Y.applyUpdate(this.mirror,Y.encodeStateAsUpdate(candidate,Y.encodeStateVector(this.mirror)),LOCAL);
      }finally{candidate.destroy();}
@@ -105,6 +106,7 @@ export class EditorBinding {
    this.capture();if(this.stopped)return;
    const anchor=this.anchor();this.applying=true;
    try{
+     deduplicateMovedParagraphs(this.doc);
      const update=Y.encodeStateAsUpdate(this.doc,Y.encodeStateVector(this.mirror));
      Y.applyUpdate(this.mirror,update,REMOTE);
      const bytes=writeHwpx(this.mirror),position=this.resolveAnchor(anchor,this.mirror);
