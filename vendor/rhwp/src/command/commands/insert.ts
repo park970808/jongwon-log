@@ -119,6 +119,8 @@ export const insertCommands: CommandDef[] = [
     execute(services) {
       const ih = services.getInputHandler();
       if (!ih) return;
+      // Keep a relative document anchor while the file dialog is open.
+      const insertAtCursor = (window as any).jongwonStudio?.prepareImageInsertion?.();
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/png,image/jpeg,image/gif,image/bmp,image/webp';
@@ -142,6 +144,10 @@ export const insertCommands: CommandDef[] = [
             img.onerror = () => reject(new Error('브라우저가 이 이미지 파일을 읽지 못했습니다.'));
             img.src = objectUrl;
           });
+          if (insertAtCursor) {
+            await insertAtCursor(data, ext, img.naturalWidth, img.naturalHeight, file.name);
+            return;
+          }
           ih.enterImagePlacementMode(data, ext, img.naturalWidth, img.naturalHeight, file.name);
           showToast({
             message: '그림을 넣을 위치를 문서 본문 또는 표 셀 안에서 클릭하거나 드래그하세요.',
