@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-history-v10-20261014">
+<meta name="app-version" content="team3-history-v13-20261014">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -125,6 +125,23 @@ table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-hei
   font-size:13px;line-height:20px;cursor:pointer;
 }
 .rich-caret-target{outline:2px solid #1D5FD6;outline-offset:-2px}
+/* 글 속 사진 크기 조절 */
+.inline-photo-node.sized{max-width:100%}
+.inline-photo-node.sized img{max-width:100%;max-height:none}
+.inline-photo-node.fit{width:100%;margin:4px 0}
+.inline-photo-node button.photo-resize-handle{
+  top:auto;bottom:-1px;right:-1px;width:16px;height:16px;border-radius:3px 0 0 0;
+  background:#1D5FD6;color:#fff;font-size:10px;line-height:16px;cursor:nwse-resize;
+  opacity:0;touch-action:none;
+}
+.rich-editor .inline-photo-node:hover .photo-resize-handle,
+.inline-photo-node.resizing .photo-resize-handle{opacity:1}
+@media (hover:none){.inline-photo-node button.photo-resize-handle{opacity:.85;width:22px;height:22px;line-height:22px}}
+.inline-photo-node.resizing{outline:2px solid #1D5FD6;outline-offset:1px}
+.photo-size-tip{
+  position:fixed;z-index:96;pointer-events:none;background:#1D5FD6;color:#fff;
+  font:11px/1.5 Pretendard,sans-serif;padding:1px 6px;border-radius:3px;transform:translate(10px,10px);
+}
 /* 글 속 사진 끌어서 옮기기 */
 .rich-editor .inline-photo-node{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .rich-editor[data-lock-key] .inline-photo-node img{cursor:grab}
@@ -255,6 +272,8 @@ table.log tr.log-empty td{color:#888;text-align:center;padding:16px 8px;font-siz
 .history-item.draft{border-color:#C78600;background:#FFF8E6}
 .history-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:7px}
 .history-meta strong{font-size:13px;color:#111}
+.history-error{color:#B00020;font-size:12px;margin:-2px 0 6px}
+.history-actions button.discard{border-color:#C9A0A0;color:#8A1C1C}
 .history-preview{white-space:pre-wrap;overflow-wrap:anywhere;max-height:7.5em;overflow:auto;background:#F6F6F6;padding:9px;border-radius:3px;font-size:12.5px;line-height:1.5}
 .history-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}
 .history-actions button{border:1px solid #999;background:#FFF;border-radius:3px;padding:6px 10px;cursor:pointer}
@@ -1043,7 +1062,7 @@ function normalizeTokens(tokens,fallback=""){
   // 삭제한 문장이 되살아나는 문제가 있었습니다.
   if(Array.isArray(tokens)) return tokens.map(t=>{
     if(t?.type==="text")return {type:"text",text:String(t.text??""),style:cleanFmt(t.style)};
-    if(t?.type==="image"&&t.id)return {type:"image",id:String(t.id)};
+    if(t?.type==="image"&&t.id)return photoToken(t.id,t.size);
     return null;
   }).filter(Boolean);
   return fallback!==""?[{type:"text",text:String(fallback),style:{}}]:[];
@@ -1059,7 +1078,7 @@ function mergeTextTokens(tokens){
       if(out.length&&out[out.length-1].type==="text"&&sameFmt(out[out.length-1].style,style))out[out.length-1].text+=s;
       else out.push({type:"text",text:s,style});
     }else if(t.type==="image"&&t.id){
-      out.push({type:"image",id:String(t.id)});
+      out.push(photoToken(t.id,t.size));
     }
   }
   return out;
@@ -1100,7 +1119,29 @@ function appendTextWithBreaks(parent,text,style={}){
   span.appendChild(document.createTextNode(String(text??"")));
   parent.appendChild(span);
 }
-function makeInlinePhotoNode(pid,p,editable=true){
+/* 사진 크기
+   - "fit": 칸 너비에 꽉 맞춤 (새로 넣는 사진의 기본값 — 이전 제출본과 같은 모양)
+   - 숫자: 손잡이로 정한 너비(px). 웹 문서가 A4와 같은 비율(1px = 한글 75 HWPUNIT)이라 한글에도 같은 비율
+   - 없음: 이 기능 이전에 넣은 사진. 예전 기본 크기 그대로 */
+const PHOTO_MIN_PX=40, PHOTO_MAX_PX=700, PHOTO_FIT="fit";
+function cleanPhotoSize(v){
+  if(v===PHOTO_FIT)return PHOTO_FIT;
+  const n=Math.round(Number(v));
+  return Number.isFinite(n)&&n>=PHOTO_MIN_PX?Math.min(n,PHOTO_MAX_PX):null;
+}
+function photoToken(id,size){
+  const t={type:"image",id:String(id)};
+  const sz=cleanPhotoSize(size); if(sz)t.size=sz;
+  return t;
+}
+function applyPhotoSize(wrap,size){
+  const sz=cleanPhotoSize(size),img=wrap.querySelector("img");
+  wrap.classList.toggle("sized",!!sz);
+  wrap.classList.toggle("fit",sz===PHOTO_FIT);
+  if(sz){wrap.dataset.size=String(sz); if(img)img.style.width=sz===PHOTO_FIT?"100%":sz+"px";}
+  else{delete wrap.dataset.size; if(img)img.style.width="";}
+}
+function makeInlinePhotoNode(pid,p,editable=true,size=null){
   const wrap=el("span","inline-photo-node");
   wrap.dataset.photoId=pid;
   wrap.contentEditable="false";
@@ -1134,7 +1175,13 @@ function makeInlinePhotoNode(pid,p,editable=true){
       }catch(e){fail(e);}
     };
     wrap.appendChild(del);
+    const handle=el("button","photo-resize-handle");
+    handle.type="button"; handle.textContent="⤡";
+    handle.title="끌어서 크기 조절 · 두 번 누르면 칸 너비에 맞춤";
+    handle.setAttribute("aria-label","사진 크기 조절");
+    wrap.appendChild(handle);
   }
+  applyPhotoSize(wrap,size);
   return wrap;
 }
 function renderRichContent(editor,tokens,fallback,editable=true){
@@ -1147,13 +1194,14 @@ function renderRichContent(editor,tokens,fallback,editable=true){
       if(!p?.data)return;
       // 맨 앞 사진·연속된 사진 사이는 커서를 놓기 어려워서 보이지 않는 칸을 둡니다.
       if(i===0||list[i-1].type!=="text")editor.appendChild(document.createTextNode("\u200B"));
-      editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
+      editor.appendChild(makeInlinePhotoNode(t.id,p,editable,t.size));
       if(i===list.length-1||list[i+1].type!=="text")editor.appendChild(document.createTextNode("\u200B"));
     }
   });
 }
 function renderRichEditor(editor,tokens,fallback,editable=true){
   if(!editor||document.activeElement===editor)return;
+  if(photoResize?.editor===editor||(photoDrag?.active&&photoDrag.editor===editor))return;
   const key=editor.dataset.richKey;
   const local=key?localRichEdits.get(key):null;
   if(local){tokens=local.tokens;fallback=local.plain;}
@@ -1179,7 +1227,7 @@ function editorTokens(editor){
     if(node.nodeType!==Node.ELEMENT_NODE)return;
     if(node.classList?.contains("inline-photo-node")){
       const id=node.dataset.photoId;
-      if(id)out.push({type:"image",id});
+      if(id)out.push(photoToken(id,node.dataset.size));
       return;
     }
     if(node.classList?.contains("rich-text-run")){
@@ -1514,6 +1562,26 @@ function insertTokensAt(tokens,pos,newTokens){
   }
   if(!done)out.push(...newTokens);
   return mergeTextTokens(out);
+}
+// pos 위치의 글자("\n" 포함), 사진이면 "img", 끝이면 null
+function charAtModel(tokens,pos){
+  let p=0;
+  for(const t of mergeTextTokens(tokens)){
+    const len=t.type==="text"?t.text.length:1;
+    if(pos<p+len)return t.type==="text"?t.text[pos-p]:"img";
+    p+=len;
+  }
+  return null;
+}
+// 사진을 넣을 때 앞뒤에 줄바꿈을 붙여 사진이 혼자 한 줄을 차지하게 합니다(글 → 사진 → 글).
+function insertPhotoOwnLine(tokens,pos,tok){
+  const parts=[];
+  if(pos>0&&charAtModel(tokens,pos-1)!=="\n")parts.push({type:"text",text:"\n",style:{}});
+  parts.push(tok);
+  const caret=pos+parts.length;                 // 사진 바로 뒤
+  const next=charAtModel(tokens,pos);
+  if(next!==null&&next!=="\n")parts.push({type:"text",text:"\n",style:{}});
+  return {tokens:insertTokensAt(tokens,pos,parts),caret};
 }
 function setCaretAtModelOffset(editor,pos){
   const r=rangeAtModelOffset(editor,pos);
@@ -2248,6 +2316,7 @@ function readDraftStore(){
         d.week=TEAM_WEEK;
         if(Array.isArray(d.targetPath)&&d.targetPath[3]===LEGACY_TEAM_WEEK)d.targetPath[3]=TEAM_WEEK;
         d.storeKey=`${TEAM_WEEK}|${d.key}`;
+        d.lastError=d.lastError||"이전 버전의 저장 위치 오류로 저장되지 않음";
         delete v[k]; v[d.storeKey]=d; moved=true;
       }
       if(moved)try{localStorage.setItem(draftStorageKey(),JSON.stringify(v));}catch(e){}
@@ -2438,6 +2507,10 @@ async function persistDraft(draft){
       }catch(fallbackError){e=fallbackError;}
     }
     fail(e);
+    if(draft.storeKey){
+      const st=readDraftStore(),cur=st[draft.storeKey];
+      if(cur?.id===draft.id){cur.lastError=String(e?.code||e?.message||"오류");writeDraftStore(st);}
+    }
     scheduleDraftRetry(draft);
     throw e;
   }
@@ -2495,14 +2568,24 @@ function appendHistoryItem(parent,data,{draft=false,id=""}={}){
   if(data.week===TEAM_WEEK){const sc=el("span");sc.textContent="모든 주차 공통";meta.append(sc);}
   const preview=el("div","history-preview");preview.textContent=data.preview||"(내용 없음)";
   const actions=el("div","history-actions");
+  const errLine=draft&&data.lastError?el("div","history-error"):null;
+  if(errLine)errLine.textContent=`저장 실패 원인: ${data.lastError}`;
   const restoreEntries=async(entries,text,button)=>{
     if(!validTargetPath(data.targetPath)){alert("이 이력의 저장 위치를 확인할 수 없습니다.");return;}
     if(!confirm(`${data.label||historyLabel(data.key)}을(를) ${text} 복원할까요?\n\n복원 작업도 새 이력으로 기록됩니다.`))return;
     button.disabled=true;
     try{
       await flushPending();
+      let ents=entries||[];
+      const tp=data.targetPath;
+      // 저장에 실패해 서버에 아예 없는 일지 행이면, 맨 아래 새 행으로 만들어 복구합니다.
+      if(tp[3]===TEAM_WEEK&&tp[4]==="logs"&&tp[5]&&!logs[tp[5]]){
+        const maxOrder=Object.values(logs).reduce((m,d)=>Math.max(m,Number(d?.order)||0),0);
+        ents=[...ents.filter(e=>!["order","week","deleted"].includes(e.path)),
+          {path:"order",value:maxOrder+10},{path:"week",value:weekId},{path:"deleted",value:false}];
+      }
       const restored=stageDraft({
-        key:data.key,week:data.week||weekId,targetPath:data.targetPath,entries:entries||[],
+        key:data.key,week:data.week||weekId,targetPath:data.targetPath,entries:ents,
         preview:text==="저장 전 내용으로"?(data.previousPreview||"저장 전 내용"):(data.preview||"복원 내용"),
         label:data.label||historyLabel(data.key),action:"restore",sourceHistoryId:id||data.id||""
       });
@@ -2517,9 +2600,23 @@ function appendHistoryItem(parent,data,{draft=false,id=""}={}){
     before.onclick=()=>restoreEntries(data.previousEntries,"저장 전 내용으로",before);
     actions.appendChild(before);
   }
+  if(draft){
+    // 이미 다시 입력했거나 필요 없는 초안은 버릴 수 있게 합니다.
+    const discard=el("button","discard");discard.type="button";discard.textContent="초안 버리기";
+    discard.onclick=()=>{
+      if(!confirm("이 초안을 버릴까요?\n\n이 브라우저에만 남아 있던 내용이라 버리면 되돌릴 수 없습니다."))return;
+      clearTimeout(retryTimers.get(data.storeKey));retryTimers.delete(data.storeKey);
+      clearDraftIfCurrent(data);
+      item.remove();
+      refreshDraftBadge();
+      if(!draftsForWeek(weekId).length)mark("저장됨",true);
+    };
+    actions.appendChild(discard);
+  }
   const restore=el("button","restore");restore.type="button";restore.textContent=draft?"초안 복구":"이 버전 복원";
   restore.onclick=()=>restoreEntries(data.entries||[],draft?"초안으로":"이 버전으로",restore);
-  actions.appendChild(restore);item.append(meta,preview,actions);parent.appendChild(item);
+  actions.appendChild(restore);
+  item.append(meta,...(errLine?[errLine]:[]),preview,actions);parent.appendChild(item);
 }
 async function openHistory(){
   try{await flushPending();}catch(e){}
@@ -2880,8 +2977,10 @@ $("#pick").onchange=async e=>{
       if(isTeamScopedKey(target))teamInlinePhotos[pid]=photoDoc; else weekInlinePhotos[pid]=photoDoc;
 
       if(richEditor){
-        const next=insertTokensAt(editorTokens(richEditor),caret,[{type:"image",id:pid}]);
-        caret+=1; // 여러 장이면 방금 넣은 사진 뒤에 이어서 넣습니다.
+        // 새 사진은 칸 너비에 맞춰 혼자 한 줄에. 여러 장이면 방금 넣은 사진 아래로 이어서.
+        const placed=insertPhotoOwnLine(editorTokens(richEditor),caret,photoToken(pid,PHOTO_FIT));
+        const next=placed.tokens;
+        caret=placed.caret;
         renderRichContent(richEditor,next,"",true);
         applyParaStyleToEditor(richEditor,paraStyleForKey(target));
         richCarets[target]=caret;
@@ -3173,10 +3272,22 @@ function recolorTemplateRedRuns(xdoc,ctx,color){
   });
 }
 
-function addInlineRunImage(xdoc,p,ref,sh){
+// 한 쪽 본문 높이(템플릿 기준 약 267mm)보다 조금 작게 — 사진 한 장은 쪽을 나눌 수 없어서 넘으면 잘립니다.
+const PHOTO_MAX_H=72000;
+function addInlineRunImage(xdoc,p,ref,sh,sizePx=null,maxW=0){
   if(!sh)return;
-  let cw=Math.min(18000,sh.w*PX), chh=Math.round(cw*sh.h/sh.w);
-  if(chh>16000){chh=16000;cw=Math.round(chh*sh.w/sh.h);}
+  let cw,chh;
+  const sz=cleanPhotoSize(sizePx);
+  if(sz){
+    cw=sz===PHOTO_FIT?(maxW>0?maxW:18000):Math.round(sz*PX);
+    if(maxW>0)cw=Math.min(cw,maxW);
+    chh=Math.round(cw*sh.h/sh.w);
+    if(chh>PHOTO_MAX_H){chh=PHOTO_MAX_H;cw=Math.round(chh*sh.w/sh.h);}
+  }else{
+    cw=Math.min(18000,sh.w*PX); if(maxW>0)cw=Math.min(cw,maxW);
+    chh=Math.round(cw*sh.h/sh.w);
+    if(chh>16000){chh=16000;cw=Math.round(chh*sh.w/sh.h);}
+  }
   const run=xdoc.createElementNS(HP,"hp:run");
   run.setAttribute("charPrIDRef",ref);
   const frag=new DOMParser().parseFromString(picXml(sh.item,sh.w,sh.h,cw,chh),"application/xml");
@@ -3199,6 +3310,9 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyl
   const base=ps[0];
   const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
   const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
+  // 사진이 칸 밖으로 넘치지 않도록 칸 안쪽 너비를 구합니다.
+  const csz=kids(tc,"hp:cellSz")[0], cmg=kids(tc,"hp:cellMargin")[0];
+  const cellInnerW=csz?Math.max(0,Number(csz.getAttribute("width"))-(cmg?Number(cmg.getAttribute("left"))+Number(cmg.getAttribute("right")):1020)-300):0;
   ps.slice(1).forEach(p=>sub.removeChild(p));
   const list=normalizeTokens(tokens,fallback);
   const paragraphs=[[]];
@@ -3217,7 +3331,7 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyl
     p.setAttribute("paraPrIDRef",ensureParaPr(styleCtx,baseParaRef,paraStyle));
     parts.forEach(tok=>{
       if(tok.type==="text")addInlineRunText(xdoc,p,ref,tok.text,styleCtx,tok.style);
-      else if(tok.type==="image")addInlineRunImage(xdoc,p,ref,itemMap[tok.id]);
+      else if(tok.type==="image")addInlineRunImage(xdoc,p,ref,itemMap[tok.id],tok.size,cellInnerW);
     });
     if(i>0)sub.appendChild(p);
   });
@@ -3468,6 +3582,75 @@ document.addEventListener("focusin",()=>{
     if(key!==activeKey) releaseFieldLock(key);
   });
 });
+
+/* ════════ 글 속 사진 크기 조절 ════════
+   사진 오른쪽 아래 파란 손잡이를 끌면 비율을 유지한 채 크기가 바뀝니다.
+   손잡이를 두 번 누르면 기본 크기로 돌아갑니다. 크기는 글 내용과 함께 저장되고 이력에도 남습니다. */
+let photoResize=null;
+function finishPhotoResize(r,commit){
+  r.tip?.remove();
+  r.wrap.classList.remove("resizing");
+  document.body.classList.remove("photo-dragging");
+  if(!commit){applyPhotoSize(r.wrap,r.startSize);return;}
+  const editor=richEditors[r.key]||r.editor;
+  if(editor&&editor.contains(r.wrap)&&myLocks.has(r.key))saveRichEditor(r.key,editor,0);
+}
+document.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest?.(".rich-editor .photo-resize-handle");
+  if(!handle)return;
+  const wrap=handle.closest(".inline-photo-node"), editor=wrap?.closest(".rich-editor"), key=editor?.dataset.richKey;
+  if(!key||!editor.dataset.lockKey)return;
+  e.preventDefault(); e.stopPropagation();
+  const a=document.activeElement;
+  if(a?.dataset?.lockKey&&a.dataset.lockKey!==key)a.blur();
+  const img=wrap.querySelector("img");
+  const startW=Math.round(img.getBoundingClientRect().width)||200;
+  const maxW=Math.max(PHOTO_MIN_PX,Math.min(PHOTO_MAX_PX,editor.clientWidth-24));
+  const tip=el("div","photo-size-tip"); document.body.appendChild(tip);
+  photoResize={pointerId:e.pointerId,wrap,editor,key,startX:e.clientX,startW,maxW,
+    startSize:wrap.dataset.size||null,tip,moved:false};
+  wrap.classList.add("resizing");
+  document.body.classList.add("photo-dragging");
+  try{handle.setPointerCapture(e.pointerId);}catch(err){}
+  acquireFieldLock(key).then(ok=>{
+    if(!ok&&photoResize?.key===key){const r=photoResize;photoResize=null;finishPhotoResize(r,false);}
+  });
+},true);
+document.addEventListener("pointermove",e=>{
+  const r=photoResize; if(!r||e.pointerId!==r.pointerId)return;
+  e.preventDefault();
+  const w=Math.round(Math.min(r.maxW,Math.max(PHOTO_MIN_PX,r.startW+(e.clientX-r.startX))));
+  if(Math.abs(e.clientX-r.startX)>2)r.moved=true;
+  applyPhotoSize(r.wrap,w);
+  r.tip.textContent=`${w}px`;
+  r.tip.style.left=e.clientX+"px"; r.tip.style.top=e.clientY+"px";
+},{passive:false});
+document.addEventListener("pointerup",async e=>{
+  const r=photoResize; if(!r||e.pointerId!==r.pointerId)return;
+  photoResize=null;
+  finishPhotoResize(r,r.moved);
+  if(r.moved)blockNextPhotoClick();
+  await releasePhotoDragLock(r);
+});
+document.addEventListener("pointercancel",e=>{
+  const r=photoResize; if(!r||e.pointerId!==r.pointerId)return;
+  photoResize=null; finishPhotoResize(r,false); releasePhotoDragLock(r);
+});
+document.addEventListener("dblclick",async e=>{
+  const handle=e.target.closest?.(".rich-editor .photo-resize-handle");
+  if(!handle)return;
+  e.preventDefault(); e.stopPropagation();
+  const wrap=handle.closest(".inline-photo-node"), editor=wrap?.closest(".rich-editor"), key=editor?.dataset.richKey;
+  if(!key||!editor.dataset.lockKey||wrap.dataset.size===PHOTO_FIT)return;
+  if(!myLocks.has(key)&&!(await acquireFieldLock(key)))return;
+  applyPhotoSize(wrap,PHOTO_FIT);
+  saveRichEditor(key,editor,0);
+  await releasePhotoDragLock({editor,key});
+},true);
+// 손잡이를 누른 클릭이 크게 보기나 삭제로 이어지지 않게
+document.addEventListener("click",e=>{
+  if(e.target.closest?.(".photo-resize-handle")){e.preventDefault();e.stopPropagation();}
+},true);
 
 /* ════════ 글 속 사진 끌어서 옮기기 ════════
    - 마우스: 사진을 누른 채 끌면 파란 세로선이 놓일 위치를 보여 주고, 놓으면 그 자리로 옮깁니다.
