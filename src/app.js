@@ -2,17 +2,36 @@ import * as Y from 'yjs';
 import {IndexeddbPersistence} from 'y-indexeddb';
 import {initializeApp,getApps} from 'firebase/app';
 import {getAuth,signInAnonymously,connectAuthEmulator} from 'firebase/auth';
-import {getFirestore,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp} from 'firebase/firestore';
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp} from 'firebase/firestore';
 import {FIREBASE_CONFIGS} from './firebase-config.js';
-import {FirestoreBackend} from './firestore-backend.js';
+import {FirestoreBackend,CLIENT_FORMAT} from './firestore-backend.js';
 import {DemoBackend} from './demo-backend.js';
-import {SyncProvider,IndexedOutbox,encodeEnvelope,decodeEnvelope,REMOTE} from './sync-provider.js';
-import {importParts,readHwpx,writeHwpx} from './document-model.js';
+import {SyncProvider,IndexedOutbox,encodeEnvelope,batchForPeers} from './sync-provider.js';
+import {importParts,readHwpx} from './document-model.js';
 import {EditorBinding} from './editor-binding.js';
+import {PRESENCE,shouldSendPresence,anchorParagraph,heartbeatFor,presenceStaleMs} from './presence-policy.js';
+
+// 다시 열 때 이미 이 기기에 있는 내용은 Firestore에서 다시 읽지 않도록, 문서별 동기화 위치를 같은 IndexedDB에 둡니다.
+// (IndexedDB가 지워지면 이 값도 함께 사라지므로 전체를 다시 읽는 안전한 경로로 돌아갑니다.)
+const CURSOR_KEY='syncCursor',CURSOR_SAVE_MS=30000;
+async function readCursor(persistence,document){
+ try{
+   const c=await persistence.get(CURSOR_KEY);
+   if(c?.v!==2||!Number.isFinite(c.since)||!(c.snapshot instanceof Uint8Array)||!document.getMap('parts').size)return null;
+   return c;
+ }catch{return null;}
+}
+function saveCursor(a){
+ // Only once the document finished opening: a half-loaded session must never record a resume point.
+ if(!a||a.demo||!a.persistence||!a.binding||a.binding.stopped)return;
+ const c=a.provider.syncCursor();if(c)void a.persistence.set(CURSOR_KEY,c).catch(()=>{});
+}
 
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);
 const invitation=new URLSearchParams(location.hash.slice(1)).get('invite')||'';
 if(invitation)$('#invite-code').value=invitation;
+// ?fullload=1: 이 기기의 동기화 위치와 서버 압축본을 쓰지 않고 전체 기록을 읽은 뒤 압축본을 새로 만듭니다(복구용).
+const fullLoad=params.get('fullload')==='1';
 const session=crypto.randomUUID();let active=null,connection=null,busy=false;
 const statusLabels={connecting:'Firestore 연결 중…',saving:'저장 중…',saved:'Firestore에 저장됨',offline:'연결 끊김 · 이 기기에 보관됨',error:'저장 상태를 확인해 주세요'};
 function isoWeek(d){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));const n=Math.ceil((((x-new Date(Date.UTC(x.getUTCFullYear(),0,1)))/86400000)+1)/7);return `${x.getUTCFullYear()}-W${String(n).padStart(2,'0')}`;}
@@ -20,10 +39,17 @@ $('#week').value=params.get('week')||isoWeek(new Date());$('#doc-id').value=para
 $('#team').value=FIREBASE_CONFIGS[params.get('team')]?params.get('team'):'team-3';
 $('#name').value=params.get('name')||localStorage.getItem('jongwon-collab-name')||'';
 $('#week').onchange=()=>$('#doc-id').value=$('#week').value;
+function warn(e){
+ $('#warning-text').textContent=e?.message||String(e);$('#warning').hidden=false;console.warn(e);
+}
+const isAccessError=e=>/permission-denied|unauthenticated/.test(e?.code||'');
 function error(e){
  const message=e?.message||String(e);$('#error').hidden=false;
  $('#error-text').textContent=/permission-denied|Missing or insufficient permissions/i.test(`${e?.code} ${message}`)
- ? `공동 문서 접근 권한이 없습니다. 관리자에게 공동 편집 규칙과 팀 권한 설정을 요청하세요.${connection?.uid?` 사용자 UID: ${connection.uid}`:''}`:message;
+ ? `공동 문서 접근 권한이 없습니다. 관리자에게 공동 편집 규칙과 팀 권한 설정을 요청하세요.${connection?.uid?` 사용자 UID: ${connection.uid}`:''}`
+ : /resource-exhausted|quota/i.test(`${e?.code} ${message}`)
+ ? '오늘 Firebase 무료 사용량을 모두 사용했습니다. 입력한 내용은 이 기기에 보관되어 있으며, 한도가 초기화되는 오후 4~5시(미국 태평양 자정) 이후 자동으로 저장됩니다. 창을 닫아도 이 기기에서 문서를 다시 열면 이어서 저장됩니다.'
+ : message;
  $('#save-status').textContent='확인이 필요합니다';
  if(active?.binding?.stopped)$('#retry').disabled=true;
  console.error(e);
@@ -46,7 +72,12 @@ async function connect(){
  const config=emulator?{apiKey:'demo-key',projectId:'demo-jongwon',authDomain:'localhost'}:FIREBASE_CONFIGS[team];
  const appName=emulator?'demo-jongwon':team;
  const app=getApps().find(a=>a.name===appName)||initializeApp(config,appName);
- const auth=getAuth(app),db=getFirestore(app);
+ // Without an offline cache, Firestore bills every reconnect (sleep, Wi-Fi change) as a brand-new query over all
+ // results. The persistent cache lets a reconnect within 30 minutes pay only for changed documents.
+ let db;
+ try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});}
+ catch{db=getFirestore(app);} // already initialized for this app, or IndexedDB unavailable
+ const auth=getAuth(app);
  if(emulator&&!app.__emulators){connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectFirestoreEmulator(db,'127.0.0.1',8080);app.__emulators=true;}
  await auth.authStateReady();const user=auth.currentUser||(await signInAnonymously(auth)).user;
  connection={db,uid:user.uid,team,id,backend:new FirestoreBackend(db,team,id)};
@@ -102,12 +133,16 @@ async function launch({backend,author,meta,demo}){
  $('#document-title').textContent=meta.title;$('#mode').textContent=demo?'기기 내 체험 · 같은 브라우저 탭끼리만 연결':'Firestore 공동 편집';
  const document=new Y.Doc({gc:false}),namespace=`jongwon-collab-v1:${demo?'demo:'+backend.room:who.team+':'+who.id}`;
  const persistence=new IndexeddbPersistence(namespace,document);await persistence.whenSynced;
+ // 이 기기에 남아 있는 문서 + 동기화 위치가 있으면 그 이후의 서버 기록만 읽습니다.
+ const cursor=demo||fullLoad?null:await readCursor(persistence,document);
  const studio=await getStudio();
  let resolveReady,rejectReady;const initial=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
- const provider=new SyncProvider({doc:document,backend,author,session,outbox:new IndexedOutbox(`${namespace}:outbox:${author}`),onStatus:({state})=>{
+ const provider=new SyncProvider({doc:document,backend,author,session,outbox:new IndexedOutbox(`${namespace}:outbox:${author}`),
+   knownServerSnapshot:cursor?.snapshot??null,listenOptions:{since:cursor?.since??null,ignoreCheckpoint:fullLoad},onWarning:warn,
+   onStatus:({state})=>{
    $('#save-status').textContent=demo?(state==='saved'?'이 기기에 저장됨 · 다른 탭과 연결':state==='connecting'?'기기 내 문서 불러오는 중…':statusLabels[state]):statusLabels[state];
-   if(state==='saved')resolveReady();
- },onError:e=>{if(provider.fatal&&active?.binding)active.binding.fail(e);else error(e);rejectReady(e);}});
+   if(state==='saved'){resolveReady();if(active?.binding&&!active.binding.stopped)$('#error').hidden=true;} // recovered after an outage
+ },onError:e=>{error(e);if(isAccessError(e))rejectReady(e);}}); // other errors are retried; the open timeout still applies
  active={doc:document,provider,persistence,backend,studio,demo,who,author};
  await provider.start();
  await Promise.race([initial,new Promise((_,reject)=>setTimeout(()=>reject(new Error('서버 응답이 없습니다. 연결 상태를 확인한 뒤 새로고침해 주세요.')),30000))]);
@@ -119,32 +154,59 @@ async function launch({backend,author,meta,demo}){
  $('#legacy-link').href=`./legacy/index.html?team=${encodeURIComponent(who.team)}`;
  // Recover local Yjs changes that survived a crash before the transport queued them.
  await provider.recoverLocalState();
- if(!demo)startPresence(active);
+ if(!demo){startPresence(active);active.cursorSaveInterval=setInterval(()=>saveCursor(active),CURSOR_SAVE_MS);}
  if(import.meta.env.DEV)window.__collab={...active,Y};
 }
 function startPresence(a){
- let peers=[],last='',lastSent=0,inflight=false;
- const send=async()=>{
+ let peers=[],last='',lastParagraph='',lastSent=0,lastHidden=false,lastIdle=false,inflight=false;
+ let observed='',lastActivity=Date.now(),sentLocalAt=0,ownUpdatedAt=0,clockOffset=0;
+ const parse=p=>{try{return JSON.parse(p.anchor||'null');}catch{return null;}};
+ // Presence times are server timestamps; a shared PC's clock may be minutes off. Estimate the offset from our
+ // own presence document (written moments ago) instead of trusting Date.now().
+ const serverNow=()=>Date.now()+clockOffset;
+ const send=async(force=false)=>{
    if(inflight||a.binding.applying||a.binding.stopped)return;
-   const anchor=a.binding.anchor(),value=JSON.stringify(anchor),now=Date.now();
-   if(value===last&&now-lastSent<15000)return;
-   inflight=true;try{await a.backend.presence(session,{uid:a.author,name:a.who.name.slice(0,30),anchor:JSON.stringify(anchor),active:!document.hidden});last=value;lastSent=now;}catch(e){error(e);}finally{inflight=false;}
+   const hidden=document.hidden,now=Date.now(),anchor=hidden?null:a.binding.anchor(),key=JSON.stringify(anchor);
+   if(key!==observed){observed=key;lastActivity=now;}
+   const idle=!hidden&&now-lastActivity>=PRESENCE.idleAfterMs,paragraph=anchorParagraph(anchor);
+   if(!shouldSendPresence({now,lastSent,paragraphChanged:paragraph!==lastParagraph,offsetChanged:key!==last,hidden,lastHidden,idle,lastIdle,force}))return;
+   // v: client format, so teammates know whether every open tab can read inline records (old tabs ignore it).
+   // hb: when our next presence will come at the latest, so teammates know how long to keep showing us.
+   const value=JSON.stringify({...anchor,v:CLIENT_FORMAT,hb:heartbeatFor(idle)});
+   inflight=true;sentLocalAt=now;
+   try{await a.backend.presence(session,{uid:a.author,name:a.who.name.slice(0,30),anchor:value,active:!hidden});last=key;lastParagraph=paragraph;lastSent=now;lastHidden=hidden;lastIdle=idle;}
+   catch(e){error(e);}finally{inflight=false;}
  };
- a.presenceInterval=setInterval(send,1000);void send();
- a.presenceOff=a.backend.watchPresence(list=>{peers=list;render();},error);
+ a.presenceSend=send;
+ a.presenceInterval=setInterval(send,PRESENCE.checkMs);void send(true);
+ a.presenceOff=a.backend.watchPresence(list=>{peers=list;calibrate();adapt();render();},error);
+ function calibrate(){
+   const own=peers.find(p=>p.id===session)?.updatedAt?.toMillis();
+   if(own&&own!==ownUpdatedAt){ownUpdatedAt=own;if(sentLocalAt)clockOffset=own-sentLocalAt;}
+ }
+ const visible=p=>p.updatedAt?.toMillis()>serverNow()-presenceStaleMs(parse(p)?.hb);
+ function adapt(){
+   const others=peers.filter(p=>p.id!==session);
+   // Every open session reads every record, hidden tabs included (they stop sending presence but keep listening
+   // until they close and delete their entry): batch harder when more of them are open.
+   a.provider.setBatch(batchForPeers(others.filter(p=>!p.active||visible(p)).length));
+   // Keep the chunked format while any recently seen tab still runs the previous version.
+   a.backend.legacyPeers=others.some(p=>p.updatedAt?.toMillis()>serverNow()-30*60*1000&&!(parse(p)?.v>=CLIENT_FORMAT));
+ }
  function render(){
-   const current=peers.filter(p=>p.id!==session&&p.active&&p.updatedAt?.toMillis()>Date.now()-45000);
+   const current=peers.filter(p=>p.id!==session&&p.active&&visible(p));
    $('#peers').replaceChildren();$('#remote-cursors').replaceChildren();
    current.forEach((p,i)=>{
      const color=['#4274a5','#a45d40','#588667','#825e9d'][i%4];
      const badge=document.createElement('span');badge.className='peer';badge.textContent=p.name?.slice(0,2)||'팀원';badge.title=p.name;$('#peers').append(badge);
-     try{const position=a.binding.resolveAnchor(JSON.parse(p.anchor||'null'),a.binding.mirror),rect=a.studio.caretRect(position);if(!rect)return;
+     try{const {v:_format,hb:_heartbeat,...anchor}=parse(p)||{};if(!anchor.key&&!anchor.fallback)return;
+       const position=a.binding.resolveAnchor(anchor,a.binding.mirror),rect=a.studio.caretRect(position);if(!rect)return;
        const caret=document.createElement('div');caret.className='peer-caret';caret.style.cssText=`--peer:${color};left:${rect.x}px;top:${rect.y}px;height:${rect.height}px`;
        const label=document.createElement('span');label.textContent=p.name;caret.append(label);$('#remote-cursors').append(caret);
      }catch{ /* expired anchor during deletion: omit until next presence */ }
    });
  }
- a.cursorInterval=setInterval(render,500);
+ a.renderInterval=setInterval(render,500);
 }
 async function action(fn){if(busy)return;busy=true;$('#error').hidden=true;const controls=Array.from($('#open-form').querySelectorAll('button'));controls.forEach(b=>b.disabled=true);try{await fn();}catch(e){error(e);if(!active){$('#workspace').hidden=true;$('#welcome').hidden=false;}}finally{busy=false;controls.forEach(b=>b.disabled=false);}}
 $('#open-form').onsubmit=e=>{e.preventDefault();void action(openFirestore);};
@@ -153,7 +215,18 @@ $('#download').onclick=()=>{try{active.binding.capture();download(active.studio.
 $('#share').onclick=async()=>{try{const url=new URL(location.href);const invite=$('#invite-code').value.trim();if(invite)url.hash=new URLSearchParams({invite}).toString();url.searchParams.delete('name');await navigator.clipboard.writeText(url.href);$('#share').textContent='복사됨';setTimeout(()=>$('#share').textContent='링크 복사',2000);}catch(e){error(e);}};
 $('#retry').onclick=()=>void active?.provider.flush();
 $('#recovery').onclick=()=>{if(!active)return;download(Y.encodeStateAsUpdate(active.doc),`${active.who.id}-공동문서-복구.yjs`);try{download(active.studio.exportHwpx(),`${active.who.id}-화면복구.hwpx`);}catch{}};
-document.addEventListener('visibilitychange',()=>{if(document.hidden){active?.binding?.capture();void active?.provider?.flush();}});
+$('#warning-close').onclick=()=>$('#warning').hidden=true;
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){active?.binding?.capture();void active?.provider?.flush();saveCursor(active);}
+ void active?.presenceSend?.(); // policy sends "away" once when hidden and resumes immediately when visible
+});
+window.addEventListener('pageshow',e=>{ // restored from the back/forward cache after pagehide stopped presence
+ if(e.persisted&&active?.presenceSend){clearInterval(active.presenceInterval);active.presenceInterval=setInterval(active.presenceSend,PRESENCE.checkMs);void active.presenceSend(true);}
+});
+window.addEventListener('pagehide',()=>{
+ saveCursor(active);
+ if(active&&!active.demo){clearInterval(active.presenceInterval);void active.backend.leave(session).catch(()=>{});}
+});
 window.addEventListener('online',()=>void active?.provider.flush());
 window.addEventListener('offline',()=>active?.provider.status('offline'));
 window.addEventListener('beforeunload',e=>{active?.binding?.capture();if(active&&(active.binding?.stopped||active.provider.state!=='saved')){e.preventDefault();e.returnValue='';}});

@@ -25,10 +25,10 @@ Firebase Console → 해당 프로젝트 → Firestore → Rules에서 현재 �
 ```text
 teams/{team}/collaborationMembers/{authUID}       role: "editor"
 teams/{team}/documents/{docID}                  제목·주차·스키마·체크포인트 참조
-  updates/{sha256}                              불변 변경 메타데이터
-    chunks/{0..31}                             bytes 데이터, 청크당 128 KiB
+  updates/{sha256}                              불변 변경 기록 (256 KiB 이하는 data 필드에 바로 저장)
+    chunks/{0..31}                             큰 변경만: bytes 데이터, 청크당 128 KiB
   presence/{sessionID}                          표시명·커서·접속 시각
-  checkpoints/{sha256}/chunks/{n}               서버가 만드는 복원본
+  checkpoints/{sha256}/chunks/{n}               압축본 (팀원 브라우저 또는 선택적 서버 함수가 만듦)
 ```
 
 `firestore.indexes.json`도 기존 인덱스 설정에 병합합니다. 청크 바이트/커서의 불필요한 인덱스를 제외하고 선택적 체크포인트 검색용 `documents.schema` collection-group 인덱스를 추가합니다.
@@ -66,9 +66,38 @@ npm run build
 
 기존 Firestore 데이터와 새 공동 문서는 별도입니다. 이전 이후의 옛 화면 수정이 새 문서로 자동 반영되지는 않습니다. 기존 문서 전체 일괄 이전은 아직 구현하지 않았습니다.
 
-## 6. 체크포인트 함수 — 선택 배포
+## 6. Spark(무료) 요금제 대응 — 규칙·인덱스 배포
 
-초기 시험은 함수 없이도 동작합니다. 변경 기록이 누적되면 `functions/`의 일일 체크포인트를 사용할 수 있습니다. 함수 배포는 해당 Firebase 프로젝트의 결제·권한 설정이 필요합니다.
+이번 변경은 작은 변경을 기록 1장에 담고(`chunks: 0` + `data`), 브라우저가 체크포인트를 만들 수 있도록 규칙을 확장했습니다. **배포 순서와 무관하게 동작합니다.** 새 규칙이 아직 없으면 브라우저가 이를 감지해 예전 청크 형식으로 저장하고, 체크포인트만 만들지 않습니다.
+
+```sh
+# 3팀 운영 프로젝트: 기존 일지 경로를 보존한 운영 규칙
+npx firebase deploy --only firestore:rules --project hyundai-8966e --config firebase.production.json
+# 권장: 인라인 바이트 필드를 색인에서 제외(저장 용량 절약). 없어도 쓰기는 실패하지 않습니다.
+npx firebase deploy --only firestore:indexes --project hyundai-8966e --config firebase.emulator.json
+```
+
+규칙 변경 요약:
+
+- `updates/{id}`: `chunks == 0`이면 `data`(1 B~256 KiB 바이트) 필수, `chunks 1~32`이면 `data` 금지. 그 외 검증은 동일.
+- `checkpoints/{sha256}` 및 `chunks/{n}`: 편집 권한자가 본인 명의로만 생성, 이후 수정·삭제 불가. `coveredUntil`은 현재 시각 이전.
+- 문서 루트: `checkpointId`/`checkpointCutoff`만 변경 가능. 시점은 앞으로만 이동하며, 해당 체크포인트의 `coveredUntil`과 같아야 합니다. 원본 기록은 누구도 삭제할 수 없습니다.
+
+체크포인트는 전체 기록(또는 기존 체크포인트+이후 기록)을 서버에서 직접 받은 브라우저만, 온라인일 때, 5분 이전까지의 서버 확인 내용으로 만듭니다. 이 기기에서 아직 보내지 않은 입력은 포함하지 않습니다. 편집 권한자는 이미 문서 내용을 바꿀 수 있으므로 신뢰 범위는 이전과 같습니다. 읽는 쪽은 체크포인트가 없거나, 포인터와 `coveredUntil`이 다르거나, 해시가 맞지 않으면 전체 기록을 읽습니다.
+
+### 배포 후 전환
+
+- 배포 직후 열려 있던 탭은 **모두 새로고침**하도록 안내합니다. 이전 버전 탭이 접속자 목록에 보이는 동안은 새 버전도 예전(청크) 형식으로 저장하므로 서로 읽을 수 있습니다.
+- 다만 접속 신호를 오래 보내지 않은 이전 버전 탭(휴대폰 백그라운드 등)이나 GitHub Pages 캐시로 몇 분간 이전 `index.html`을 받은 탭은 새 형식 기록을 읽지 못해 오류를 표시할 수 있습니다. 내용은 서버에 있으며 새로고침하면 해결됩니다.
+
+### 체크포인트 복구
+
+- 잘못된 체크포인트가 의심되면 편집 권한이 있는 팀원이 문서 주소에 `&fullload=1`을 붙여 엽니다. 체크포인트와 이 기기의 동기화 위치를 쓰지 않고 전체 기록을 읽은 뒤, 새 체크포인트로 교체하면 "전체 기록으로 압축본을 새로 만들었습니다" 안내가 뜹니다. 그 뒤로는 평소 주소를 씁니다. 교체할 새 기록이 아직 없으면 다음 입력 뒤에 다시 시도합니다.
+- 관리자는 콘솔에서 문서의 `checkpointId`/`checkpointCutoff` 필드를 지워도 됩니다. 새 기기가 전체 기록을 다시 읽습니다. 원본 기록은 삭제되지 않으므로 어느 경우에도 내용은 잃지 않습니다.
+
+## 7. 체크포인트 함수 — 선택 배포 (Blaze 요금제)
+
+초기 시험은 함수 없이도 동작합니다. Spark에서는 6장의 브라우저 체크포인트를 사용합니다. 변경 기록이 누적되면 `functions/`의 일일 체크포인트를 사용할 수 있습니다. 함수 배포는 해당 Firebase 프로젝트의 결제·권한 설정이 필요합니다.
 
 ```sh
 npm --prefix functions ci
@@ -90,8 +119,8 @@ npx firebase deploy --only functions:jongwon-collaboration --project YOUR_PROJEC
 
 ## 용량과 운영
 
-Firestore 한 문서의 최대 크기는 1 MiB이므로 변경 바이트를 128 KiB 청크로 나눕니다. 앱은 압축 묶음 4 MiB 상한을 적용합니다. 이는 HWPX 파일 크기와 정확히 같지 않습니다. 큰 사진을 줄여야 할 수 있습니다. [Firestore 제한](https://firebase.google.com/docs/firestore/quotas).
+Firestore 한 문서의 최대 크기는 1 MiB이므로 256 KiB를 넘는 변경은 128 KiB 청크로 나눕니다. 앱은 압축 묶음 4 MiB 상한을 적용합니다. 이는 HWPX 파일 크기와 정확히 같지 않습니다. 큰 사진을 줄여야 할 수 있습니다. [Firestore 제한](https://firebase.google.com/docs/firestore/quotas).
 
-문자 변경은 짧게 모아 전송하고, 커서는 움직일 때 최대 초당 한 번/정지 상태 약 15초에 한 번 보냅니다. 실제 읽기·쓰기량은 동시 사용자·문서 크기에 따라 달라집니다. 운영 전 Firebase Usage에서 사용량을 확인합니다.
+문자 변경과 커서 전송 간격은 README의 "Firestore 무료(Spark) 한도"에 정리했습니다. 실제 읽기·쓰기량은 동시 사용자·문서 크기에 따라 달라집니다. 운영 중 Firebase Console의 사용량을 확인합니다.
 
 오류 상태에서는 **복구 데이터 받기**로 Yjs 복구본과 현재 화면 HWPX를 보관합니다. HWPX는 새 문서로 다시 가져올 수 있습니다. Yjs 복구본은 개발자가 내용 비교·복원에 사용할 수 있으나 자동 복구 UI는 아직 없습니다.

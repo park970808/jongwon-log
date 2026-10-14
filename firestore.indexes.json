@@ -1,8 +1,30 @@
 {
   "indexes": [],
   "fieldOverrides": [
-    {"collectionGroup": "documents", "fieldPath": "schema", "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]},
-    {"collectionGroup": "chunks", "fieldPath": "data", "indexes": []},
-    {"collectionGroup": "presence", "fieldPath": "anchor", "indexes": []}
+    {
+      "collectionGroup": "documents",
+      "fieldPath": "schema",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "chunks",
+      "fieldPath": "data",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "presence",
+      "fieldPath": "anchor",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "updates",
+      "fieldPath": "data",
+      "indexes": []
+    }
   ]
 }

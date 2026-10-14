@@ -16,11 +16,18 @@ export async function checkpointDocument(root) {
   const shared=new Y.Doc({gc:false});
   try{
     for(const record of snapshot.docs){
-      const data=record.data();if(data.schema!==1||data.rawSize>96*1024*1024||data.rawSize<2||data.chunks>32||data.chunks<1)throw new Error('Invalid update envelope');
-      const pieces=await record.ref.collection('chunks').get();
-      const buffers=Array.from({length:data.chunks},(_,i)=>pieces.docs.find(c=>c.id===String(i))?.data().data);
-      if(buffers.some(x=>!Buffer.isBuffer(x)||x.length>chunkSize))throw new Error('Incomplete update');
-      const update=inflateSync(Buffer.concat(buffers),{out:new Uint8Array(data.rawSize)});
+      const data=record.data();if(data.schema!==1||data.rawSize>96*1024*1024||data.rawSize<2||!Number.isInteger(data.chunks)||data.chunks>32||data.chunks<0)throw new Error('Invalid update envelope');
+      let payload;
+      if(data.chunks===0){ // small update stored inline in the record itself
+        if(!Buffer.isBuffer(data.data)||!data.data.length||data.data.length>256*1024)throw new Error('Invalid inline update');
+        payload=data.data;
+      }else{
+        const pieces=await record.ref.collection('chunks').get();
+        const buffers=Array.from({length:data.chunks},(_,i)=>pieces.docs.find(c=>c.id===String(i))?.data().data);
+        if(buffers.some(x=>!Buffer.isBuffer(x)||x.length>chunkSize))throw new Error('Incomplete update');
+        payload=Buffer.concat(buffers);
+      }
+      const update=inflateSync(payload,{out:new Uint8Array(data.rawSize)});
       if(hash(update)!==data.hash||record.id!==data.hash)throw new Error('Invalid update hash');
       Y.applyUpdate(shared,update);
     }
@@ -28,12 +35,12 @@ export async function checkpointDocument(root) {
     if(payload.length>4*1024*1024)throw new Error('Checkpoint exceeds inline capacity; retain logs and migrate checkpoint blobs to Storage before continuing.');
     const id=hash(state),ref=root.collection('checkpoints').doc(id),chunks=Math.ceil(payload.length/chunkSize);
     const batch=db.batch();
-    batch.set(ref,{schema:1,hash:id,codec:'deflate',rawSize:state.length,chunks,createdAt:FieldValue.serverTimestamp(),coveredCount:snapshot.size});
+    batch.set(ref,{schema:1,hash:id,codec:'deflate',rawSize:state.length,chunks,createdAt:FieldValue.serverTimestamp(),coveredCount:snapshot.size,coveredUntil:snapshot.readTime}); // clients verify coveredUntil == pointer
     for(let i=0;i<chunks;i++)batch.set(ref.collection('chunks').doc(String(i)),{data:Buffer.from(payload.slice(i*chunkSize,(i+1)*chunkSize))});
     await batch.commit();
     await db.runTransaction(async tx=>{
       const current=await tx.get(root),cutoff=current.data()?.checkpointCutoff;
-      if(cutoff && cutoff.toMillis()>snapshot.readTime.toMillis())return;
+      if(cutoff && cutoff.toMillis()>=snapshot.readTime.toMillis())return; // forward only, like the client rules
       tx.update(root,{checkpointId:id,checkpointCutoff:snapshot.readTime});
     });
     // Deliberately retain append-only history. No TTL/delete: old offline clients and recovery remain safe.

@@ -10,6 +10,8 @@ npm run build
 
 단위 테스트는 실제 활동일지 HWPX의 구조/텍스트 왕복, 같은 셀의 동시 입력과 역순·중복 전송, 개인 실행 취소, 잘못된 파일·업데이트 거부, 전송 outbox와 재시도를 검사합니다.
 
+`tests/spark-sync.test.js`는 Spark 한도 대응을 검사합니다: 입력 멈춤 기준 묶음 전송, 증분 재열기(최근 기록만 받고 수렴, 캐시 재업로드 없음, 보내지 못한 입력만 복구), 맞지 않는 캐시의 전체 재조회 전환, 손상 기록 격리, 한도 소진 후 쓰기 재시도·리스너 재연결, 권한 오류 재시도 금지, 인라인 기록과 예전 규칙에서의 청크 전환, 클라이언트 체크포인트(새 기기는 압축본+짧은 꼬리만 읽음, 캐시 기반 세션은 만들지 않음, 보내지 않은 입력 제외, 포인터 전진만 허용), 커서 정책. `tests/reliability.test.js`는 장애 상황을 검사합니다: 오프라인 중 조각 읽기를 손상으로 오인하지 않음, 처리 도중 실패한 스냅샷의 리스너 즉시 중단과 완전한 로딩 전 처음부터 재구독, 없음·범위 불일치·해시 불일치·적용 실패 체크포인트의 전체 기록 대체, 삭제가 빠진 로컬 캐시의 증분 거부, 서버에 이미 있는 삭제의 재업로드 방지(yjs `snapshotContainsUpdate`가 입력을 변경하는 문제 회피 포함), 체크포인트 실패 시 중단·백오프, `?fullload=1` 복구, 이전 버전 탭이 있을 때 인라인 기록 보류, 오프라인 쓰기 대기 표시, 전송 중 입력의 자동 재전송. `tests/usage-model.test.js`는 사용량 모델(1시간 집중 작성, 하루 전체)이 규칙 읽기 최악 기준으로도 무료 한도 안에 있는지 확인합니다.
+
 ## 실제 편집기 브라우저 검사
 
 별도 터미널에서 `npm run dev -- --port 5173`을 실행한 뒤:
@@ -33,7 +35,7 @@ npx firebase emulators:start --only firestore,auth --project demo-jongwon --conf
 다른 터미널에서 순서대로:
 
 ```sh
-node tests/firestore-rules.emulator.js
+node tests/firestore-rules.emulator.js   # 인라인 기록·클라이언트 체크포인트 규칙 포함
 node tests/checkpoint.emulator.js
 node tests/production-rules.emulator.js
 node scripts/firestore-browser-test.mjs
