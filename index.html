@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-history-v5-20260923">
+<meta name="app-version" content="team3-history-v9-20261014">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -125,6 +125,21 @@ table.pbl .rich-editor{font-size:11.5px;padding:1px 4px;line-height:1.35;min-hei
   font-size:13px;line-height:20px;cursor:pointer;
 }
 .rich-caret-target{outline:2px solid #1D5FD6;outline-offset:-2px}
+/* 글 속 사진 끌어서 옮기기 */
+.rich-editor .inline-photo-node{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.rich-editor[data-lock-key] .inline-photo-node img{cursor:grab}
+.inline-photo-node.dragging{opacity:.35;outline:2px dashed #1D5FD6;outline-offset:1px}
+.photo-drag-ghost{
+  position:fixed;z-index:95;width:96px;max-height:96px;object-fit:contain;pointer-events:none;
+  transform:translate(-50%,-60%);opacity:.85;background:#fff;border:2px solid #1D5FD6;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+}
+.photo-drop-caret{
+  position:fixed;z-index:94;width:3px;display:none;pointer-events:none;
+  background:#1D5FD6;border-radius:2px;box-shadow:0 0 0 1px #fff;
+}
+.rich-editor.photo-drop-zone{background:#EAF0FB;outline:1px dashed #1D5FD6;outline-offset:-1px}
+body.photo-dragging,body.photo-dragging *{cursor:grabbing!important}
 
 .peer{
   position:absolute;top:1px;right:3px;font-size:10.5px;color:#fff;background:var(--focus);
@@ -163,6 +178,25 @@ table.pbl textarea.f,table.pbl input.f{font-size:11.5px;padding:1px 4px;line-hei
 table.pbl input.pbl-meta{text-align:center;min-height:18px}
 
 table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-weight:700;padding:5px}
+/* 누적 프로젝트 일지 */
+table.log td.log-date{position:relative}
+.log-week{display:block;font-size:10px;color:#9A9A9A;text-align:center;line-height:1.2;padding:0 2px 3px}
+.log-del{
+  position:absolute;left:-27px;top:50%;transform:translateY(-50%);width:21px;height:21px;padding:0;
+  border:0;border-radius:50%;background:transparent;color:#999;font-size:15px;line-height:21px;cursor:pointer;opacity:0;
+}
+table.log tr:hover .log-del,.log-del:focus{opacity:1}
+.log-del:hover{background:#F6DADA;color:#B00020}
+@media (hover:none){.log-del{opacity:.55}}
+table.log tr.log-empty td{color:#888;text-align:center;padding:16px 8px;font-size:12.5px;border:1px solid var(--line)}
+.log-actions{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.log-actions button{
+  border:1px solid #1D5FD6;background:#fff;color:#1D5FD6;border-radius:3px;padding:6px 12px;
+  cursor:pointer;font-family:Pretendard,sans-serif;font-size:13px;
+}
+.log-actions button:hover{background:#EAF0FB}
+.log-actions span{font-size:12px;color:#777}
+.team-scope-note{font-size:11.5px;color:#1D5FD6;text-align:right;padding:0 2px 3px}
 
 /* 사진 */
 .shots{display:flex;flex-wrap:wrap;gap:8px}
@@ -279,7 +313,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <button id="btn-prev-copy">지난 주 가져오기</button>
     <span id="save-status">불러오는 중</span>
     <span class="grow"></span>
-    <button id="btn-team">팀: <span id="toolbar-team">장원급제</span></button>
+    <button id="btn-team">팀: <span id="toolbar-team"></span></button>
     <span id="who-label">–</span>
     <button id="btn-photo" title="긴 글 입력칸에서는 커서 위치에 사진이 삽입됩니다">사진 추가</button>
     <button id="btn-history" title="저장된 수정 내용과 브라우저 초안을 확인합니다">수정 이력</button>
@@ -327,7 +361,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
     <table class="doc">
       <colgroup><col style="width:128px"><col><col><col style="width:74px"><col style="width:96px"><col style="width:74px"><col style="width:72px"></colgroup>
       <tr><th class="lbl">팀 명</th>
-        <td class="cell" colspan="6" data-key="team:name"><input class="f" id="document-team" type="text" value="장원급제"></td></tr>
+        <td class="cell" colspan="6" data-key="team:name"><input class="f" id="document-team" type="text" value=""></td></tr>
       <tr><th class="lbl">프로젝트 주제</th>
         <td class="cell" colspan="6" data-key="s:topic"><input class="f" type="text" data-f="topic"></td></tr>
       <tr><th class="lbl red">주차 주요활동내용</th>
@@ -355,6 +389,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       <tr><th class="lbl">전체일정</th>
         <td colspan="6" style="padding:4px 0 2px">
           <div class="sched-cap">수행목표(예정활동)</div>
+          <div class="team-scope-note">이 표는 모든 주차에 똑같이 적용됩니다</div>
           <table class="pbl" id="pbl-table"></table>
         </td></tr>
       <tr><th class="lbl red">팀운영 계획</th>
@@ -390,7 +425,7 @@ table.log td.h{background:var(--lbl-bg);text-align:center;font-size:12.5px;font-
       </div>
       <button id="history-close" type="button">닫기</button>
     </div>
-    <p class="history-help">저장된 버전을 확인하고 복원할 수 있습니다. 복원해도 기존 이력은 삭제되지 않습니다.</p>
+    <p class="history-help">칸 하나를 수정하고 벗어날 때마다(오래 쓰는 중이면 2분마다) 버전이 하나씩 저장됩니다. 복원해도 기존 이력은 삭제되지 않습니다.</p>
     <div class="history-list" id="history-list"></div>
   </div>
 </div>
@@ -403,7 +438,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, collection, setDoc, onSnapshot, getDoc, getDocs,
-  serverTimestamp, writeBatch, FieldPath, query, orderBy, limit }
+  serverTimestamp, writeBatch, FieldPath, query, where, orderBy, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ════════ 팀 라우팅 (index.html 단독 동작) ════════ */
@@ -472,6 +507,11 @@ const SHARED_FIELDS=["topic","weekly","period","hours","totalHours","progress","
 const APP_VERSION=document.querySelector('meta[name="app-version"]')?.content||"unknown";
 
 let db,auth,uid,slot,weekId,started=false;
+// 주차와 관계없이 팀 전체가 같이 쓰는 데이터(전체일정 표, 누적 프로젝트 일지)는
+// teams/{팀}/weeks/__team__ 문서와 그 아래 logs·inlinePhotos에 저장합니다.
+const TEAM_WEEK="__team__", SAFE_DOC_ID=/^[A-Za-z0-9_-]{1,100}$/;
+let teamShared={},teamInlinePhotos={},weekInlinePhotos={},teamUnsub=[],teamLogsLoaded=false;
+const logRowEls=new Map();
 let shared={},members={},logs={},photos={},inlinePhotos={},locks={},unsub=[],peers={},presenceAll={},presenceReady=false,focusedField=null,photoTargetKey=null,formatTargetKey=null,formatBarInteracting=false,richEditors={},richRanges={},timers={};
 const myLocks=new Set(), lockPending=new Map();
 const pendingWrites=new Map();
@@ -487,6 +527,40 @@ const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e
 // 접속자 표시에만 쓰입니다. 내용 자동 저장(700ms)과 실시간 구독에는 영향이 없습니다.
 const PRESENCE_HEARTBEAT_MS=60000;
 const PRESENCE_STALE_MS=130000;
+
+// 사진 데이터는 data:image/...;base64 형식만 화면과 한글 파일에 사용합니다.
+function safeImageSrc(v){
+  const s=String(v||"");
+  return /^data:image\/(?:jpeg|jpg|png|gif|webp);base64,[A-Za-z0-9+/]+=*$/.test(s)?s:"";
+}
+
+// 입력 없이 칸을 붙잡고 있으면 다른 사람이 못 쓰므로 일정 시간 뒤 잠금을 풉니다.
+const IDLE_RELEASE_MS=180000;
+let lastActivityAt=Date.now();
+["keydown","input","pointerdown","wheel","touchstart"].forEach(t=>
+  document.addEventListener(t,()=>{lastActivityAt=Date.now();},{capture:true,passive:true})
+);
+function checkIdleLock(){
+  if(!myLocks.size||Date.now()-lastActivityAt<IDLE_RELEASE_MS)return;
+  formatBarInteracting=false;
+  const a=document.activeElement;
+  // blur 핸들러가 저장 → 잠금 해제 → 이력 기록까지 처리합니다.
+  if(a?.dataset?.lockKey&&myLocks.has(a.dataset.lockKey))a.blur();
+  else releaseAllLocks();
+  mark("오래 입력이 없어 수정 잠금을 풀었습니다",false);
+}
+
+// 주차를 빠르게 바꿀 때 늦게 끝난 비동기 구독이 섞이지 않도록 구분합니다.
+let weekGen=0;
+
+// 팀 공용 칸인지(주차가 달라도 같은 칸으로 취급해 잠금·접속 표시를 공유)
+function isTeamScopedKey(key){return /^(p:\d+$|s:pblMeta\.|l:)/.test(String(key||""));}
+function sameScope(v,key){return v.week===weekId||isTeamScopedKey(key);}
+function photoScopeWeekForTarget(target){return isTeamScopedKey(target)?TEAM_WEEK:weekId;}
+function inlinePhotoPath(pid){
+  return ["teams",TEAM_ID,"weeks",teamInlinePhotos[pid]?TEAM_WEEK:weekId,"inlinePhotos",pid];
+}
+function weekShortLabel(id){const m=String(id||"").match(/W(\d+)$/);return m?`${Number(m[1])}주차`:"";}
 
 function currentEditorName(){
   if(slot){
@@ -505,9 +579,14 @@ function activePresence(v){
 }
 function presenceClaimsForField(key){
   return Object.entries(presenceAll)
-    .filter(([,v])=>activePresence(v)&&v.week===weekId&&v.field===key)
+    .filter(([,v])=>activePresence(v)&&v.field===key&&sameScope(v,key))
     .map(([owner,v])=>({owner,...v}))
-    .sort((a,b)=>String(a.owner).localeCompare(String(b.owner)));
+    .sort((a,b)=>claimTime(a)-claimTime(b)||String(a.owner).localeCompare(String(b.owner)));
+}
+function claimTime(v){
+  // claimedAt이 없는 구버전 접속자는 마지막 접속 시각으로 대신합니다.
+  const t=Number(v?.claimedAt||v?.at);
+  return Number.isFinite(t)&&t>0?t:Number.MAX_SAFE_INTEGER;
 }
 function winningPresenceForField(key){
   return presenceClaimsForField(key)[0]||null;
@@ -568,7 +647,7 @@ function rebuildLocksFromPresence(){
   const fields=new Set();
 
   Object.values(presenceAll).forEach(v=>{
-    if(activePresence(v)&&v.week===weekId&&v.field)fields.add(v.field);
+    if(activePresence(v)&&v.field&&sameScope(v,v.field))fields.add(v.field);
   });
 
   fields.forEach(key=>{
@@ -578,7 +657,7 @@ function rebuildLocksFromPresence(){
 
   locks=next;
 
-  // 두 사람이 거의 동시에 같은 칸을 눌렀다면 uid 기준으로 한 명만 남깁니다.
+  // 두 사람이 거의 동시에 같은 칸을 눌렀다면 먼저 누른 사람(claimedAt)만 남깁니다.
   // transaction/추가 읽기 없이 모든 클라이언트가 같은 승자를 계산합니다.
   for(const key of Array.from(myLocks)){
     const winner=next[key];
@@ -597,12 +676,16 @@ function rebuildLocksFromPresence(){
   renderFieldLocks();
 }
 let presenceWrite=Promise.resolve();
+let presenceClaim={field:null,at:0};
 function publishPresence(field=focusedField){
   if(!uid||!weekId)return Promise.resolve();
 
+  // 같은 칸을 계속 잡고 있는 동안에는 처음 잡은 시각을 유지합니다.
+  if((field||null)!==presenceClaim.field)presenceClaim={field:field||null,at:Date.now()};
   const payload={
     name:currentEditorName(),
     field:field||null,
+    claimedAt:field?presenceClaim.at:null,
     week:weekId,
     at:Date.now()
   };
@@ -635,7 +718,8 @@ async function acquireFieldLock(key){
   myLocks.clear();
   myLocks.add(key);
   focusedField=key;
-  locks[key]={owner:uid,name:currentEditorName(),field:key,week:weekId,at:Date.now()};
+  presenceClaim={field:key,at:Date.now()};
+  locks[key]={owner:uid,name:currentEditorName(),field:key,week:weekId,at:Date.now(),claimedAt:presenceClaim.at};
   renderFieldLocks();
 
   // 서버에는 기존 presence 문서 하나만 갱신합니다.
@@ -658,8 +742,12 @@ async function releaseFieldLock(key){
   // 이미 다른 칸으로 이동한 경우 새 칸 claim을 null로 덮지 않습니다.
   const activeKey=document.activeElement?.dataset?.lockKey||null;
   if(!activeKey&&!focusedField)publishPresence(null);
+
+  // 이 칸에서 한 수정들을 이력 1건으로 남깁니다.
+  flushHistory().catch(()=>{});
 }
 async function releaseAllLocks(){
+  try{await flushHistory();}catch(e){}
   myLocks.clear();
   focusedField=null;
   renderFieldLocks();
@@ -749,9 +837,11 @@ function isoWeek(d){
 }
 const pad=n=>String(n).padStart(2,"0");
 const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+// 과거 주차가 드롭다운에서 사라지지 않도록 반년치를 보여줍니다.
+const WEEKS_PAST=26, WEEKS_FUTURE=8;
 const WEEKS=(()=>{
   const out=[],base=mondayOf(new Date());
-  for(let i=4;i>=-8;i--){
+  for(let i=WEEKS_PAST;i>=-WEEKS_FUTURE;i--){
     const mon=new Date(base); mon.setDate(mon.getDate()-i*7);
     const fri=new Date(mon); fri.setDate(fri.getDate()+4);
     const {year,week}=isoWeek(mon);
@@ -789,7 +879,6 @@ function boot(){
     // 3팀은 새 Firebase 프로젝트 + Anonymous Auth 사용.
     // 초대코드나 부모 team 문서 확인 때문에 앱 진입이 막히지 않게 바로 시작합니다.
     if(TEAM_ID==="team-3"){
-      setTeamName("3팀");
       enterLog();
 
       // 저장해 둔 팀명이 있으면 비동기로 갱신만 합니다.
@@ -1015,8 +1104,10 @@ function makeInlinePhotoNode(pid,p,editable=true){
   wrap.dataset.photoId=pid;
   wrap.contentEditable="false";
   const img=el("img");
-  img.src=p?.data||"";
+  img.src=safeImageSrc(p?.data);
   img.alt=p?.name||"사진";
+  img.draggable=false;
+  if(editable)img.title="끌어서 위치 이동 (휴대폰은 길게 누른 뒤 이동) · 클릭하면 크게 보기";
   img.onclick=ev=>{
     ev.stopPropagation();
     const lb=$("#lightbox");
@@ -1034,7 +1125,7 @@ function makeInlinePhotoNode(pid,p,editable=true){
       if(!confirm("이 사진을 지울까요?"))return;
       try{
         await softDeletePhoto(
-          ["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+          inlinePhotoPath(pid),
           `photo:inline:${pid}`,`삭제한 ${p?.name||"삽입 사진"}`
         );
         wrap.remove();
@@ -1048,11 +1139,15 @@ function makeInlinePhotoNode(pid,p,editable=true){
 function renderRichContent(editor,tokens,fallback,editable=true){
   const list=normalizeTokens(tokens,fallback);
   editor.innerHTML="";
-  list.forEach(t=>{
+  list.forEach((t,i)=>{
     if(t.type==="text")appendTextWithBreaks(editor,t.text,t.style);
     else if(t.type==="image"){
       const p=inlinePhotos[t.id];
-      if(p?.data)editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
+      if(!p?.data)return;
+      // 맨 앞 사진·연속된 사진 사이는 커서를 놓기 어려워서 보이지 않는 칸을 둡니다.
+      if(i===0||list[i-1].type!=="text")editor.appendChild(document.createTextNode("\u200B"));
+      editor.appendChild(makeInlinePhotoNode(t.id,p,editable));
+      if(i===list.length-1||list[i+1].type!=="text")editor.appendChild(document.createTextNode("\u200B"));
     }
   });
 }
@@ -1118,14 +1213,14 @@ function remoteRichStateForKey(key){
   }
   if((m=key.match(/^p:(\d+)$/))){
     const k="p"+m[1];
-    return {plain:(shared.pbl||{})[k]??"",tokens:shared.richPbl?.[k]};
+    return {plain:(teamShared.pbl||{})[k]??"",tokens:teamShared.richPbl?.[k]};
   }
   if((m=key.match(/^(m\d+):content$/))){
     const d=members[m[1]]||{};
     return {plain:d.content??"",tokens:d.contentRich};
   }
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{},f=m[2];
+  if((m=key.match(/^l:([^:]+):(content|note)$/))){
+    const d=logs[m[1]]||{},f=m[2];
     return {plain:d[f]??"",tokens:d[f+"Rich"]};
   }
   return null;
@@ -1155,14 +1250,14 @@ function richDataForKey(key){
   }
   if((m=key.match(/^p:(\d+)$/))){
     const k="p"+m[1];
-    return {tokens:shared.richPbl?.[k],fallback:(shared.pbl||{})[k]??(PBL_DEFAULT[Number(m[1])]||"")};
+    return {tokens:teamShared.richPbl?.[k],fallback:(teamShared.pbl||{})[k]??(PBL_DEFAULT[Number(m[1])]||"")};
   }
   if((m=key.match(/^(m\d+):(content)$/))){
     const d=members[m[1]]||{};
     return {tokens:d.contentRich,fallback:d.content??""};
   }
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{}, f=m[2];
+  if((m=key.match(/^l:([^:]+):(content|note)$/))){
+    const d=logs[m[1]]||{}, f=m[2];
     return {tokens:d[f+"Rich"],fallback:d[f]??""};
   }
   return {tokens:null,fallback:""};
@@ -1178,10 +1273,10 @@ function paraStyleForKey(key){
   if(!key)return {};
   let m;
   if((m=key.match(/^s:(.+)$/)))return cleanParaStyle(shared.richPara?.[m[1]]);
-  if((m=key.match(/^p:(\d+)$/)))return cleanParaStyle(shared.richPblPara?.["p"+m[1]]);
+  if((m=key.match(/^p:(\d+)$/)))return cleanParaStyle(teamShared.richPblPara?.["p"+m[1]]);
   if((m=key.match(/^(m\d+):content$/)))return cleanParaStyle((members[m[1]]||{}).contentPara);
-  if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const d=logs["r"+m[1]]||{};return cleanParaStyle(d[m[2]+"Para"]);
+  if((m=key.match(/^l:([^:]+):(content|note)$/))){
+    const d=logs[m[1]]||{};return cleanParaStyle(d[m[2]+"Para"]);
   }
   return {};
 }
@@ -1195,24 +1290,24 @@ function applyParaStyleToEditor(editor,style){
 function saveParaStyle(key,style){
   const previousStyle=cleanParaStyle(paraStyleForKey(key));
   const s=cleanParaStyle(style),targetWeek=weekId;
-  let m,targetPath,entryPath;
+  let m,targetPath,entryPath,scopeWeek=targetWeek;
   if((m=key.match(/^s:(.+)$/))){
     const f=m[1];shared.richPara=Object.assign({},shared.richPara,{[f]:s});
     targetPath=["teams",TEAM_ID,"weeks",targetWeek];entryPath=`richPara.${f}`;
   }else if((m=key.match(/^p:(\d+)$/))){
-    const k="p"+m[1];shared.richPblPara=Object.assign({},shared.richPblPara,{[k]:s});
-    targetPath=["teams",TEAM_ID,"weeks",targetWeek];entryPath=`richPblPara.${k}`;
+    const k="p"+m[1];teamShared.richPblPara=Object.assign({},teamShared.richPblPara,{[k]:s});
+    scopeWeek=TEAM_WEEK;targetPath=["teams",TEAM_ID,"weeks",TEAM_WEEK];entryPath=`richPblPara.${k}`;
   }else if((m=key.match(/^(m\d+):content$/))){
     const id=m[1];members[id]=Object.assign({},members[id]||{},{contentPara:s});
     targetPath=["teams",TEAM_ID,"weeks",targetWeek,"members",id];entryPath="contentPara";
-  }else if((m=key.match(/^l:(\d+):(content|note)$/))){
-    const id="r"+m[1],f=m[2];logs[id]=Object.assign({},logs[id]||{},{[f+"Para"]:s});
-    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"logs",id];entryPath=f+"Para";
+  }else if((m=key.match(/^l:([^:]+):(content|note)$/))){
+    const id=m[1],f=m[2];logs[id]=Object.assign({},logs[id]||{},{[f+"Para"]:s});
+    scopeWeek=TEAM_WEEK;targetPath=["teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",id];entryPath=f+"Para";
   }
   const editor=richEditors[key];if(editor)applyParaStyleToEditor(editor,s);
   if(!targetPath||!entryPath)return;
   queueVersionedWrite("para:"+key,{
-    key:"para:"+key,week:targetWeek,targetPath,entries:[{path:entryPath,value:s}],
+    key:"para:"+key,week:scopeWeek,targetPath,entries:[{path:entryPath,value:s}],
     previousEntries:[{path:entryPath,value:previousStyle}],
     preview:Object.keys(s).length?JSON.stringify(s):"기본 문단 서식",
     previousPreview:Object.keys(previousStyle).length?JSON.stringify(previousStyle):"기본 문단 서식",
@@ -1365,11 +1460,105 @@ function initFormatToolbar(){
     }
   });
 }
+/* 사진 추가 버튼을 누르면 입력칸이 포커스를 잃고, 그 사이 실시간 동기화로 칸이 다시 그려집니다.
+   이때 저장해 둔 DOM Range는 칸의 맨 앞으로 밀려나서 사진이 항상 맨 앞에 들어갔습니다.
+   그래서 커서 위치를 "내용 기준 숫자"로 따로 기억합니다. 글자 1개 = 1, 사진 1장 = 1.
+   계산 규칙은 editorTokens()와 똑같이 맞춰 두었습니다(줄바꿈 <br>/<div> 포함). */
+const richCarets={};
+function richModelOffset(editor,container,offset){
+  let n=0,last="",stop=false;
+  const pushText=v=>{v=String(v||"").replace(/\u200B/g,"");if(!v)return;n+=v.length;last=v[v.length-1];};
+  function walk(node){
+    if(stop)return;
+    if(node.nodeType===Node.TEXT_NODE){
+      if(node===container){pushText((node.nodeValue||"").slice(0,offset));stop=true;return;}
+      pushText(node.nodeValue);return;
+    }
+    if(node.nodeType!==Node.ELEMENT_NODE)return;
+    if(node.classList?.contains("inline-photo-node")){
+      n+=1;last="img";
+      if(node===container||node.contains(container))stop=true; // 사진을 누른 경우 → 사진 바로 뒤
+      return;
+    }
+    if(node.tagName==="BR"){
+      if(node===container){stop=true;return;}
+      pushText("\n");return;
+    }
+    const kids=Array.from(node.childNodes);
+    const isBlock=(node.tagName==="DIV"||node.tagName==="P")&&node!==editor;
+    const before=n;
+    const limit=node===container?Math.min(offset,kids.length):kids.length;
+    for(let i=0;i<limit;i++){walk(kids[i]);if(stop)return;}
+    if(node===container){stop=true;return;}
+    if(isBlock&&(n===before||last!=="\n"))pushText("\n");
+  }
+  walk(editor);
+  return n;
+}
+function richTokenLength(tokens){
+  return mergeTextTokens(tokens).reduce((n,t)=>n+(t.type==="text"?t.text.length:1),0);
+}
+function insertTokensAt(tokens,pos,newTokens){
+  const list=mergeTextTokens(tokens),out=[];
+  let p=0,done=false;
+  for(const t of list){
+    const len=t.type==="text"?t.text.length:1;
+    if(!done&&pos<=p){out.push(...newTokens);done=true;}
+    if(!done&&t.type==="text"&&pos<p+len){
+      const k=pos-p;
+      out.push({type:"text",text:t.text.slice(0,k),style:t.style},...newTokens,{type:"text",text:t.text.slice(k),style:t.style});
+      done=true;p+=len;continue;
+    }
+    out.push(t);p+=len;
+  }
+  if(!done)out.push(...newTokens);
+  return mergeTextTokens(out);
+}
+function setCaretAtModelOffset(editor,pos){
+  const r=rangeAtModelOffset(editor,pos);
+  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+  return r;
+}
+function rangeAtModelOffset(editor,pos){
+  let remain=Math.max(0,pos);
+  const r=document.createRange();
+  function walk(node){
+    for(const c of Array.from(node.childNodes)){
+      if(c.nodeType===Node.TEXT_NODE){
+        const raw=c.nodeValue||"";
+        if(!raw.replace(/\u200B/g,"").length)continue; // 보이지 않는 칸
+        if(remain<=raw.length){r.setStart(c,remain);return true;}
+        remain-=raw.length;continue;
+      }
+      if(c.nodeType!==Node.ELEMENT_NODE)continue;
+      if(c.classList?.contains("inline-photo-node")){
+        if(remain===0){r.setStartBefore(c);return true;}
+        remain-=1;
+        if(remain===0){
+          // 사진 뒤 보이지 않는 칸이 있으면 그 뒤에 커서를 둬야 바로 입력할 수 있습니다.
+          const nx=c.nextSibling;
+          if(nx&&nx.nodeType===Node.TEXT_NODE&&nx.nodeValue==="\u200B")r.setStart(nx,1);
+          else r.setStartAfter(c);
+          return true;
+        }
+        continue;
+      }
+      if(walk(c))return true;
+    }
+    return false;
+  }
+  if(!walk(editor)){r.selectNodeContents(editor);r.collapse(false);}
+  r.collapse(true);
+  return r;
+}
 function captureRichRange(editor,key){
   const sel=window.getSelection();
   if(!sel||!sel.rangeCount)return;
   const r=sel.getRangeAt(0);
-  if(editor.contains(r.commonAncestorContainer)) richRanges[key]=r.cloneRange();
+  if(editor.contains(r.commonAncestorContainer)){
+    richRanges[key]=r.cloneRange();
+    richCarets[key]=richModelOffset(editor,r.endContainer,r.endOffset);
+  }
 }
 function insertRichNewline(editor,key){
   const sel=window.getSelection();
@@ -1454,6 +1643,8 @@ function bindRichEditor(editor,key,editable=true){
         return;
       }
       if(e.key!=="Enter")return;
+      // 한글 등 IME 조합 중 Enter를 가로채면 마지막 글자가 중복되거나 사라질 수 있습니다.
+      if(e.isComposing||e.keyCode===229)return;
       if(!myLocks.has(key)){
         e.preventDefault();
         return;
@@ -1463,6 +1654,24 @@ function bindRichEditor(editor,key,editable=true){
       activate();
     });
     ["keyup","mouseup"].forEach(ev=>editor.addEventListener(ev,activate));
+    editor.addEventListener("paste",e=>{
+      // 잠금이 없을 때는 setLockableNode의 핸들러가 이미 막습니다.
+      if(!myLocks.has(key))return;
+      // 웹/한글/워드에서 복사한 서식·HTML이 섞이지 않도록 텍스트만 넣습니다.
+      e.preventDefault();
+      const text=(e.clipboardData?.getData("text/plain")||"").replace(/\r\n?/g,"\n");
+      if(!text)return;
+      const sel=window.getSelection();
+      if(!sel||!sel.rangeCount||!editor.contains(sel.getRangeAt(0).commonAncestorContainer))return;
+      const range=sel.getRangeAt(0);
+      range.deleteContents();
+      const node=document.createTextNode(text);
+      range.insertNode(node);
+      range.setStartAfter(node); range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+      richRanges[key]=range.cloneRange();
+      saveRichEditor(key,editor,0);
+    });
     editor.addEventListener("input",()=>{
       if(!myLocks.has(key))return;
       activate();
@@ -1507,17 +1716,17 @@ function saveRichEditor(key,editor,delay=700){
     shared.rich=Object.assign({},shared.rich,{[f]:tokens});
   }else if((localMatch=key.match(/^p:(\d+)$/))){
     const k="p"+localMatch[1];
-    shared.pbl=Object.assign({},shared.pbl,{[k]:plain});
-    shared.richPbl=Object.assign({},shared.richPbl,{[k]:tokens});
+    teamShared.pbl=Object.assign({},teamShared.pbl,{[k]:plain});
+    teamShared.richPbl=Object.assign({},teamShared.richPbl,{[k]:tokens});
   }else if((localMatch=key.match(/^(m\d+):content$/))){
     const id=localMatch[1];
     members[id]=Object.assign({},members[id]||{},{content:plain,contentRich:tokens});
-  }else if((localMatch=key.match(/^l:(\d+):(content|note)$/))){
-    const id="r"+localMatch[1], f=localMatch[2];
+  }else if((localMatch=key.match(/^l:([^:]+):(content|note)$/))){
+    const id=localMatch[1], f=localMatch[2];
     logs[id]=Object.assign({},logs[id]||{},{[f]:plain,[f+"Rich"]:tokens});
   }
 
-  let m,targetPath,entries,previousEntries;
+  let m,targetPath,entries,previousEntries,scopeWeek=targetWeek;
   if((m=key.match(/^s:(.+)$/))){
     const f=m[1];
     targetPath=["teams",TEAM_ID,"weeks",targetWeek];
@@ -1525,22 +1734,24 @@ function saveRichEditor(key,editor,delay=700){
     previousEntries=[{path:f,value:baseline.plain},{path:`rich.${f}`,value:baseline.tokens}];
   }else if((m=key.match(/^p:(\d+)$/))){
     const k="p"+m[1];
-    targetPath=["teams",TEAM_ID,"weeks",targetWeek];
+    scopeWeek=TEAM_WEEK;
+    targetPath=["teams",TEAM_ID,"weeks",TEAM_WEEK];
     entries=[{path:`pbl.${k}`,value:plain},{path:`richPbl.${k}`,value:tokens}];
     previousEntries=[{path:`pbl.${k}`,value:baseline.plain},{path:`richPbl.${k}`,value:baseline.tokens}];
   }else if((m=key.match(/^(m\d+):content$/))){
     targetPath=["teams",TEAM_ID,"weeks",targetWeek,"members",m[1]];
     entries=[{path:"content",value:plain},{path:"contentRich",value:tokens}];
     previousEntries=[{path:"content",value:baseline.plain},{path:"contentRich",value:baseline.tokens}];
-  }else if((m=key.match(/^l:(\d+):(content|note)$/))){
+  }else if((m=key.match(/^l:([^:]+):(content|note)$/))){
     const f=m[2];
-    targetPath=["teams",TEAM_ID,"weeks",targetWeek,"logs","r"+m[1]];
+    scopeWeek=TEAM_WEEK;
+    targetPath=["teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",m[1]];
     entries=[{path:f,value:plain},{path:f+"Rich",value:tokens}];
     previousEntries=[{path:f,value:baseline.plain},{path:f+"Rich",value:baseline.tokens}];
   }
   if(targetPath){
     queueVersionedWrite("rich:"+key,{
-      key,week:targetWeek,targetPath,entries,previousEntries,
+      key,week:scopeWeek,targetPath,entries,previousEntries,
       preview:plain||"(빈 내용)",previousPreview:baseline.plain||"(빈 내용)",label:historyLabel(key)
     },delay);
   }
@@ -1569,7 +1780,12 @@ function start(){
     finally{ sel.disabled=false; }
   };
   openWeek(now.id);
+  prepareTeamData();
   setInterval(beat,PRESENCE_HEARTBEAT_MS);
+  setInterval(()=>{
+    checkIdleLock();
+    flushHistory(HISTORY_MAX_SESSION_MS).catch(()=>{});
+  },30000);
 }
 function buildAbsent(){
   const tr=$("#abs-row");
@@ -1639,8 +1855,8 @@ function buildPbl(){
     const nameInput=$("#pbl-name-"+i),pctInput=$("#pbl-pct-"+i);
     track(nameInput,`s:pblMeta.${k}.name`);
     track(pctInput,`s:pblMeta.${k}.pct`);
-    nameInput.addEventListener("input",()=>save(`pblMeta.${k}.name`,nameInput.value));
-    pctInput.addEventListener("input",()=>save(`pblMeta.${k}.pct`,pctInput.value));
+    nameInput.addEventListener("input",()=>saveTeamField(`pblMeta.${k}.name`,nameInput.value,`s:pblMeta.${k}.name`));
+    pctInput.addEventListener("input",()=>saveTeamField(`pblMeta.${k}.pct`,pctInput.value,`s:pblMeta.${k}.pct`));
     const editor=$("#pbl-"+i);
     bindRichEditor(editor,"p:"+i,true);
   });
@@ -1668,21 +1884,83 @@ function buildMembers(){
     bindRichEditor($("#"+id+"-content"),id+":content",mine);
   }
 }
+/* ── 누적 프로젝트 일지 ──
+   한 줄 = 팀 공용 logs 문서 1개. 각 줄에는 처음 적은 주차(week)와 순서(order)가 있고,
+   선택한 주차와 그 이전 주차에 적은 줄을 순서대로 모두 보여 줍니다.
+   → 지난주에 적은 일지가 이번 주에도 그대로 있고, 새 줄은 그 아래로 이어집니다. */
 function buildLogs(){
-  const t=$("#log-table");
-  for(let r=1;r<=LOG_ROWS;r++){
-    const tr=el("tr");
-    tr.innerHTML=`
-      <td class="cell" data-key="l:${r}:date"><input class="f" id="lg-${r}-date" type="text" style="text-align:center"></td>
-      <td class="cell" data-key="l:${r}:content"><div class="f rich-editor" id="lg-${r}-content" data-rich-key="l:${r}:content" contenteditable="true"></div></td>
-      <td class="cell" data-key="l:${r}:note"><div class="f rich-editor" id="lg-${r}-note" data-rich-key="l:${r}:note" contenteditable="true"></div></td>`;
-    t.appendChild(tr);
-    const date=$("#lg-"+r+"-date");
-    track(date,`l:${r}:date`);
-    date.addEventListener("input",()=>saveLog(r,"date",date.value));
-    bindRichEditor($("#lg-"+r+"-content"),`l:${r}:content`,true);
-    bindRichEditor($("#lg-"+r+"-note"),`l:${r}:note`,true);
-  }
+  const box=el("div","log-actions");
+  const add=el("button"); add.type="button"; add.id="btn-log-add"; add.textContent="＋ 일지 행 추가";
+  add.onclick=()=>addLogRow();
+  const hint=el("span"); hint.textContent="이전 주차에 적은 일지는 계속 이어지고, 새 행은 맨 아래에 추가됩니다.";
+  box.append(add,hint);
+  $("#log-table").after(box);
+}
+function visibleLogRows(){
+  return Object.entries(logs)
+    .filter(([id,d])=>SAFE_DOC_ID.test(id)&&d&&!d.deleted&&(!d.week||String(d.week)<=String(weekId)))
+    .sort((a,b)=>(Number(a[1].order)||0)-(Number(b[1].order)||0)||a[0].localeCompare(b[0]));
+}
+function logLabelIndex(id){
+  const i=visibleLogRows().findIndex(([x])=>x===id);
+  return i<0?null:i+1;
+}
+function buildLogRow(id){
+  const tr=el("tr"); tr.dataset.logId=id;
+  tr.innerHTML=`
+    <td class="cell log-date" data-key="l:${id}:date"><input class="f" type="text" style="text-align:center" aria-label="날짜"><span class="log-week"></span><button type="button" class="log-del" title="이 행 삭제" aria-label="이 행 삭제">×</button></td>
+    <td class="cell" data-key="l:${id}:content"><div class="f rich-editor" data-rich-key="l:${id}:content" contenteditable="true"></div></td>
+    <td class="cell" data-key="l:${id}:note"><div class="f rich-editor" data-rich-key="l:${id}:note" contenteditable="true"></div></td>`;
+  const row={
+    tr,date:tr.querySelector("input"),week:tr.querySelector(".log-week"),
+    content:tr.querySelector(`[data-rich-key="l:${id}:content"]`),
+    note:tr.querySelector(`[data-rich-key="l:${id}:note"]`)
+  };
+  track(row.date,`l:${id}:date`);
+  row.date.addEventListener("input",()=>saveLog(id,"date",row.date.value));
+  bindRichEditor(row.content,`l:${id}:content`,true);
+  bindRichEditor(row.note,`l:${id}:note`,true);
+  tr.querySelector(".log-del").onclick=()=>deleteLogRow(id);
+  logRowEls.set(id,row);
+  return row;
+}
+async function addLogRow(){
+  const maxOrder=Object.values(logs).reduce((m,d)=>Math.max(m,Number(d?.order)||0),0);
+  const id=`l${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`;
+  const data={order:maxOrder+10,week:weekId,date:"",content:"",note:"",deleted:false,createdAt:Date.now(),createdBy:currentEditorName()};
+  logs[id]=Object.assign({},data);
+  renderLogs();
+  logRowEls.get(id)?.date.focus();
+  try{
+    const draft=makeDraft({
+      key:`log:add:${id}`,week:TEAM_WEEK,targetPath:["teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",id],
+      entries:Object.entries(data).map(([path,value])=>({path,value})),
+      historyEntries:[{path:"deleted",value:false}],previousEntries:[{path:"deleted",value:true}],
+      preview:`${weekShortLabel(weekId)}에 일지 행 추가`,previousPreview:"행 추가 전",label:"프로젝트 일지 행 추가"
+    });
+    await persistDraft(draft);
+  }catch(e){fail(e);}
+}
+async function deleteLogRow(id){
+  const d=logs[id]; if(!d)return;
+  const busy=["date","content","note"].map(f=>otherLock(`l:${id}:${f}`)).find(Boolean);
+  if(busy){alert(`${busy.name||"다른 사용자"}님이 이 행을 수정 중입니다.`);return;}
+  const text=[d.date,d.content,d.note].map(v=>String(v||"").trim()).filter(Boolean).join(" · ");
+  if(!confirm(text?`이 행을 지울까요?\n\n${text.slice(0,80)}\n\n‘수정 이력’에서 되돌릴 수 있습니다.`:"빈 행을 지울까요?"))return;
+  const a=document.activeElement;
+  if(a&&logRowEls.get(id)?.tr.contains(a))a.blur();
+  try{
+    await flushPending();
+    const draft=makeDraft({
+      key:`log:del:${id}`,week:TEAM_WEEK,targetPath:["teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",id],
+      entries:[{path:"deleted",value:true},{path:"deletedAt",value:Date.now()}],
+      historyEntries:[{path:"deleted",value:true}],previousEntries:[{path:"deleted",value:false}],
+      preview:`삭제한 행: ${text||"(빈 행)"}`,previousPreview:"삭제 전",label:"프로젝트 일지 행 삭제"
+    });
+    logs[id]=Object.assign({},d,{deleted:true});
+    renderLogs();
+    await persistDraft(draft);
+  }catch(e){fail(e);}
 }
 function bindShared(){
   SHARED_FIELDS.forEach(f=>{
@@ -1698,8 +1976,10 @@ function bindShared(){
 
 /* ── 데이터 ── */
 function openWeek(id){
-  unsub.forEach(u=>u()); unsub=[]; peers={}; presenceAll={}; presenceReady=false; photos={}; inlinePhotos={}; locks={};
-  shared={}; members={}; logs={};
+  const gen=++weekGen;
+  unsub.forEach(u=>u()); unsub=[]; peers={}; presenceAll={}; presenceReady=false; photos={}; locks={};
+  weekInlinePhotos={}; inlinePhotos=Object.assign({},teamInlinePhotos);
+  shared={}; members={};
   localRichEdits.clear();
   weekId=id;
   draftNoticeWeek=null;
@@ -1719,15 +1999,7 @@ function openWeek(id){
     reconcileLocalRichEdits();
     renderMembers();
   },fail));
-  unsub.push(onSnapshot(collection(wref,"logs"),s=>{
-    logs={};s.forEach(d=>logs[d.id]=d.data());
-    reconcileLocalRichEdits();
-    renderLogs();
-  },fail));
-  unsub.push(onSnapshot(collection(wref,"inlinePhotos"),s=>{
-    inlinePhotos={}; s.forEach(d=>{const v=d.data();if(!v.deleted)inlinePhotos[d.id]=v;});
-    renderInlinePhotos(); refreshRichEditors();
-  },fail));
+  subscribeInlinePhotos(wref,gen);
 
   for(let i=1;i<=MEMBERS;i++){
     const id="m"+i;
@@ -1759,6 +2031,178 @@ function openWeek(id){
   }));
   mark("연결됨",true);
 }
+/* 삭제한 사진(deleted:true)도 원본을 보관하므로, 전체 구독하면 지운 사진까지 매번 내려받습니다.
+   deleted==false 인 것만 구독하고, 이 필드가 없는 예전 사진은 처음 한 번만 채워 넣습니다. */
+async function subscribeInlinePhotos(wref,gen){
+  const col=collection(wref,"inlinePhotos");
+  const flag=`inline-photo-backfill-v1:${TEAM_ID}:${wref.id}`;
+  let filtered=false;
+  try{filtered=localStorage.getItem(flag)==="1";}catch(e){}
+  if(!filtered){
+    try{
+      const all=await getDocs(col);
+      const legacy=all.docs.filter(d=>d.data().deleted===undefined);
+      for(let i=0;i<legacy.length;i+=400){
+        const b=writeBatch(db);
+        legacy.slice(i,i+400).forEach(d=>b.set(d.ref,{deleted:false},{merge:true}));
+        await b.commit();
+      }
+      try{localStorage.setItem(flag,"1");}catch(e){}
+      filtered=true;
+    }catch(e){
+      console.warn("예전 사진 정리 실패 — 전체 구독으로 대신합니다.",e?.code,e?.message);
+    }
+  }
+  if(gen!==weekGen)return; // 그 사이 다른 주차로 이동함
+  const source=filtered?query(col,where("deleted","==",false)):col;
+  unsub.push(onSnapshot(source,s=>{
+    weekInlinePhotos={}; s.forEach(d=>{const v=d.data();if(!v.deleted)weekInlinePhotos[d.id]=v;});
+    mergeInlinePhotos();
+  },fail));
+}
+function mergeInlinePhotos(){
+  inlinePhotos=Object.assign({},weekInlinePhotos,teamInlinePhotos);
+  renderInlinePhotos(); refreshRichEditors();
+}
+
+/* ════════ 팀 공용 데이터 (전체일정 표 · 누적 프로젝트 일지) ════════ */
+function prepareTeamData(){
+  migrateTeamData()
+    .catch(e=>{
+      console.warn("이전 주차 데이터 모으기 실패",e?.code,e?.message);
+      mark(String(e?.code||"").includes("permission")?"팀 공용 칸 저장 권한 확인 필요":"이전 일지를 모으지 못했습니다",false);
+    })
+    .finally(startTeamSubscriptions);
+}
+function startTeamSubscriptions(){
+  teamUnsub.forEach(u=>u()); teamUnsub=[];
+  const tref=teamMetaRef();
+  const warn=what=>e=>{
+    console.warn(`${what} 구독 실패`,e?.code,e?.message);
+    mark(`${what}을(를) 불러오지 못했습니다`,false);
+  };
+  teamUnsub.push(onSnapshot(tref,s=>{
+    teamShared=s.exists()?(s.data()||{}):{};
+    reconcileLocalRichEdits();
+    renderPbl();
+  },warn("전체일정")));
+  teamUnsub.push(onSnapshot(collection(tref,"logs"),s=>{
+    logs={}; s.forEach(d=>{logs[d.id]=d.data();});
+    teamLogsLoaded=true;
+    reconcileLocalRichEdits();
+    renderLogs();
+  },warn("프로젝트 일지")));
+  teamUnsub.push(onSnapshot(query(collection(tref,"inlinePhotos"),where("deleted","==",false)),s=>{
+    teamInlinePhotos={}; s.forEach(d=>{const v=d.data();if(!v.deleted)teamInlinePhotos[d.id]=v;});
+    mergeInlinePhotos();
+  },warn("공용 사진")));
+}
+
+/* 예전 방식(주차마다 따로 저장)에서 한 번만 옮겨 옵니다. 원래 주차 데이터는 지우지 않습니다.
+   - 전체일정 표: 칸마다 가장 최근 주차에 적힌 값
+   - 프로젝트 일지: 오래된 주차부터 차례로 이어 붙이고, 이전 주를 그대로 옮겨 적은 똑같은 행은 한 번만
+   - 그 칸들에 들어 있던 사진도 공용 위치로 복사
+   문서 id가 고정이라 두 사람이 동시에 실행해도 중복되지 않습니다. */
+const TEAM_DATA_VERSION=1;
+async function migrateTeamData(){
+  const metaRef=teamMetaRef();
+  const metaSnap=await getDoc(metaRef);
+  const meta=metaSnap.exists()?(metaSnap.data()||{}):{};
+  if(Number(meta.teamDataVersion)>=TEAM_DATA_VERSION)return;
+  mark("이전 주차 일지·전체일정을 모으는 중…",false);
+
+  const weekData=await Promise.all(WEEKS.map(async w=>{
+    const wref=doc(db,"teams",TEAM_ID,"weeks",w.id);
+    const [ws,ls]=await Promise.all([getDoc(wref),getDocs(collection(wref,"logs"))]);
+    return {id:w.id,shared:ws.exists()?(ws.data()||{}):{},logs:ls.docs.map(d=>({id:d.id,...d.data()}))};
+  }));
+  const hasContent=(plain,rich)=>String(plain??"").trim()!==""||(Array.isArray(rich)&&rich.some(t=>t?.type==="image"));
+
+  // 전체일정 표
+  const pbl={pblMeta:{},pbl:{},richPbl:{},richPblPara:{}},pblFrom={};
+  const alreadyPbl=!!(meta.pbl||meta.pblMeta||meta.richPbl);
+  if(!alreadyPbl){
+    for(const w of [...weekData].reverse()){
+      const sh=w.shared;
+      PBL_STEPS.forEach((_,i)=>{
+        const k="p"+i,mt=(sh.pblMeta||{})[k]||{};
+        ["name","pct"].forEach(f=>{
+          if(typeof mt[f]==="string"&&(pbl.pblMeta[k]||{})[f]===undefined)
+            (pbl.pblMeta[k]||(pbl.pblMeta[k]={}))[f]=mt[f];
+        });
+        if(!(k in pbl.pbl)&&hasContent((sh.pbl||{})[k],sh.richPbl?.[k])){
+          pbl.pbl[k]=String((sh.pbl||{})[k]??"");
+          if(Array.isArray(sh.richPbl?.[k]))pbl.richPbl[k]=sh.richPbl[k];
+          if(sh.richPblPara?.[k]&&typeof sh.richPblPara[k]==="object")pbl.richPblPara[k]=sh.richPblPara[k];
+          pblFrom[k]=w.id;
+        }
+      });
+    }
+  }
+
+  // 프로젝트 일지
+  const seen=new Set(),newLogs=[],keyMap={};
+  let order=0;
+  for(const w of weekData){
+    const rows=w.logs.filter(r=>/^r\d+$/.test(r.id)).sort((a,b)=>Number(a.id.slice(1))-Number(b.id.slice(1)));
+    for(const r of rows){
+      if(!hasContent(r.date,null)&&!hasContent(r.content,r.contentRich)&&!hasContent(r.note,r.noteRich))continue;
+      const sig=[r.date,r.content,r.note].map(v=>String(v??"").trim()).join("\u0001");
+      if(seen.has(sig))continue;
+      seen.add(sig);
+      order+=10;
+      const id=`m-${w.id}-${r.id}`;
+      const data={
+        order,week:w.id,date:String(r.date??""),content:String(r.content??""),note:String(r.note??""),
+        deleted:false,createdAt:Date.now(),migratedFrom:`${w.id}/${r.id}`
+      };
+      ["contentRich","noteRich"].forEach(f=>{if(Array.isArray(r[f]))data[f]=r[f];});
+      ["contentPara","notePara"].forEach(f=>{if(r[f]&&typeof r[f]==="object")data[f]=r[f];});
+      newLogs.push({id,data});
+      ["date","content","note"].forEach(f=>{keyMap[`${w.id}|l:${r.id.slice(1)}:${f}`]=`l:${id}:${f}`;});
+    }
+  }
+
+  // 옮긴 칸에 들어 있던 사진 복사
+  const needWeeks=new Set([...newLogs.map(l=>l.data.week),...Object.values(pblFrom)]);
+  for(const wid of needWeeks){
+    const tokIds=new Set();
+    newLogs.filter(l=>l.data.week===wid).forEach(l=>
+      [...(l.data.contentRich||[]),...(l.data.noteRich||[])].forEach(t=>{if(t?.type==="image")tokIds.add(String(t.id));})
+    );
+    Object.entries(pblFrom).filter(([,w])=>w===wid).forEach(([k])=>
+      (pbl.richPbl[k]||[]).forEach(t=>{if(t?.type==="image")tokIds.add(String(t.id));})
+    );
+    const snap=await getDocs(collection(db,"teams",TEAM_ID,"weeks",wid,"inlinePhotos"));
+    for(const d of snap.docs){
+      const v=d.data()||{},tgt=String(v.target||"");
+      let newTarget=null;
+      if(keyMap[`${wid}|${tgt}`])newTarget=keyMap[`${wid}|${tgt}`];
+      else if(/^p:\d+$/.test(tgt)&&pblFrom["p"+tgt.slice(2)]===wid)newTarget=tgt;
+      else if(tokIds.has(d.id))newTarget=tgt;
+      if(!newTarget||!SAFE_DOC_ID.test(d.id))continue;
+      await setDoc(doc(db,"teams",TEAM_ID,"weeks",TEAM_WEEK,"inlinePhotos",d.id),
+        {...v,target:newTarget,deleted:v.deleted===true},{merge:true});
+    }
+  }
+
+  // 이미 옮겨진 행(동시에 실행된 경우)은 건드리지 않음
+  const existing=await getDocs(collection(db,"teams",TEAM_ID,"weeks",TEAM_WEEK,"logs"));
+  const have=new Set(existing.docs.map(d=>d.id));
+  const toWrite=newLogs.filter(l=>!have.has(l.id));
+  for(let i=0;i<toWrite.length;i+=100){
+    const b=writeBatch(db);
+    toWrite.slice(i,i+100).forEach(l=>b.set(doc(db,"teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",l.id),l.data));
+    await b.commit();
+  }
+
+  const update={teamDataVersion:TEAM_DATA_VERSION,teamDataMigratedAt:Date.now()};
+  if(!alreadyPbl){
+    ["pblMeta","pbl","richPbl","richPblPara"].forEach(f=>{if(Object.keys(pbl[f]).length)update[f]=pbl[f];});
+  }
+  await setDoc(metaRef,update,{merge:true});
+  mark(toWrite.length?`이전 주차 일지 ${toWrite.length}행을 이어 붙였습니다`:"연결됨",true);
+}
 const fail=e=>{console.error(e);mark("저장 안 됨",false);};
 function mark(t,ok){const s=$("#save-status");s.textContent=t;s.classList.toggle("on",!!ok);}
 
@@ -1779,9 +2223,13 @@ function historyLabel(key){
   if((m=String(key).match(/^m(\d+):(name|role|content)$/))){
     const f={name:"이름",role:"역할",content:"주요활동"}[m[2]];return `${m[1]}번 ${f}`;
   }
-  if((m=String(key).match(/^l:(\d+):(date|content|note)$/))){
-    const f={date:"날짜",content:"주요내용",note:"특이사항"}[m[2]];return `프로젝트 일지 ${m[1]}행 ${f}`;
+  if((m=String(key).match(/^l:([^:]+):(date|content|note)$/))){
+    const f={date:"날짜",content:"주요내용",note:"특이사항"}[m[2]];
+    const n=logLabelIndex(m[1]);
+    return `프로젝트 일지 ${n?n+"행 ":""}${f}`;
   }
+  if(/^log:add:/.test(String(key)))return "프로젝트 일지 행 추가";
+  if(/^log:del:/.test(String(key)))return "프로젝트 일지 행 삭제";
   if((m=String(key).match(/^abscheck:m(\d+)$/)))return `결시자 ${m[1]}번 체크`;
   if((m=String(key).match(/^absname:m(\d+)$/)))return `결시자 ${m[1]}번 이름`;
   if(String(key).startsWith("para:"))return `${historyLabel(String(key).slice(5))} 문단 서식`;
@@ -1808,13 +2256,13 @@ function clientId(){
 }
 function makeHistoryId(){return `${clientId()}-${Date.now()}-${Math.floor(Math.random()*1000000)}`;}
 function safeClone(value){return JSON.parse(JSON.stringify(value));}
-function makeDraft({key,week,targetPath,entries,historyEntries,previousEntries=[],preview,previousPreview="",label,action="edit",sourceHistoryId=""}){
+function makeDraft({key,week,targetPath,entries,historyEntries,previousEntries=[],preview,previousPreview="",label,action="edit",sourceHistoryId="",coalesce=false}){
   return {
     id:makeHistoryId(),key:String(key),week:String(week),targetPath:safeClone(targetPath),
     entries:safeClone(entries||[]),historyEntries:safeClone(historyEntries||entries||[]),
     previousEntries:safeClone(previousEntries||[]),
     preview:String(preview??"").slice(0,1200),previousPreview:String(previousPreview??"").slice(0,1200),
-    label:label||historyLabel(key),action,sourceHistoryId,
+    label:label||historyLabel(key),action,sourceHistoryId,coalesce:!!coalesce,
     actorUid:uid||"",actorSlot:slot||"",actorName:currentEditorName(),clientAt:Date.now(),appVersion:APP_VERSION
   };
 }
@@ -1832,7 +2280,7 @@ function clearDraftIfCurrent(draft){
   writeDraftStore(store);
 }
 function draftsForWeek(id=weekId){
-  return Object.values(readDraftStore()).filter(d=>d&&d.week===id).sort((a,b)=>b.clientAt-a.clientAt);
+  return Object.values(readDraftStore()).filter(d=>d&&(d.week===id||d.week===TEAM_WEEK)).sort((a,b)=>b.clientAt-a.clientAt);
 }
 function refreshDraftBadge(){
   const b=$("#btn-history");if(!b)return;
@@ -1869,6 +2317,16 @@ async function writeCurrentOnly(draft){
   if(!validTargetPath(draft.targetPath))throw new Error("invalid-history-target");
   await setDoc(doc(db,...draft.targetPath),currentWriteData(draft.entries),{mergeFields:currentMergeFields(draft.entries)});
 }
+function historyPayload(draft,previousEntries=draft.previousEntries,previousPreview=draft.previousPreview){
+  return {
+    key:draft.key,label:draft.label,action:draft.action,preview:draft.preview,
+    previousPreview,entries:draft.historyEntries,previousEntries,
+    targetPath:draft.targetPath,
+    actorUid:draft.actorUid,actorSlot:draft.actorSlot,actorName:draft.actorName,
+    clientAt:draft.clientAt,serverAt:serverTimestamp(),appVersion:draft.appVersion,
+    ...(draft.sourceHistoryId?{sourceHistoryId:draft.sourceHistoryId}:{})
+  };
+}
 async function commitVersioned(draft){
   if(!validTargetPath(draft.targetPath))throw new Error("invalid-history-target");
   const batch=writeBatch(db);
@@ -1877,15 +2335,60 @@ async function commitVersioned(draft){
     currentWriteData(draft.entries),
     {mergeFields:currentMergeFields(draft.entries)}
   );
-  batch.set(doc(db,"teams",TEAM_ID,"weeks",draft.week,"history",draft.id),{
-    key:draft.key,label:draft.label,action:draft.action,preview:draft.preview,
-    previousPreview:draft.previousPreview,entries:draft.historyEntries,previousEntries:draft.previousEntries,
-    targetPath:draft.targetPath,
-    actorUid:draft.actorUid,actorSlot:draft.actorSlot,actorName:draft.actorName,
-    clientAt:draft.clientAt,serverAt:serverTimestamp(),appVersion:draft.appVersion,
-    ...(draft.sourceHistoryId?{sourceHistoryId:draft.sourceHistoryId}:{})
-  });
+  batch.set(doc(db,"teams",TEAM_ID,"weeks",draft.week,"history",draft.id),historyPayload(draft));
   await batch.commit();
+}
+
+/* 타이핑 중 자동 저장은 본문만 쓰고, 이력은 칸 단위로 모았다가 한 번에 남깁니다.
+   (예전: 0.7초마다 본문 + 이력 2건 → 지금: 0.7초마다 본문 1건, 칸을 벗어날 때 이력 1건) */
+const HISTORY_MAX_SESSION_MS=120000;
+const pendingHistory=new Map();
+const lastFlushedHistory=new Map();
+function stableJson(v){
+  if(Array.isArray(v))return "["+v.map(stableJson).join(",")+"]";
+  if(v&&typeof v==="object")return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stableJson(v[k])).join(",")+"}";
+  return JSON.stringify(v===undefined?null:v);
+}
+function noteHistory(draft){
+  if(historyPermission===false)return;
+  const hk=`${draft.week}|${draft.key}`;
+  const prev=pendingHistory.get(hk), flushed=lastFlushedHistory.get(hk);
+  pendingHistory.set(hk,{
+    draft,
+    previousEntries:prev?prev.previousEntries:(flushed?flushed.entries:draft.previousEntries),
+    previousPreview:prev?prev.previousPreview:(flushed?flushed.preview:draft.previousPreview),
+    startedAt:prev?prev.startedAt:Date.now()
+  });
+}
+async function writeHistoryOnly(h){
+  const d=h.draft;
+  if(stableJson(h.previousEntries)===stableJson(d.historyEntries))return; // 결과적으로 바뀐 게 없음
+  try{
+    await setDoc(doc(db,"teams",TEAM_ID,"weeks",d.week,"history",d.id),historyPayload(d,h.previousEntries,h.previousPreview));
+  }catch(e){
+    if(String(e?.code||"").includes("permission-denied"))historyPermission=false;
+    console.warn("수정 이력 저장 실패",e?.code,e?.message);
+  }
+}
+// maxAgeMs를 주면 그보다 오래 이어진 편집만 중간 저장합니다(긴 편집 중 체크포인트).
+async function flushHistory(maxAgeMs=0){
+  const now=Date.now(),jobs=[];
+  for(const [hk,h] of Array.from(pendingHistory)){
+    if(maxAgeMs&&now-h.startedAt<maxAgeMs)continue;
+    pendingHistory.delete(hk);
+    if(maxAgeMs)lastFlushedHistory.set(hk,{entries:h.draft.historyEntries,preview:h.draft.preview});
+    else lastFlushedHistory.delete(hk);
+    jobs.push(writeHistoryOnly(h));
+  }
+  await Promise.allSettled(jobs);
+}
+async function commitDraft(draft){
+  if(draft.coalesce){
+    await writeCurrentOnly(draft);
+    noteHistory(draft);
+  }else{
+    await commitVersioned(draft);
+  }
 }
 function scheduleDraftRetry(draft,attempt=1){
   if(!draft.storeKey)return;
@@ -1896,7 +2399,7 @@ function scheduleDraftRetry(draft,attempt=1){
     const current=readDraftStore()[draft.storeKey];
     if(current?.id!==draft.id)return;
     try{
-      await commitVersioned(draft);
+      await commitDraft(draft);
       clearDraftIfCurrent(draft);
       mark("자동 재저장됨",true);
     }catch(e){
@@ -1908,12 +2411,12 @@ function scheduleDraftRetry(draft,attempt=1){
 }
 async function persistDraft(draft){
   try{
-    await commitVersioned(draft);
+    await commitDraft(draft);
     if(draft.storeKey)clearDraftIfCurrent(draft);
-    mark("저장됨 · 이력 보관",true);
+    mark(draft.coalesce?"저장됨":"저장됨 · 이력 보관",true);
   }catch(e){
     // 예전 1·2팀 규칙이 history 하위 컬렉션을 막아도 기존 저장 기능은 유지합니다.
-    if(String(e?.code||"").includes("permission-denied")){
+    if(!draft.coalesce&&String(e?.code||"").includes("permission-denied")){
       try{
         await writeCurrentOnly(draft);
         historyPermission=false;
@@ -1928,7 +2431,7 @@ async function persistDraft(draft){
   }
 }
 function queueVersionedWrite(queueKey,spec,delay=700){
-  const draft=stageDraft(spec);
+  const draft=stageDraft({...spec,coalesce:true});
   mark("입력 중…",false);
   scheduleWrite(queueKey,()=>persistDraft(draft),delay);
   return draft;
@@ -1942,7 +2445,15 @@ async function reconcileStoredDrafts(){
   await Promise.all(drafts.map(async d=>{
     try{
       const s=await getDoc(doc(db,"teams",TEAM_ID,"weeks",d.week,"history",d.id));
-      if(s.exists())clearDraftIfCurrent(d);
+      if(s.exists()){clearDraftIfCurrent(d);return;}
+    }catch(e){}
+    // 본문만 저장하는 방식이라 이력이 없을 수 있으므로 실제 저장된 값과 비교합니다.
+    try{
+      if(!validTargetPath(d.targetPath))return;
+      const cur=await getDoc(doc(db,...d.targetPath));
+      const data=cur.exists()?cur.data():{};
+      const same=(d.entries||[]).every(e=>stableJson(valueAtPath(data,e.path))===stableJson(e.value));
+      if(same)clearDraftIfCurrent(d);
     }catch(e){}
   }));
   const left=draftsForWeek(weekId);
@@ -1969,6 +2480,7 @@ function appendHistoryItem(parent,data,{draft=false,id=""}={}){
   const who=el("span");who.textContent=data.actorName||"사용자";
   const kind=el("span");kind.textContent=draft?"브라우저 초안":(data.action==="restore"?"복원 저장":"자동 백업");
   meta.append(title,when,who,kind);
+  if(data.week===TEAM_WEEK){const sc=el("span");sc.textContent="모든 주차 공통";meta.append(sc);}
   const preview=el("div","history-preview");preview.textContent=data.preview||"(내용 없음)";
   const actions=el("div","history-actions");
   const restoreEntries=async(entries,text,button)=>{
@@ -1998,6 +2510,8 @@ function appendHistoryItem(parent,data,{draft=false,id=""}={}){
   actions.appendChild(restore);item.append(meta,preview,actions);parent.appendChild(item);
 }
 async function openHistory(){
+  try{await flushPending();}catch(e){}
+  await flushHistory();
   const overlay=$("#history-overlay"),list=$("#history-list");
   overlay.classList.remove("hide");
   $("#history-week").textContent=`${TEAM_NAME} · ${weekMeta(weekId).label}`;
@@ -2005,9 +2519,14 @@ async function openHistory(){
   draftsForWeek(weekId).forEach(d=>appendHistoryItem(list,d,{draft:true,id:d.id}));
   const loading=el("div","history-empty");loading.textContent="저장 이력을 불러오는 중…";list.appendChild(loading);
   try{
-    const q=query(collection(db,"teams",TEAM_ID,"weeks",weekId,"history"),orderBy("clientAt","desc"),limit(200));
-    const snap=await getDocs(q);loading.remove();
-    snap.forEach(s=>appendHistoryItem(list,{id:s.id,week:weekId,...s.data()},{id:s.id}));
+    const histQ=w=>query(collection(db,"teams",TEAM_ID,"weeks",w,"history"),orderBy("clientAt","desc"),limit(200));
+    const [snap,teamSnap]=await Promise.all([getDocs(histQ(weekId)),getDocs(histQ(TEAM_WEEK)).catch(()=>null)]);
+    loading.remove();
+    const items=[];
+    snap.forEach(s=>items.push({id:s.id,week:weekId,...s.data()}));
+    teamSnap?.forEach(s=>items.push({id:s.id,week:TEAM_WEEK,...s.data()}));
+    items.sort((a,b)=>(Number(b.clientAt)||0)-(Number(a.clientAt)||0))
+      .forEach(it=>appendHistoryItem(list,it,{id:it.id}));
     if(!list.children.length){const empty=el("div","history-empty");empty.textContent="아직 저장된 수정 이력이 없습니다.";list.appendChild(empty);}
   }catch(e){
     loading.textContent=historyPermission?"수정 이력을 불러오지 못했습니다. 연결 상태를 확인해 주세요.":"이 팀의 Firebase 규칙에 수정 이력 읽기 권한을 추가해야 합니다.";
@@ -2079,7 +2598,8 @@ function saveMember(field,value){
   const draft=stageDraft({
     key,week:targetWeek,targetPath:["teams",TEAM_ID,"weeks",targetWeek,"members",targetSlot],
     entries:[{path:field,value}],previousEntries:[{path:field,value:previous}],
-    preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key)
+    preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key),
+    coalesce:true
   });
   mark("입력 중…",false);
   scheduleWrite("m:"+field,async()=>{
@@ -2090,12 +2610,21 @@ function saveMember(field,value){
     }
   },700);
 }
-function saveLog(row,field,value){
-  const targetWeek=weekId;
-  const key=`l:${row}:${field}`;
-  const previous=editBaselines.get(key)??((logs["r"+row]||{})[field]??"");
+function saveTeamField(path,value,key){
+  const previous=editBaselines.has(key)?editBaselines.get(key):(valueAtPath(teamShared,path)??"");
+  setNestedValue(teamShared,path,value);
+  queueVersionedWrite("t:"+path,{
+    key,week:TEAM_WEEK,targetPath:["teams",TEAM_ID,"weeks",TEAM_WEEK],
+    entries:[{path,value}],previousEntries:[{path,value:previous}],
+    preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key)
+  },700);
+}
+function saveLog(id,field,value){
+  const key=`l:${id}:${field}`;
+  const previous=editBaselines.get(key)??((logs[id]||{})[field]??"");
+  logs[id]=Object.assign({},logs[id]||{},{[field]:value});
   queueVersionedWrite(key,{
-    key,week:targetWeek,targetPath:["teams",TEAM_ID,"weeks",targetWeek,"logs","r"+row],
+    key,week:TEAM_WEEK,targetPath:["teams",TEAM_ID,"weeks",TEAM_WEEK,"logs",id],
     entries:[{path:field,value}],previousEntries:[{path:field,value:previous}],
     preview:String(value??""),previousPreview:String(previous??""),label:historyLabel(key)
   },700);
@@ -2112,15 +2641,17 @@ function renderShared(){
       n.value=shared[f]??(f==="totalHours"?"110":""); autosize(n);
     }
   });
+  document.documentElement.style.setProperty("--red","#C00000");
+  paintAbsent();
+}
+function renderPbl(){
   PBL_STEPS.forEach((_,i)=>{
-    const n=$("#pbl-"+i), k="p"+i,meta=(shared.pblMeta||{})[k]||{};
+    const n=$("#pbl-"+i), k="p"+i,meta=(teamShared.pblMeta||{})[k]||{};
     const name=$("#pbl-name-"+i),pct=$("#pbl-pct-"+i);
     if(name&&document.activeElement!==name)name.value=meta.name??PBL_STEPS[i][0];
     if(pct&&document.activeElement!==pct)pct.value=meta.pct??PBL_STEPS[i][1];
-    if(n) renderRichEditor(n,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
+    if(n) renderRichEditor(n,teamShared.richPbl?.[k],(teamShared.pbl||{})[k]??(PBL_DEFAULT[i]||""),true);
   });
-  document.documentElement.style.setProperty("--red","#C00000");
-  paintAbsent();
 }
 function renderMembers(){
   for(let i=1;i<=MEMBERS;i++){
@@ -2135,21 +2666,44 @@ function renderMembers(){
   paintAbsent();
 }
 function renderLogs(){
-  for(let r=1;r<=LOG_ROWS;r++){
-    const d=logs["r"+r]||{};
-    const date=$("#lg-"+r+"-date");
-    if(date&&document.activeElement!==date) date.value=d.date??"";
-    ["content","note"].forEach(f=>{
-      const editor=$(`#lg-${r}-${f}`);
-      if(editor) renderRichEditor(editor,d[f+"Rich"],d[f]??"",true);
-    });
+  const t=$("#log-table"); if(!t)return;
+  const list=visibleLogRows();
+  const keep=new Set(list.map(([id])=>id));
+  let changed=false;
+  // 지워졌거나 이 주차에서는 아직 없는 행 제거 (지금 편집 중인 행은 남겨 둠)
+  for(const [id,row] of Array.from(logRowEls)){
+    if(keep.has(id)||row.tr.contains(document.activeElement))continue;
+    row.tr.remove(); logRowEls.delete(id);
+    ["content","note"].forEach(f=>{delete richEditors[`l:${id}:${f}`];});
+    changed=true;
   }
+  const header=t.querySelector("tr");
+  t.querySelector("tr.log-empty")?.remove();
+  let prev=header;
+  list.forEach(([id,d])=>{
+    let row=logRowEls.get(id);
+    if(!row){row=buildLogRow(id);changed=true;}
+    // 이미 제자리에 있으면 옮기지 않아 입력 중인 칸의 포커스가 유지됩니다.
+    if(prev.nextElementSibling!==row.tr){prev.after(row.tr);changed=true;}
+    prev=row.tr;
+    if(document.activeElement!==row.date)row.date.value=d.date??"";
+    row.week.textContent=weekShortLabel(d.week);
+    renderRichEditor(row.content,d.contentRich,d.content??"",true);
+    renderRichEditor(row.note,d.noteRich,d.note??"",true);
+  });
+  if(!list.length){
+    const tr=el("tr","log-empty"),td=el("td");
+    td.colSpan=3;
+    td.textContent=teamLogsLoaded?"아직 적은 일지가 없습니다. 아래 ‘＋ 일지 행 추가’를 눌러 시작하세요.":"프로젝트 일지를 불러오는 중…";
+    tr.appendChild(td); header.after(tr);
+  }
+  if(changed){renderFieldLocks();renderInlinePhotos();if(uid&&slot)renderPeers();}
 }
 /* ── 사진 ── */
 const MAX_SHOTS=6, MAX_BYTES=700000;
 async function savePhotoVersion({targetPath,photoData,key,preview}){
   const draft=makeDraft({
-    key,week:weekId,targetPath,
+    key,week:targetPath[3]||weekId,targetPath,
     entries:Object.entries(photoData).map(([path,value])=>({path,value})),
     // 사진 원본은 대상 문서에 한 번만 보관합니다. 이력에서는 삭제 여부만 바꿔 복구합니다.
     historyEntries:[{path:"deleted",value:false}],
@@ -2160,7 +2714,7 @@ async function savePhotoVersion({targetPath,photoData,key,preview}){
 }
 async function softDeletePhoto(targetPath,key,preview){
   const draft=makeDraft({
-    key,week:weekId,targetPath,
+    key,week:targetPath[3]||weekId,targetPath,
     entries:[{path:"deleted",value:true},{path:"deletedAt",value:Date.now()}],
     previousEntries:[{path:"deleted",value:false}],
     preview,previousPreview:"사진이 있던 상태",label:"사진 삭제"
@@ -2173,9 +2727,11 @@ function renderPhotos(id){
   const list=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
   box.innerHTML="";
   list.forEach(([pid,p])=>{
+    const src=safeImageSrc(p.data); if(!src)return;
     const d=el("div","shot");
-    d.innerHTML=`<img src="${p.data}" alt="">${mine?'<button title="삭제">×</button>':''}`;
-    d.querySelector("img").onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=p.data; lb.classList.remove("hide"); };
+    const img=el("img"); img.src=src; img.alt=""; d.appendChild(img);
+    if(mine){ const b=el("button"); b.type="button"; b.title="삭제"; b.textContent="×"; d.appendChild(b); }
+    img.onclick=()=>{ const lb=$("#lightbox"); lb.querySelector("img").src=src; lb.classList.remove("hide"); };
     if(mine) d.querySelector("button").onclick=async()=>{
       if(!confirm("이 사진을 지울까요?")) return;
       try{
@@ -2202,14 +2758,16 @@ function renderInlinePhotos(){
     if(!host)return;
     const box=el("div","inline-shots");
     list.forEach(([pid,p])=>{
+      const src=safeImageSrc(p.data); if(!src)return;
       const d=el("div","shot");
-      d.innerHTML=`<img src="${p.data}" alt=""><button title="삭제">×</button>`;
-      d.querySelector("img").onclick=()=>{const lb=$("#lightbox");lb.querySelector("img").src=p.data;lb.classList.remove("hide");};
+      const img=el("img"); img.src=src; img.alt=""; d.appendChild(img);
+      const b=el("button"); b.type="button"; b.title="삭제"; b.textContent="×"; d.appendChild(b);
+      img.onclick=()=>{const lb=$("#lightbox");lb.querySelector("img").src=src;lb.classList.remove("hide");};
       d.querySelector("button").onclick=async()=>{
         if(!confirm("이 사진을 지울까요?"))return;
         try{
           await softDeletePhoto(
-            ["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+            inlinePhotoPath(pid),
             `photo:inline:${pid}`,`삭제한 ${p.name||"삽입 사진"}`
           );
         }
@@ -2277,7 +2835,13 @@ $("#pick").onchange=async e=>{
   const picked=files.slice(0,Math.max(room,0));
   const bad=[];
   const richEditor=richEditors[target];
-  let range=richRanges[target]?.cloneRange()||null;
+  // 마지막으로 커서가 있던 위치. 한 번도 클릭하지 않은 칸이면 맨 끝에 넣습니다.
+  let caret=0;
+  if(richEditor){
+    const total=richTokenLength(editorTokens(richEditor));
+    const saved=richCarets[target];
+    caret=Number.isFinite(saved)?Math.min(Math.max(0,saved),total):total;
+  }
 
   for(let i=0;i<picked.length;i++){
     const f=picked[i];
@@ -2297,27 +2861,18 @@ $("#pick").onchange=async e=>{
         deleted:false
       };
       await savePhotoVersion({
-        targetPath:["teams",TEAM_ID,"weeks",weekId,"inlinePhotos",pid],
+        targetPath:["teams",TEAM_ID,"weeks",photoScopeWeekForTarget(target),"inlinePhotos",pid],
         photoData:photoDoc,key:`photo:inline:${pid}`,preview:`추가한 ${f.name||"사진"}`
       });
       inlinePhotos[pid]=photoDoc;
+      if(isTeamScopedKey(target))teamInlinePhotos[pid]=photoDoc; else weekInlinePhotos[pid]=photoDoc;
 
       if(richEditor){
-        if(!range||!richEditor.contains(range.commonAncestorContainer)){
-          range=document.createRange();
-          range.selectNodeContents(richEditor);
-          range.collapse(false);
-        }
-        const node=makeInlinePhotoNode(pid,photoDoc,true);
-        range.deleteContents();
-        range.insertNode(node);
-        range.setStartAfter(node); range.collapse(true);
-        const spacer=document.createTextNode("\u200B");
-        range.insertNode(spacer);
-        range.setStartAfter(spacer); range.collapse(true);
-        richRanges[target]=range.cloneRange();
-        const sel=window.getSelection();
-        sel.removeAllRanges(); sel.addRange(range);
+        const next=insertTokensAt(editorTokens(richEditor),caret,[{type:"image",id:pid}]);
+        caret+=1; // 여러 장이면 방금 넣은 사진 뒤에 이어서 넣습니다.
+        renderRichContent(richEditor,next,"",true);
+        applyParaStyleToEditor(richEditor,paraStyleForKey(target));
+        richCarets[target]=caret;
         saveRichEditor(target,richEditor,0);
       }
     }catch(err){ console.error(f.name,err); bad.push((f.name||"사진")+" — "+err.message); }
@@ -2326,7 +2881,14 @@ $("#pick").onchange=async e=>{
   mark(bad.length&&bad.length===picked.length?"저장 안 됨":"저장됨", !(bad.length&&bad.length===picked.length));
   if(files.length>picked.length) alert(`한 입력칸에는 사진 ${MAX_SHOTS}장까지 넣을 수 있습니다.`);
   if(bad.length) alert("올리지 못한 사진:\n\n"+bad.join("\n"));
-  await releaseFieldLock(target);
+  if(richEditor&&myLocks.has(target)){
+    // 사진 바로 뒤에 커서를 두고 칸을 다시 활성화해서 이어서 글을 쓸 수 있게 합니다.
+    // (잠금은 이 칸을 벗어날 때 blur 핸들러가 풉니다)
+    richEditor.focus({preventScroll:true});
+    richRanges[target]=setCaretAtModelOffset(richEditor,caret).cloneRange();
+  }else{
+    await releaseFieldLock(target);
+  }
 };
 $("#lightbox").onclick=()=>$("#lightbox").classList.add("hide");
 
@@ -2337,7 +2899,7 @@ async function beat(){
 function renderPeers(){
   document.querySelectorAll(".peer").forEach(p=>p.remove());
   Object.values(peers).forEach(p=>{
-    if(!p.field||p.week!==weekId)return;
+    if(!p.field||!sameScope(p,p.field))return;
     const host=document.querySelector(`[data-key="${CSS.escape(p.field)}"]`);
     if(!host)return;
     const t=el("span","peer"); t.textContent=p.name; host.appendChild(t);
@@ -2348,7 +2910,7 @@ function renderPeers(){
 
 /* ── 지난 주 가져오기 ── */
 $("#btn-prev-copy").onclick=async()=>{
-  const prev=WEEKS[WEEKS.findIndex(w=>w.id===weekId)+1];
+  const prev=WEEKS[WEEKS.findIndex(w=>w.id===weekId)-1];
   if(!prev) return alert("지난 주가 목록에 없습니다.");
   if(!confirm(`${prev.label}의 주제·기간·팀운영 계획과 팀원 이름·역할을 가져옵니다.`)) return;
   try{
@@ -2426,11 +2988,12 @@ function fillCell(xdoc,tbl,row,col,text){
   const ps=kids(sub,"hp:p"); if(!ps.length)return;
   const base=ps[0];
   const ref=(base.getElementsByTagName("hp:run")[0]||{getAttribute:()=>null}).getAttribute("charPrIDRef")||"0";
-  const baseParaRef=base.getAttribute("paraPrIDRef")||"0";
   ps.slice(1).forEach(p=>sub.removeChild(p));
   String(text??"").split("\n").forEach((line,i)=>{
     const p=i===0?base:base.cloneNode(true);
     Array.from(p.getElementsByTagName("hp:run")).forEach(r=>r.parentNode.removeChild(r));
+    // 템플릿의 줄 배치 캐시를 지워 긴 글이 겹치지 않게 한글이 다시 계산하도록 합니다.
+    Array.from(p.getElementsByTagName("hp:linesegarray")).forEach(r=>r.parentNode.removeChild(r));
     const run=xdoc.createElementNS(HP,"hp:run"); run.setAttribute("charPrIDRef",ref);
     if(line.length){ const t=xdoc.createElementNS(HP,"hp:t"); t.appendChild(xdoc.createTextNode(line)); run.appendChild(t); }
     p.insertBefore(run,p.firstChild);
@@ -2648,7 +3211,24 @@ function fillCellRich(xdoc,tbl,row,col,tokens,fallback,itemMap,styleCtx,paraStyl
   });
 }
 
-function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
+// 템플릿 표보다 행이 많으면 마지막 행을 복제해 늘립니다(프로젝트 일지 누적용).
+function ensureTableRows(tbl,total){
+  const rows=kids(tbl,"hp:tr"); if(!rows.length)return;
+  const have=rows.length; if(total<=have)return;
+  const last=rows[rows.length-1];
+  const sz0=last.getElementsByTagName("hp:cellSz")[0];
+  const rowH=Number(sz0?sz0.getAttribute("height"):0)||0;
+  for(let r=have;r<total;r++){
+    const tr=last.cloneNode(true);
+    Array.from(tr.getElementsByTagName("hp:cellAddr")).forEach(a=>a.setAttribute("rowAddr",String(r)));
+    Array.from(tr.getElementsByTagName("hp:t")).forEach(x=>x.parentNode.removeChild(x));
+    tbl.appendChild(tr);
+  }
+  tbl.setAttribute("rowCnt",String(total));
+  const sz=kids(tbl,"hp:sz")[0];
+  if(sz&&rowH)sz.setAttribute("height",String((Number(sz.getAttribute("height"))||0)+rowH*(total-have)));
+}
+function inlineTargetCell(target,T1,TPBL,TMEM,TLOG,logRowIndex={}){
   const sharedMap={
     "s:topic":[T1,1,1],
     "s:weekly":[T1,2,1],
@@ -2675,9 +3255,10 @@ function inlineTargetCell(target,T1,TPBL,TMEM,TLOG){
     return [TMEM,i*2,1];
   }
 
-  m=target.match(/^l:(\d+):(date|content|note)$/);
+  m=target.match(/^l:([^:]+):(date|content|note)$/);
   if(m){
-    const r=Number(m[1]), col={date:0,content:1,note:2}[m[2]];
+    const r=logRowIndex[m[1]], col={date:0,content:1,note:2}[m[2]];
+    if(!r)return null; // 이 주차까지의 일지에 없는 행
     return [TLOG,r,col];
   }
   return null;
@@ -2725,7 +3306,7 @@ $("#btn-export").onclick=async()=>{
     const binFiles=[]; let imgNo=0;
     const inlineItemMap={};
     for(const [pid,sh] of Object.entries(inlinePhotos||{})){
-      if(sh.mode!=="inline"||!sh.data)continue;
+      if(sh.mode!=="inline"||!safeImageSrc(sh.data))continue;
       let iw=sh.w,ih=sh.h;
       if(!iw||!ih){
         const im=new Image(); im.src=sh.data;
@@ -2755,10 +3336,10 @@ $("#btn-export").onclick=async()=>{
     fillCellRich(xdoc,T1,9,1,shared.rich?.mentor,shared.mentor||"",inlineItemMap,styleCtx,shared.richPara?.mentor);
 
     PBL_STEPS.forEach((_,i)=>{
-      const k="p"+i,meta=(shared.pblMeta||{})[k]||{};
+      const k="p"+i,meta=(teamShared.pblMeta||{})[k]||{};
       fillCell(xdoc,TPBL,i+2,1,meta.name??PBL_STEPS[i][0]);
       fillCell(xdoc,TPBL,i+2,2,meta.pct??PBL_STEPS[i][1]);
-      fillCellRich(xdoc,TPBL,i+2,3,shared.richPbl?.[k],(shared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,shared.richPblPara?.[k]);
+      fillCellRich(xdoc,TPBL,i+2,3,teamShared.richPbl?.[k],(teamShared.pbl||{})[k]??(PBL_DEFAULT[i]||""),inlineItemMap,styleCtx,teamShared.richPblPara?.[k]);
     });
 
     for(let i=0;i<MEMBERS;i++){
@@ -2769,7 +3350,7 @@ $("#btn-export").onclick=async()=>{
       const shots=Object.entries(photos[id]||{}).sort((a,b)=>(a[1].at||0)-(b[1].at||0)).map(([,p])=>p);
       const ready=[];
       for(const sh of shots){
-        if(!sh.data) continue;
+        if(!safeImageSrc(sh.data)) continue;
         let w=sh.w,h=sh.h;
         if(!w||!h){
           const im=new Image(); im.src=sh.data;
@@ -2783,18 +3364,21 @@ $("#btn-export").onclick=async()=>{
       }
       addPics(xdoc,TMEM,i*2,1,ready);
     }
-    for(let r=1;r<=LOG_ROWS;r++){
-      const d=logs["r"+r]||{};
+    // 이 주차까지 누적된 일지를 순서대로. 템플릿의 23행보다 많으면 행을 늘립니다.
+    const logList=visibleLogRows(), logRowIndex={};
+    ensureTableRows(TLOG,logList.length+1);
+    logList.forEach(([id,d],i)=>{
+      const r=i+1; logRowIndex[id]=r;
       fillCell(xdoc,TLOG,r,0,d.date||"");
       fillCellRich(xdoc,TLOG,r,1,d.contentRich,d.content||"",inlineItemMap,styleCtx,d.contentPara);
       fillCellRich(xdoc,TLOG,r,2,d.noteRich,d.note||"",inlineItemMap,styleCtx,d.notePara);
-    }
+    });
 
     // 현재 커서가 있던 입력칸에 추가한 사진도 HWPX의 같은 셀에 삽입
     const inlineReady={};
     const inlineList=Object.values(inlinePhotos||{}).sort((a,b)=>(a.at||0)-(b.at||0));
     for(const sh of inlineList){
-      if(!sh.data||!sh.target||sh.mode==="inline")continue;
+      if(!safeImageSrc(sh.data)||!sh.target||sh.mode==="inline")continue;
       let iw=sh.w,ih=sh.h;
       if(!iw||!ih){
         const im=new Image(); im.src=sh.data;
@@ -2807,7 +3391,7 @@ $("#btn-export").onclick=async()=>{
       (inlineReady[sh.target]||(inlineReady[sh.target]=[])).push({item,w:iw,h:ih});
     }
     Object.entries(inlineReady).forEach(([target,ready])=>{
-      const loc=inlineTargetCell(target,T1,TPBL,TMEM,TLOG);
+      const loc=inlineTargetCell(target,T1,TPBL,TMEM,TLOG,logRowIndex);
       if(loc)addPics(xdoc,loc[0],loc[1],loc[2],ready);
     });
 
@@ -2873,9 +3457,209 @@ document.addEventListener("focusin",()=>{
   });
 });
 
+/* ════════ 글 속 사진 끌어서 옮기기 ════════
+   - 마우스: 사진을 누른 채 끌면 파란 세로선이 놓일 위치를 보여 주고, 놓으면 그 자리로 옮깁니다.
+   - 휴대폰: 사진을 길게(0.35초) 누르면 끌기 시작합니다. 짧게 누르면 기존처럼 크게 보기.
+   - 같은 입력칸 안에서만 옮길 수 있습니다. 칸 밖에 놓거나 Esc를 누르면 취소됩니다.
+   - 위치는 "글자 수 + 사진 1칸" 기준으로 계산해서, 저장 형식(토큰)을 그대로 재배열합니다. */
+const PHOTO_DRAG_THRESHOLD=6, PHOTO_LONGPRESS_MS=350;
+let photoDrag=null, suppressPhotoClick=false;
+
+function photoTokenIndex(tokens,pid){
+  let p=0;
+  for(const t of mergeTextTokens(tokens)){
+    if(t.type==="image"&&t.id===pid)return p;
+    p+=t.type==="text"?t.text.length:1;
+  }
+  return -1;
+}
+function caretFromPoint(x,y){
+  if(document.caretPositionFromPoint){
+    const p=document.caretPositionFromPoint(x,y);
+    if(p&&p.offsetNode)return {node:p.offsetNode,offset:p.offset};
+  }
+  if(document.caretRangeFromPoint){
+    const r=document.caretRangeFromPoint(x,y);
+    if(r)return {node:r.startContainer,offset:r.startOffset};
+  }
+  return null;
+}
+function photoDropTarget(editor,x,y){
+  const hit=document.elementFromPoint(x,y);
+  if(!hit||(hit!==editor&&!editor.contains(hit)))return null; // 칸 밖
+  const total=richTokenLength(editorTokens(editor));
+  const ph=hit.closest?.(".inline-photo-node");
+  if(ph&&editor.contains(ph)){
+    // 사진 위에서는 왼쪽 절반이면 그 사진 앞, 오른쪽 절반이면 뒤
+    const b=ph.getBoundingClientRect();
+    const after=richModelOffset(editor,ph,0);
+    return x<b.left+b.width/2?after-1:after;
+  }
+  const cp=caretFromPoint(x,y);
+  if(cp&&editor.contains(cp.node))return Math.min(richModelOffset(editor,cp.node,cp.offset),total);
+  return total; // 글 아래 빈 공간 → 맨 끝
+}
+function caretRectForRange(r){
+  const rect=r.getBoundingClientRect();
+  if(rect&&(rect.height>0||rect.width>0))return {left:rect.left,top:rect.top,height:rect.height};
+  // 요소 경계(사진 앞뒤)에 놓인 접힌 Range는 크기가 0이라 이웃 노드 기준으로 계산
+  const c=r.startContainer,o=r.startOffset,rr=document.createRange();
+  const kids=c.nodeType===Node.ELEMENT_NODE?c.childNodes:null;
+  const before=kids?kids[o-1]:null, after=kids?kids[o]:null;
+  if(before){rr.selectNode(before);const b=rr.getBoundingClientRect();if(b.height)return {left:b.right,top:b.top,height:b.height};}
+  if(after){rr.selectNode(after);const b=rr.getBoundingClientRect();if(b.height)return {left:b.left,top:b.top,height:b.height};}
+  return null;
+}
+function showDropCaret(d,pos){
+  const ind=d.caretEl; if(!ind)return;
+  d.editor.classList.toggle("photo-drop-zone",pos!=null);
+  if(pos==null){ind.style.display="none";return;}
+  let rect=caretRectForRange(rangeAtModelOffset(d.editor,pos));
+  if(!rect){const b=d.editor.getBoundingClientRect();rect={left:b.left+7,top:b.top+5,height:18};}
+  ind.style.display="block";
+  ind.style.left=(rect.left-1)+"px";
+  ind.style.top=rect.top+"px";
+  ind.style.height=Math.max(16,rect.height)+"px";
+}
+function updatePhotoDrag(){
+  const d=photoDrag; if(!d?.active)return;
+  d.ghost.style.left=d.x+"px"; d.ghost.style.top=d.y+"px";
+  d.target=photoDropTarget(d.editor,d.x,d.y);
+  showDropCaret(d,d.target);
+}
+function autoScrollDuringDrag(){
+  const d=photoDrag; if(!d?.active)return;
+  const topEdge=($(".toolbar")?.getBoundingClientRect().bottom||0)+50, bottomEdge=innerHeight-50;
+  let dy=0;
+  if(d.y<topEdge)dy=-Math.ceil((topEdge-d.y)/4);
+  else if(d.y>bottomEdge)dy=Math.ceil((d.y-bottomEdge)/4);
+  if(dy){window.scrollBy(0,dy);updatePhotoDrag();}
+}
+function beginPhotoDrag(){
+  const d=photoDrag; if(!d||d.active)return;
+  clearTimeout(d.timer);
+  d.active=true;
+  // 다른 칸을 편집 중이었다면 그 칸을 먼저 저장·해제합니다.
+  const a=document.activeElement;
+  if(a?.dataset?.lockKey&&a.dataset.lockKey!==d.key)a.blur();
+  acquireFieldLock(d.key).then(ok=>{
+    if(!ok&&photoDrag===d)cancelPhotoDrag();
+  });
+  const ghost=el("img","photo-drag-ghost");
+  ghost.src=d.wrap.querySelector("img")?.src||""; ghost.alt="";
+  const caret=el("div","photo-drop-caret");
+  document.body.append(ghost,caret);
+  d.ghost=ghost; d.caretEl=caret;
+  d.wrap.classList.add("dragging");
+  document.body.classList.add("photo-dragging");
+  if(d.touch&&navigator.vibrate)try{navigator.vibrate(15);}catch(e){}
+  d.scrollTimer=setInterval(autoScrollDuringDrag,16);
+  updatePhotoDrag();
+}
+function endPhotoDragUi(d){
+  clearTimeout(d.timer);
+  clearInterval(d.scrollTimer);
+  d.ghost?.remove(); d.caretEl?.remove();
+  d.wrap?.classList.remove("dragging");
+  d.editor?.classList.remove("photo-drop-zone");
+  document.body.classList.remove("photo-dragging");
+}
+function blockNextPhotoClick(){
+  suppressPhotoClick=true;
+  setTimeout(()=>{suppressPhotoClick=false;},400);
+}
+async function releasePhotoDragLock(d){
+  // 글을 쓰던 칸이 아니었다면 옮기기만 하고 잠금을 바로 풉니다.
+  if(document.activeElement===d.editor||!myLocks.has(d.key))return;
+  await releaseFieldLock(d.key);
+  richSaveBaselines.delete(d.key);
+}
+function cancelPhotoDrag(){
+  const d=photoDrag; if(!d)return;
+  photoDrag=null;
+  endPhotoDragUi(d);
+  if(d.active){blockNextPhotoClick();releasePhotoDragLock(d);}
+}
+async function finishPhotoMove(d,target){
+  try{
+    if(target==null){mark("칸 밖이라 사진을 옮기지 않았습니다",false);return;}
+    if(!myLocks.has(d.key)&&!(await acquireFieldLock(d.key)))return;
+    const editor=richEditors[d.key]||d.editor;
+    const tokens=mergeTextTokens(editorTokens(editor));
+    const from=photoTokenIndex(tokens,d.pid);
+    if(from<0)return;                               // 그 사이 다른 곳에서 지워진 사진
+    if(target===from||target===from+1)return;       // 제자리
+    const without=tokens.filter(t=>!(t.type==="image"&&t.id===d.pid));
+    const to=target>from?target-1:target;           // 빠진 사진 1칸만큼 보정
+    const next=insertTokensAt(without,to,[{type:"image",id:d.pid}]);
+    const hadFocus=document.activeElement===editor;
+    renderRichContent(editor,next,"",true);
+    applyParaStyleToEditor(editor,paraStyleForKey(d.key));
+    richCarets[d.key]=to+1;
+    if(hadFocus)richRanges[d.key]=setCaretAtModelOffset(editor,to+1).cloneRange();
+    saveRichEditor(d.key,editor,0);
+  }catch(e){fail(e);}
+  finally{await releasePhotoDragLock(d);}
+}
+
+document.addEventListener("pointerdown",e=>{
+  if(photoDrag)cancelPhotoDrag();
+  if(e.pointerType==="mouse"&&e.button!==0)return;
+  const wrap=e.target.closest?.(".rich-editor .inline-photo-node");
+  if(!wrap||e.target.closest("button"))return;       // × 삭제 버튼은 그대로
+  const editor=wrap.closest(".rich-editor"), key=editor?.dataset.richKey;
+  if(!key||!editor.dataset.lockKey)return;          // 내가 수정할 수 없는 칸
+  if(e.pointerType==="mouse")e.preventDefault();    // 글자 선택·브라우저 기본 끌기 방지
+  photoDrag={
+    pid:wrap.dataset.photoId,key,editor,wrap,pointerId:e.pointerId,
+    startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,
+    touch:e.pointerType!=="mouse",active:false,timer:null,target:null
+  };
+  if(photoDrag.touch)photoDrag.timer=setTimeout(beginPhotoDrag,PHOTO_LONGPRESS_MS);
+},true);
+document.addEventListener("pointermove",e=>{
+  const d=photoDrag; if(!d||e.pointerId!==d.pointerId)return;
+  d.x=e.clientX; d.y=e.clientY;
+  if(!d.active){
+    const moved=Math.hypot(d.x-d.startX,d.y-d.startY);
+    if(d.touch){if(moved>8)cancelPhotoDrag();return;} // 길게 누르기 전에 움직이면 스크롤
+    if(moved<PHOTO_DRAG_THRESHOLD)return;
+    beginPhotoDrag();
+    if(!photoDrag)return;
+  }
+  e.preventDefault();
+  updatePhotoDrag();
+},{passive:false});
+document.addEventListener("pointerup",e=>{
+  const d=photoDrag; if(!d||e.pointerId!==d.pointerId)return;
+  if(!d.active){cancelPhotoDrag();return;}         // 그냥 클릭 → 크게 보기
+  e.preventDefault();
+  updatePhotoDrag();
+  const target=d.target;
+  photoDrag=null;
+  endPhotoDragUi(d);
+  blockNextPhotoClick();
+  finishPhotoMove(d,target);
+});
+document.addEventListener("pointercancel",e=>{
+  if(photoDrag&&e.pointerId===photoDrag.pointerId)cancelPhotoDrag();
+});
+// 끌기를 끝낸 직후의 클릭은 크게 보기로 열리지 않게 합니다.
+document.addEventListener("click",e=>{
+  if(suppressPhotoClick&&e.target.closest?.(".inline-photo-node")){
+    e.preventDefault(); e.stopPropagation(); suppressPhotoClick=false;
+  }
+},true);
+// 휴대폰: 끄는 동안 화면이 스크롤되지 않게 합니다.
+document.addEventListener("touchmove",e=>{if(photoDrag?.active)e.preventDefault();},{passive:false});
+// 휴대폰 길게 누르기 메뉴(이미지 저장 등)와 브라우저 기본 이미지 끌기를 막습니다.
+document.addEventListener("contextmenu",e=>{if(photoDrag)e.preventDefault();});
+document.addEventListener("dragstart",e=>{if(e.target.closest?.(".rich-editor .inline-photo-node"))e.preventDefault();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&photoDrag?.active)cancelPhotoDrag();});
+
 window.addEventListener("pagehide",()=>{
   // 브라우저가 전송을 끝내지 못해도 stageDraft가 localStorage에 먼저 남아 있습니다.
-  flushPending().catch(()=>{});
+  flushPending().catch(()=>{}).then(()=>flushHistory()).catch(()=>{});
   try{
     setDoc(presenceRef(),{
       name:currentEditorName(),
@@ -2887,7 +3671,7 @@ window.addEventListener("pagehide",()=>{
 });
 
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="hidden")flushPending().catch(()=>{});
+  if(document.visibilityState==="hidden")flushPending().catch(()=>{}).then(()=>flushHistory()).catch(()=>{});
 });
 
 window.addEventListener("beforeunload",e=>{
