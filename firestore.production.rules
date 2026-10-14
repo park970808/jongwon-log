@@ -40,18 +40,34 @@ service cloud.firestore {
         && request.resource.data.title is string && request.resource.data.title.size() <= 150
         && request.resource.data.week is string && request.resource.data.week.size() <= 20
         && request.resource.data.seedId is string && request.resource.data.seedId.matches('^[a-f0-9]{64}$');
-      allow update, delete: if false;
+      // Only the checkpoint pointer may change: it moves strictly forward, to an existing checkpoint whose declared
+      // coverage equals the new cutoff, and never into the future. History itself is never modified or deleted.
+      allow update: if editor(team)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkpointId','checkpointCutoff'])
+        && request.resource.data.checkpointId is string && request.resource.data.checkpointId.matches('^[a-f0-9]{64}$')
+        && request.resource.data.checkpointCutoff is timestamp
+        && request.resource.data.checkpointCutoff < request.time
+        && (!('checkpointCutoff' in resource.data) || request.resource.data.checkpointCutoff > resource.data.checkpointCutoff)
+        && get(/databases/$(database)/documents/teams/$(team)/documents/$(documentId)/checkpoints/$(request.resource.data.checkpointId)).data.coveredUntil == request.resource.data.checkpointCutoff;
+      allow delete: if false;
       match /updates/{updateId} {
         allow read: if member(team);
         allow create: if editor(team)
           && existsAfter(/databases/$(database)/documents/teams/$(team)/documents/$(documentId))
-          && request.resource.data.keys().hasOnly(['schema','hash','author','session','codec','rawSize','chunks','createdAt'])
+          && request.resource.data.keys().hasOnly(['schema','hash','author','session','codec','rawSize','chunks','createdAt','data'])
           && request.resource.data.schema == 1 && request.resource.data.codec == 'deflate'
           && request.resource.data.author == request.auth.uid
           && request.resource.data.session is string && request.resource.data.session.size() <= 100
           && updateId.matches('^[a-f0-9]{64}$') && request.resource.data.hash == updateId
           && request.resource.data.rawSize is int && request.resource.data.rawSize >= 2 && request.resource.data.rawSize <= 100663296
-          && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 32
+          && request.resource.data.chunks is int
+          // chunks == 0: small update stored inline in this document (1 write, 1 read per reader).
+          // chunks 1..32: large update split into chunks/{n}; such a record must not also carry inline data.
+          && ((request.resource.data.chunks == 0
+                && request.resource.data.data is bytes
+                && request.resource.data.data.size() >= 1 && request.resource.data.data.size() <= 262144)
+              || (request.resource.data.chunks >= 1 && request.resource.data.chunks <= 32
+                && !('data' in request.resource.data)))
           && request.resource.data.createdAt == request.time;
         allow update, delete: if false;
         match /chunks/{chunkId} {
@@ -79,9 +95,33 @@ service cloud.firestore {
           && request.resource.data.active is bool && request.resource.data.updatedAt == request.time;
         allow delete: if editor(team) && resource.data.uid == request.auth.uid;
       }
-      match /checkpoints/{checkpointId}/{rest=**} {
+      // Compacted copies made by teammates' browsers (Spark has no Cloud Functions). Immutable once written.
+      match /checkpoints/{checkpointId} {
         allow read: if member(team);
-        allow write: if false;
+        allow create: if editor(team)
+          && checkpointId.matches('^[a-f0-9]{64}$')
+          && request.resource.data.keys().hasOnly(['schema','hash','codec','rawSize','chunks','createdAt','createdBy','coveredUntil'])
+          && request.resource.data.schema == 1 && request.resource.data.codec == 'deflate'
+          && request.resource.data.hash == checkpointId
+          && request.resource.data.rawSize is int && request.resource.data.rawSize >= 2 && request.resource.data.rawSize <= 100663296
+          && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 32
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.coveredUntil is timestamp && request.resource.data.coveredUntil < request.time;
+        allow update, delete: if false;
+        match /chunks/{chunkId} {
+          function checkpoint() {
+            return getAfter(/databases/$(database)/documents/teams/$(team)/documents/$(documentId)/checkpoints/$(checkpointId)).data;
+          }
+          allow read: if member(team);
+          allow create: if editor(team)
+            && checkpoint().createdBy == request.auth.uid && checkpoint().createdAt == request.time
+            && chunkId.matches('^([0-9]|[12][0-9]|3[01])$')
+            && int(chunkId) < checkpoint().chunks
+            && request.resource.data.keys().hasOnly(['data'])
+            && request.resource.data.data is bytes && request.resource.data.data.size() <= 131072;
+          allow update, delete: if false;
+        }
       }
     }
   }
