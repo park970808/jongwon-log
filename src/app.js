@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import {IndexeddbPersistence} from 'y-indexeddb';
 import {initializeApp,getApps} from 'firebase/app';
 import {getAuth,signInAnonymously,connectAuthEmulator} from 'firebase/auth';
-import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp,collection,query,orderBy,limit,getDocs} from 'firebase/firestore';
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,updateDoc,serverTimestamp,collection,query,orderBy,limit,getDocs} from 'firebase/firestore';
 import {FIREBASE_CONFIGS} from './firebase-config.js';
 import {FirestoreBackend,CLIENT_FORMAT} from './firestore-backend.js';
 import {DemoBackend} from './demo-backend.js';
@@ -43,23 +43,40 @@ $('#name').value=params.get('name')||localStorage.getItem('jongwon-collab-name')
 const NEW_DOC='__new';
 function chooseDocument(){
  const sel=$('#doc-list'),opt=sel.selectedOptions[0];
+ $('#doc-actions').hidden=!opt||!opt.value||opt.value===NEW_DOC;$('#title-field').hidden=opt?.value!==NEW_DOC;
+ if(opt?.value===NEW_DOC&&!$('#doc-title').dataset.edited)$('#doc-title').value=`${$('#week').value} 활동일지`;
  if(!opt||!opt.value)return;
  if(opt.value===NEW_DOC){
    // A week can have more than one document (e.g. a test one): the next is WEEK-2, WEEK-3, …
    const week=$('#week').value,taken=new Set(Array.from(sel.options).map(o=>o.value));
-   let id=week;for(let n=2;taken.has(id);n++)id=`${week}-${n}`;
+   let id=week;for(let n=2;taken.has(id)||deletedIds.has(id);n++)id=`${week}-${n}`;
    $('#doc-id').value=id;return;
  }
  $('#doc-id').value=opt.value;if(opt.dataset.week)$('#week').value=opt.dataset.week;
 }
 $('#doc-list').onchange=chooseDocument;
+$('#doc-title').oninput=()=>{$('#doc-title').dataset.edited='1';};
+async function editDocument(change){
+ const opt=$('#doc-list').selectedOptions[0];if(!opt||!opt.value||opt.value===NEW_DOC)return;
+ const c=await connect(),ref=firestoreDoc(c.db,'teams',$('#team').value,'documents',opt.value);
+ await updateDoc(ref,change(opt));await refreshDocList();
+}
+$('#rename-doc').onclick=()=>void action(()=>editDocument(opt=>{
+ const title=prompt('새 문서 제목',opt.dataset.title||opt.textContent)?.trim();
+ if(!title)throw Object.assign(new Error('제목을 바꾸지 않았습니다.'),{quiet:true});
+ return {title:title.slice(0,150)};
+}));
+$('#delete-doc').onclick=()=>void action(()=>editDocument(opt=>{
+ if(!confirm(`"${opt.dataset.title||opt.textContent}" 문서를 목록에서 삭제할까요?\n\n팀원 모두의 목록에서 사라집니다. 내용은 서버에 보관되어, 필요하면 관리자가 Firebase 콘솔에서 되살리거나(archived 필드 삭제) 완전히 지울 수 있습니다.`))throw Object.assign(new Error('삭제를 취소했습니다.'),{quiet:true});
+ return {archived:true,archivedAt:serverTimestamp()};
+}));
 $('#week').onchange=()=>{
  // A week that already has a document opens it; another week starts a new one.
  const sel=$('#doc-list'),match=Array.from(sel.options).find(o=>o.dataset.week===$('#week').value&&o.value!==NEW_DOC);
  if(match)sel.value=match.value;else if(Array.from(sel.options).some(o=>o.value===NEW_DOC))sel.value=NEW_DOC;
  if(match)$('#doc-id').value=match.value;else chooseDocument();
 };
-let listRequest=0;
+let listRequest=0,deletedIds=new Set(); // deleted (hidden) documents keep their IDs
 async function refreshDocList(){
  const sel=$('#doc-list'),request=++listRequest,team=$('#team').value;
  const show=(options,selected)=>{if(request!==listRequest)return;sel.replaceChildren(...options);if(selected!==undefined)sel.value=selected;chooseDocument();};
@@ -71,9 +88,11 @@ async function refreshDocList(){
    const member=await getDoc(firestoreDoc(c.db,'teams',team,'collaborationMembers',c.uid));
    if(member.data()?.role!=='editor'){show([option('','초대 코드로 팀에 참여하면 문서 목록이 보입니다'),fresh()],'');return;}
    const snap=await getDocs(query(collection(c.db,'teams',team,'documents'),orderBy('createdAt','desc'),limit(100)));
-   const docs=snap.docs.map(d=>option(d.id,`${d.data().title||d.id}${d.data().week&&!String(d.data().title||'').includes(d.data().week)?` · ${d.data().week}`:''}`,d.data().week||''));
+   const docs=snap.docs.filter(d=>d.data().archived!==true).map(d=>{const t=d.data().title||d.id,o=option(d.id,`${t}${d.data().week&&!String(t).includes(d.data().week)?` · ${d.data().week}`:''}`,d.data().week||'');o.dataset.title=t;return o;});
+   const hidden=new Set(snap.docs.filter(d=>d.data().archived===true).map(d=>d.id));
    const wanted=params.get('doc')||$('#doc-id').value,thisWeek=docs.find(o=>o.dataset.week===$('#week').value);
    const selected=docs.some(o=>o.value===wanted)?wanted:thisWeek?thisWeek.value:docs.length?docs[0].value:NEW_DOC;
+   if(request===listRequest)deletedIds=hidden;
    show([...docs,fresh()],selected);
  }catch(e){console.warn('문서 목록을 불러오지 못했습니다.',e);show([option('','문서 목록을 불러오지 못했습니다 · 새 문서로 만들 수 있습니다'),fresh()],NEW_DOC);}
 }
@@ -151,7 +170,7 @@ async function createFirestore(){
  readHwpx(bytes);await studio.open(bytes,file?.name||'활동일지.hwpx');
  const document=new Y.Doc({gc:false});importParts(document,readHwpx(studio.exportHwpx()));
  const seed=encodeEnvelope(Y.encodeStateAsUpdate(document),c.uid,session);
- const suffix=who.id.startsWith(`${who.week}-`)?` (${who.id.slice(who.week.length+1)})`:'',title=`${who.week} 활동일지${suffix}`;
+ const suffix=who.id.startsWith(`${who.week}-`)?` (${who.id.slice(who.week.length+1)})`:'',title=($('#doc-title').value.trim()||`${who.week} 활동일지${suffix}`).slice(0,150);
  await c.backend.create({title,week:who.week,seed,author:c.uid,session});
  document.destroy();await launch({backend:c.backend,author:c.uid,meta:{title,seedId:seed.id},demo:false,connection:c});
 }
@@ -267,7 +286,7 @@ function startPresence(a){
  }
  a.renderInterval=setInterval(render,500); // also on every presence change (watch callback)
 }
-async function action(fn){if(busy)return;busy=true;$('#error').hidden=true;const controls=Array.from($('#open-form').querySelectorAll('button'));controls.forEach(b=>b.disabled=true);try{await fn();}catch(e){error(e);if(!active){$('#workspace').hidden=true;$('#welcome').hidden=false;}}finally{busy=false;controls.forEach(b=>b.disabled=false);}}
+async function action(fn){if(busy)return;busy=true;$('#error').hidden=true;const controls=Array.from($('#open-form').querySelectorAll('button'));controls.forEach(b=>b.disabled=true);try{await fn();}catch(e){if(e?.quiet)return;error(e);if(!active){$('#workspace').hidden=true;$('#welcome').hidden=false;}}finally{busy=false;controls.forEach(b=>b.disabled=false);}}
 $('#open-form').onsubmit=e=>{e.preventDefault();void action(openFirestore);};
 $('#create').onclick=()=>void action(createFirestore);$('#join-team').onclick=()=>void action(openFirestore);$('#demo').onclick=()=>void action(openDemo);
 $('#download').onclick=()=>{try{active.binding.capture();download(active.studio.exportHwpx(),`${active.who.week}-활동일지.hwpx`);}catch(e){error(e);}};
