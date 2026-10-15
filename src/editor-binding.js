@@ -102,6 +102,11 @@ export class EditorBinding {
  }
  anchor(){
    const position=this.studio.position();if(!position)return null;
+   return this.anchorOf(position);
+ }
+ /** The fixed end of a dragged text selection, anchored like the caret so it survives a teammate's change. */
+ selectionEnd(){const start=this.studio.selectionAnchor?.();return start?this.anchorOf(start):null;}
+ anchorOf(position){
    const p=paragraphs(snapshotParts(this.mirror)).find(x=>matchPosition(x.position,position));
    if(!p)return {fallback:position};
    const text=this.mirror.getMap('nodes').get(p.node.key)?.get('rich');
@@ -130,13 +135,15 @@ export class EditorBinding {
      deduplicateMovedParagraphs(this.doc);
      // Equal state vectors alone miss deletion-only edits (including undo/cut).
      if(!this.needsProjection&&Y.equalSnapshots(Y.snapshot(this.doc),Y.snapshot(this.mirror)))return;
-     const anchor=this.anchor();
+     const anchor=this.anchor(),end=this.selectionEnd();
      const update=Y.encodeStateAsUpdate(this.doc,Y.encodeStateVector(this.mirror));
      Y.applyUpdate(this.mirror,update,REMOTE);
      const bytes=this.projection&&Y.equalSnapshots(this.projection.snapshot,Y.snapshot(this.mirror))?this.projection.bytes:writeHwpx(this.mirror);
      const position=this.resolveAnchor(anchor,this.mirror);
+     // A selection end whose paragraph a teammate deleted is dropped (never widened to the document start).
+     const selection=end&&(!end.key||paragraphs(snapshotParts(this.mirror)).some(x=>x.node.key===end.key))?this.resolveAnchor(end,this.mirror):null;
      this.needsProjection=false;
-     await this.studio.replace(bytes,position);
+     await this.studio.replace(bytes,position,selection);
      this.adoptNativeBaseline();this.projection=null;
    }catch(error){this.fail(error);}finally{this.applying=false;if(!this.stopped)this.studio.flushInput?.();}
  }
