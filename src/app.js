@@ -44,7 +44,12 @@ const NEW_DOC='__new';
 function chooseDocument(){
  const sel=$('#doc-list'),opt=sel.selectedOptions[0];
  if(!opt||!opt.value)return;
- if(opt.value===NEW_DOC){$('#doc-id').value=$('#week').value;return;}
+ if(opt.value===NEW_DOC){
+   // A week can have more than one document (e.g. a test one): the next is WEEK-2, WEEK-3, …
+   const week=$('#week').value,taken=new Set(Array.from(sel.options).map(o=>o.value));
+   let id=week;for(let n=2;taken.has(id);n++)id=`${week}-${n}`;
+   $('#doc-id').value=id;return;
+ }
  $('#doc-id').value=opt.value;if(opt.dataset.week)$('#week').value=opt.dataset.week;
 }
 $('#doc-list').onchange=chooseDocument;
@@ -52,14 +57,14 @@ $('#week').onchange=()=>{
  // A week that already has a document opens it; another week starts a new one.
  const sel=$('#doc-list'),match=Array.from(sel.options).find(o=>o.dataset.week===$('#week').value&&o.value!==NEW_DOC);
  if(match)sel.value=match.value;else if(Array.from(sel.options).some(o=>o.value===NEW_DOC))sel.value=NEW_DOC;
- $('#doc-id').value=match?match.value:$('#week').value;
+ if(match)$('#doc-id').value=match.value;else chooseDocument();
 };
 let listRequest=0;
 async function refreshDocList(){
  const sel=$('#doc-list'),request=++listRequest,team=$('#team').value;
  const show=(options,selected)=>{if(request!==listRequest)return;sel.replaceChildren(...options);if(selected!==undefined)sel.value=selected;chooseDocument();};
  const option=(value,text,week)=>{const o=document.createElement('option');o.value=value;o.textContent=text;if(week)o.dataset.week=week;return o;};
- const fresh=()=>option(NEW_DOC,'+ 새 문서 (위 활동 주차로 만들기)');
+ const fresh=()=>option(NEW_DOC,'+ 새 문서 (위 활동 주차로 · 같은 주차에 여러 개 가능)');
  show([option('','팀 문서 목록을 불러오는 중…')]);
  try{
    const c=await connect();
@@ -146,8 +151,9 @@ async function createFirestore(){
  readHwpx(bytes);await studio.open(bytes,file?.name||'활동일지.hwpx');
  const document=new Y.Doc({gc:false});importParts(document,readHwpx(studio.exportHwpx()));
  const seed=encodeEnvelope(Y.encodeStateAsUpdate(document),c.uid,session);
- await c.backend.create({title:`${who.week} 활동일지`,week:who.week,seed,author:c.uid,session});
- document.destroy();await launch({backend:c.backend,author:c.uid,meta:{title:`${who.week} 활동일지`},demo:false,connection:c});
+ const suffix=who.id.startsWith(`${who.week}-`)?` (${who.id.slice(who.week.length+1)})`:'',title=`${who.week} 활동일지${suffix}`;
+ await c.backend.create({title,week:who.week,seed,author:c.uid,session});
+ document.destroy();await launch({backend:c.backend,author:c.uid,meta:{title,seedId:seed.id},demo:false,connection:c});
 }
 async function openDemo(){
  const who=identity();const room=params.get('room')||'activity-log-v1';const backend=new DemoBackend(room);
@@ -167,8 +173,20 @@ async function launch({backend,author,meta,demo,connection:c=null}){
  const who=identity();if(active)throw new Error('다른 문서를 열려면 새 탭을 사용해 주세요.');
  $('#welcome').hidden=true;$('#workspace').hidden=false;$('#loading').hidden=false;
  $('#document-title').textContent=meta.title;$('#mode').textContent=demo?'기기 내 체험 · 같은 브라우저 탭끼리만 연결':'Firestore 공동 편집';
- const document=new Y.Doc({gc:false}),namespace=`jongwon-collab-v1:${demo?'demo:'+backend.room:who.team+':'+who.id}`;
- const persistence=new IndexeddbPersistence(namespace,document);await persistence.whenSynced;
+ let document=new Y.Doc({gc:false});const namespace=`jongwon-collab-v1:${demo?'demo:'+backend.room:who.team+':'+who.id}`;
+ let persistence=new IndexeddbPersistence(namespace,document);await persistence.whenSynced;
+ // A document deleted in the console and created again under the same ID must not inherit this device's copy of
+ // the old one (it would be uploaded into the new document). The seed record identifies the document.
+ if(!demo&&meta.seedId){
+   const known=await persistence.get('seedId').catch(()=>null);
+   if(known&&known!==meta.seedId){
+     await persistence.clearData();
+     await new Promise(r=>{const q=indexedDB.deleteDatabase(`${namespace}:outbox:${author}`);q.onsuccess=q.onerror=q.onblocked=()=>r();});
+     document.destroy();document=new Y.Doc({gc:false});
+     persistence=new IndexeddbPersistence(namespace,document);await persistence.whenSynced;
+   }
+   await persistence.set('seedId',meta.seedId).catch(()=>{});
+ }
  // 이 기기에 남아 있는 문서 + 동기화 위치가 있으면 그 이후의 서버 기록만 읽습니다.
  const cursor=demo||fullLoad?null:await readCursor(persistence,document);
  const studio=await getStudio();
