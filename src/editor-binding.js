@@ -28,6 +28,39 @@ function paragraphs(parts){
  });
  return found;
 }
+// ── caret anchors: text context, to follow the caret's words across paragraph splits/joins ──
+const CONTEXT=16;
+function richText(text){return text?text.toDelta().map(op=>typeof op.insert==='string'?op.insert:'￼').join(''):'';}
+function paraIndex(position){return position.cellPath?.length?position.cellPath.at(-1).cellParaIndex:position.paragraphIndex;}
+function sameContainer(a,b){
+ if(a.sectionIndex!==b.sectionIndex)return false;
+ const pa=a.cellPath||[],pb=b.cellPath||[];
+ if(pa.length!==pb.length)return false;
+ if(!pa.length)return true;
+ if(a.parentParaIndex!==b.parentParaIndex)return false;
+ const key=path=>JSON.stringify(path.map((e,i)=>i===path.length-1?[e.controlIndex,e.cellIndex]:[e.controlIndex,e.cellIndex,e.cellParaIndex]));
+ return key(pa)===key(pb);
+}
+/** How many context characters around offset in text match the anchor's (before: suffix, after: prefix). */
+function contextScore(text,offset,anchor){
+ if(anchor.before===undefined)return 0;
+ const plain=typeof text==='string'?text:richText(text),b=anchor.before,a=anchor.after;
+ let s=0;while(s<b.length&&offset-s-1>=0&&plain[offset-s-1]===b[b.length-s-1])s++;
+ let t=0;while(t<a.length&&offset+t<plain.length&&plain[offset+t]===a[t])t++;
+ return s+t;
+}
+function bestContextOffset(text,anchor){
+ const plain=richText(text),b=anchor.before,a=anchor.after;
+ if(!plain||(!b&&!a))return null;
+ let best=null;
+ const consider=offset=>{const score=contextScore(plain,offset,anchor);if(!best||score>best.score)best={offset,score};};
+ // Candidate offsets: right after an occurrence of the last characters before the caret, or right before an
+ // occurrence of the first characters after it.
+ const tail=b.slice(-Math.min(4,b.length)),head=a.slice(0,Math.min(4,a.length));
+ for(let i=tail?plain.indexOf(tail):-1;i>=0;i=plain.indexOf(tail,i+1))consider(i+tail.length);
+ for(let i=head?plain.indexOf(head):-1;i>=0;i=plain.indexOf(head,i+1))consider(i);
+ return best;
+}
 function matchPosition(a,b){
  if(a.sectionIndex!==b.sectionIndex)return false;
  if(a.cellIndex===undefined||b.cellIndex===undefined)return a.cellIndex===b.cellIndex&&a.paragraphIndex===b.paragraphIndex;
@@ -111,15 +144,37 @@ export class EditorBinding {
    if(!p)return {fallback:position};
    const text=this.mirror.getMap('nodes').get(p.node.key)?.get('rich');
    if(!text)return {key:p.node.key,offset:position.charOffset,fallback:position};
-   return {key:p.node.key,relative:Array.from(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text,Math.min(position.charOffset,text.length)))),fallback:position};
+   const index=Math.min(position.charOffset,text.length),plain=richText(text);
+   // assoc -1: the caret sticks to the character before it, so a teammate typing at the very same spot does not
+   // push it. The text around the caret lets it follow its words when a teammate splits or joins its paragraph.
+   return {key:p.node.key,relative:Array.from(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text,index,-1))),
+     before:plain.slice(Math.max(0,index-CONTEXT),index),after:plain.slice(index,index+CONTEXT),fallback:position};
  }
  resolveAnchor(anchor,doc=this.doc){
    if(!anchor)return null;
-   const p=paragraphs(snapshotParts(doc)).find(x=>x.node.key===anchor.key);
-   if(!p)return anchor.key ? {sectionIndex:0,paragraphIndex:0,charOffset:0}:anchor.fallback;
-   let offset=anchor.offset||0;
-   if(anchor.relative){const abs=Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(new Uint8Array(anchor.relative)),doc);if(abs)offset=abs.index;}
-   return {...p.position,charOffset:offset};
+   const list=paragraphs(snapshotParts(doc)),nodes=doc.getMap('nodes');
+   const p=anchor.key?list.find(x=>x.node.key===anchor.key):null;
+   let found=null;
+   if(p){
+     let offset=anchor.offset||0;
+     if(anchor.relative){const abs=Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(new Uint8Array(anchor.relative)),doc);if(abs)offset=abs.index;}
+     found={position:{...p.position,charOffset:offset},score:contextScore(nodes.get(p.node.key)?.get('rich'),offset,anchor)};
+   }
+   // The caret's words may now be in a neighbouring paragraph of the same cell (Enter or Backspace by a teammate):
+   // follow them there when they match better than where the caret's own paragraph left it.
+   if(anchor.before!==undefined&&(!found||found.score<(anchor.before.length+anchor.after.length))){
+     const home=p?.position??anchor.fallback,near=list.filter(x=>sameContainer(x.position,home)&&Math.abs(paraIndex(x.position)-paraIndex(home))<=6);
+     for(const x of near){
+       const best=bestContextOffset(nodes.get(x.node.key)?.get('rich'),anchor);
+       if(best&&best.score>=2&&(!found||best.score>found.score))found={position:{...x.position,charOffset:best.offset},score:best.score};
+     }
+   }
+   if(found)return found.position;
+   if(!anchor.key)return anchor.fallback;
+   // Its paragraph is gone and nothing matched: stay at the same place in the same cell, never the document start.
+   const home=anchor.fallback,near=home?list.filter(x=>sameContainer(x.position,home)):[];
+   if(near.length){const x=near.reduce((a,b)=>Math.abs(paraIndex(b.position)-paraIndex(home))<Math.abs(paraIndex(a.position)-paraIndex(home))?b:a);return {...x.position,charOffset:0};}
+   return home??{sectionIndex:0,paragraphIndex:0,charOffset:0};
  }
  scheduleRemote(){
    if(this.remoteTimer||this.stopped)return;
