@@ -1435,6 +1435,24 @@ export function onContextMenu(this: any, e: MouseEvent): void {
   e.preventDefault();
   if (!this.active || !this.contextMenu) return;
 
+  // 공동 활동일지: 선택하지 않은 그림을 우클릭해도 그 그림을 선택하고 그림 메뉴(그림 자르기 등)를 연다.
+  if (!this.cursor.isInPictureObjectSelection() && !this.cursor.isInHeaderFooter() && !this.cursor.isInFootnote?.()) {
+    try {
+      const sc = this.container.querySelector('#scroll-content')!;
+      const rect = sc.getBoundingClientRect(), z = this.viewportManager.getZoom();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top, page = this.virtualScroll.getPageAtPoint(cx, cy);
+      const pic = this.findPictureAtClick(page, (cx - this.virtualScroll.getPageLeftResolved(page, sc.clientWidth)) / z, (cy - this.virtualScroll.getPageOffset(page)) / z);
+      if (pic && pic.type === 'image' && !(pic as any).headerFooter) {
+        this.cursor.clearSelection();
+        this.cursor.enterPictureObjectSelectionDirect(pic.sec, pic.ppi, pic.ci, 'image', pic.cellIdx, pic.cellParaIdx, undefined, (pic as any).outerTableControlIdx, (pic as any).cellPath);
+        this.caret.hide();
+        this.selectionRenderer.clear();
+        this.renderPictureObjectSelection();
+        this.eventBus.emit('picture-object-selection-changed', true);
+      }
+    } catch { /* fall back to the text menu */ }
+  }
+
   // 그림 객체 선택 중 우클릭 → 그림 객체 메뉴 표시 (선택 유지)
   if (this.cursor.isInPictureObjectSelection()) {
     this.contextMenu.show(e.clientX, e.clientY, this.getPictureObjectContextMenuItems());

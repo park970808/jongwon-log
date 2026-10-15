@@ -190,6 +190,16 @@ export function keptPictureText(): string | null { return copiedPicture?.text ??
 export function insertKeptPictureInCell(wasm: WasmBridge, target: CellTarget): any {
   const record = copiedPicture;
   if (!record) throw new Error('붙여넣을 사진이 없습니다.');
+  return insertPictureRecordInCell(wasm, target, record);
+}
+
+/** Replace a cell photo with new image bytes (e.g. a cropped copy) at the same place, with the given size. */
+export function replaceCellPicture(wasm: WasmBridge, ref: CellPictureRef, data: Uint8Array, ext: string, props: Record<string, any>): any {
+  const { position } = removeCellPicture(wasm, ref);
+  return insertPictureRecordInCell(wasm, { sectionIndex: position.sectionIndex, parentParaIndex: position.parentParaIndex, cellPath: position.cellPath, charOffset: position.charOffset }, { data, ext, props, text: '[그림]' });
+}
+
+function insertPictureRecordInCell(wasm: WasmBridge, target: CellTarget, record: PictureRecord): any {
   const sec = target.sectionIndex, ppi = target.parentParaIndex, p = record.props;
   const natural = (v: number, fallback: number) => Math.max(1, Math.round((v || fallback) / 75));
   // Same route as a new photo: a temporary body picture, made inline, copied, removed, then placed in the cell.

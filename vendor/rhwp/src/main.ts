@@ -2092,7 +2092,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     },
     exportHwpx: () => wasm.exportHwpx(),
     composing: () => composing,
-    interacting: () => {const h=inputHandler as any;return !!(h?.isDragging||h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging||h?.isCellPictureDragging);},
+    interacting: () => {const h=inputHandler as any;return !!(h?.isCropDialogOpen||h?.isDragging||h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging||h?.isCellPictureDragging);},
     position: () => inputHandler?.getCursorPosition(),
     // The fixed end of a body/cell text selection (the caret is the moving end), or null.
     selectionAnchor: () => {const c=(inputHandler as any)?.cursor;if(!c||c.isInCellSelectionMode?.())return null;const sel=c.getSelection?.();return sel?{...sel.anchor}:null;},
