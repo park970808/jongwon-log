@@ -18,6 +18,8 @@
 <label>팀<select id="team"><option value="team-3">3팀</option><option value="jangwon" disabled>장원급제 · 연결 준비 중</option><option value="team-2">2팀</option></select></label>
 <div class="form-row"><label>작성자 이름<input id="name" required maxlength="30" autocomplete="name" placeholder="팀원에게 표시할 이름"></label><label>활동 주차<input id="week" type="week" required></label></div>
 <label>문서<select id="doc-list"><option value="">팀 문서 목록을 불러오는 중…</option></select></label>
+<div id="doc-actions" class="doc-actions" hidden><button type="button" id="rename-doc">이름 바꾸기</button><button type="button" id="delete-doc">목록에서 삭제</button></div>
+<label id="title-field" hidden>새 문서 제목<input id="doc-title" maxlength="150" placeholder="예: 2026-W42 활동일지"></label>
 <label id="doc-id-field" hidden>문서 ID<input id="doc-id" required pattern="[A-Za-z0-9_-]{1,100}" maxlength="100" placeholder="예: 2026-W42"></label>
 <button type="submit" class="primary">Firestore 문서 열기</button>
 <div id="join-options" hidden><p>팀 초대 링크로 접속하거나 초대 코드를 입력해 주세요.</p><label>팀 초대 코드<input id="invite-code" type="password" autocomplete="off" placeholder="관리자에게 받은 초대 코드"></label><button type="button" id="join-team">팀에 참여하기</button></div>

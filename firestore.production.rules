@@ -42,6 +42,12 @@ service cloud.firestore {
         && request.resource.data.seedId is string && request.resource.data.seedId.matches('^[a-f0-9]{64}$');
       // Only the checkpoint pointer may change: it moves strictly forward, to an existing checkpoint whose declared
       // coverage equals the new cutoff, and never into the future. History itself is never modified or deleted.
+      // Title and "deleted" (hidden from the list) may be changed by any editor; the content is never deleted here.
+      allow update: if editor(team)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','archived','archivedAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 150
+        && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
+        && (!('archivedAt' in request.resource.data) || request.resource.data.archivedAt == request.time);
       allow update: if editor(team)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkpointId','checkpointCutoff'])
         && request.resource.data.checkpointId is string && request.resource.data.checkpointId.matches('^[a-f0-9]{64}$')
