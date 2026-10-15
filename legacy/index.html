@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="team3-history-v14-20261014">
+<meta name="app-version" content="team3-history-v15-20261015">
 <title>장원급제 · 훈련생 프로젝트 활동일지</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -2857,7 +2857,7 @@ function renderLogs(){
 }
 /* ── 사진 ── */
 // 이전 제출본은 한 칸에 사진 13장 → 한도를 넉넉히. 자르기 전 원본은 세지 않습니다.
-const MAX_SHOTS=20, MAX_BYTES=700000;
+const MAX_SHOTS=40, MAX_BYTES=700000;
 async function savePhotoVersion({targetPath,photoData,key,preview}){
   const draft=makeDraft({
     key,week:targetPath[3]||weekId,targetPath,
