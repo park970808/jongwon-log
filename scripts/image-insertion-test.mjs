@@ -18,6 +18,18 @@ try{
  await a.bringToFront();await a.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(pos,true),position);await a.keyboard.insertText('앞뒤');await a.waitForTimeout(800);
  await a.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore({...pos,charOffset:1},true),position);
  const picture=Buffer.from(await a.evaluate(()=>{const c=document.createElement('canvas');c.width=1600;c.height=800;const x=c.getContext('2d');x.fillStyle='#187652';x.fillRect(0,0,1600,800);return c.toDataURL().split(',')[1];}),'base64');
+ // The native snapshot must roll back a partial insert without exporting/reloading a backup HWPX.
+ if(await a.evaluate(()=>!!document.querySelector('#studio').contentWindow.__inputHandler)){
+  const beforeFailure=(await exported(a)).toString();
+  const failure=await a.evaluate(({position,bytes})=>{
+   const w=document.querySelector('#studio').contentWindow,wasm=w.__inputHandler.wasm,original=wasm.pasteInternalInCellByPath;
+   wasm.pasteInternalInCellByPath=()=>JSON.stringify({ok:false});
+   try{w.jongwonStudio.insertImage({...position,charOffset:1},new Uint8Array(bytes),'png',1600,800,'failed.png');return null;}
+   catch(e){return e.message;}finally{wasm.pasteInternalInCellByPath=original;}
+  },{position,bytes:Array.from(picture)});
+  assert.match(failure,/선택한 셀/);assert.equal((await exported(a)).toString(),beforeFailure,'partial insert restores text, paragraphs, picture and cell geometry');
+  console.log('PASS failed cell paste restores native snapshot atomically');
+ }
  const chooserPromise=a.waitForEvent('filechooser');await a.frameLocator('#studio').locator('button[data-cmd="insert:image"]').click();const chooser=await chooserPromise;
  // The other editor changes the same paragraph while the chooser is open.
  await eventually(async()=>assert.ok((await exported(b)).documentElement.textContent.includes('앞뒤')),'peer has the text before typing next to it');

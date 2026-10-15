@@ -89,3 +89,14 @@ LARGE_TEST=1 node scripts/firestore-browser-test.mjs
 표 안 사진은 커서 앞뒤 글을 보존하면서 별도 문단으로 삽입합니다. 사진 문단의 들여쓰기·줄 간격을 초기화하고 해당 셀을 위쪽 정렬합니다. 초기 높이는 최대 360px이며 셀 너비와 페이지 높이에도 맞춥니다. 확대 드래그는 셀 안쪽 너비와 페이지의 남은 높이에서 제한됩니다. 연속된 표의 셀 높이는 실제 그리기 명령의 사진 및 글자 끝 위치를 측정해 보정합니다.
 
 `picture-geometry.mjs`는 전체 페이지에서 사진/선택 대상이 한 개이고, 사진의 네 경계가 셀 안에 있으며, 글자 영역과 겹치지 않는지 확인합니다. `image-insertion-test.mjs`는 첫 행의 페이지 넘어감과 셀 너비를 넘는 실제 확대 드래그를 포함합니다. `picture-resize-test.mjs`는 긴 글 사이의 세로 사진, 축소 도중 동료 입력, 양쪽 화면과 새로고침을 검사합니다. 검증 자료는 합성 사진과 체험 문서입니다.
+
+## 사진 작업 성능 (2026-10-15)
+
+`TEST_BASE_URL=http://127.0.0.1:5173/ PERF_SEED_PHOTOS=8 node scripts/photo-performance.mjs`는 별도 체험 문서에 합성 JPEG를 넣고 첨부·잘라내기·붙여넣기부터 로컬 화면 갱신이 끝날 때까지의 시간과 내부 호출 횟수를 출력합니다. `PERF_SAVE_SEED=.test-output/perf.hwpx`로 비교용 문서를 저장한 뒤, 수정 전후 서버에 동일한 `PERF_FIXTURE=.test-output/perf.hwpx`를 지정해 비교할 수 있습니다. CPU 프로파일은 `PERF_PROFILE=.test-output/photo.cpuprofile`로 선택합니다. 개발 서버 전용이며 실제 팀 문서는 바꾸지 않습니다.
+
+macOS Chrome, 동일한 합성 사진 8장 문서(약 1MB)에 1600×1200 JPEG를 첨부한 로컬 비교: 첨부 1806→1056ms, 잘라내기 1270→632ms, 붙여넣기 1381→711ms. 사진 삽입 때 전체 HWPX 내보내기는 4→2회, 다시 열기는 2→1회로 줄었습니다. 기기·문서에 따라 달라지며 Firestore 전송 완료 시간은 포함하지 않습니다.
+
+- `tests/editor-binding.test.js`: 변경 없는 재열기 생략, 삭제만 있는 원격 변경의 캐시 무효화, 반복 수정·원격 수정·실행 취소/다시 실행, 검증 실패의 원자성.
+- `image-insertion-test.mjs`: 셀 붙여넣기가 중간에 실패해도 네이티브 스냅샷으로 전체 작업 복구.
+- `photo-move-test.mjs`: 다시 그리기 전에 곧바로 잘라내기→붙여넣기해도 사진 한 장·문단 위치·동료 화면 유지.
+- `TEST_BASE_URL=https://배포주소/ node scripts/production-photo-test.mjs`: 개발 전용 훅 없이 실제 그림 버튼, 화면 사진 클릭, 잘라내기·즉시 붙여넣기, 셀/글 보존, 새로고침 검사. 공개 사이트에서도 별도 체험 문서만 사용합니다.

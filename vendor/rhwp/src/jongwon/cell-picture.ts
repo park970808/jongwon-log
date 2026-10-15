@@ -46,11 +46,7 @@ function reserveFor(wasm: WasmBridge, sec: number, ppi: number, entry: CellEntry
 
 /** Grow the cell where any of its photos would be cut off (text grows the row by itself; photos do not). */
 function ensureCellPhotos(wasm: WasmBridge, sec: number, ppi: number, controlIndex: number, cellIndex: number): void {
-  const count = wasm.getCellParagraphCount(sec, ppi, controlIndex, cellIndex);
-  for (let p = 0; p < count; p++) {
-    const entry = { controlIndex, cellIndex, cellParaIndex: p };
-    for (let ci = 0; ci < 8 && pictureAt(wasm, sec, ppi, entry, ci); ci++) wasm.ensureCellPictureHeight(sec, ppi, [entry], ci);
-  }
+  wasm.fitCellPictureHeights({ sec, parentPara: ppi, control: controlIndex, cell: cellIndex });
 }
 
 /**

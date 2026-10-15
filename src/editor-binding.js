@@ -46,6 +46,9 @@ export class EditorBinding {
  constructor({doc,studio,onError=()=>{},onChange=()=>{}}){
    Object.assign(this,{doc,studio,onError,onChange});deduplicateMovedParagraphs(doc);this.mirror=cloneDoc(doc);this.baseline=snapshotParts(this.mirror);this.applying=false;this.stopped=false;this.dirty=false;
    const writer=new Y.Doc();this.writerId=writer.clientID;writer.destroy();
+   // Keep an isolated staging document: cloning the complete photo/undo history on every edit is expensive.
+   // Only validated deltas leave this document, so failed edits still cannot partially reach teammates.
+   this.candidate=cloneDoc(this.mirror);this.projection=null;this.needsProjection=false;
    this.undo=new Y.UndoManager([doc.getMap('nodes'),doc.getMap('parts'),doc.getMap('blobs')],{trackedOrigins:new Set([LOCAL]),captureTimeout:500});
    this.mirror.on('update',(u,origin)=>{if(origin===LOCAL)Y.applyUpdate(this.doc,u,LOCAL);});
    this.liveUpdate=(_u,origin)=>{if(origin!==LOCAL)this.scheduleRemote();};
@@ -58,7 +61,7 @@ export class EditorBinding {
    this.studio.setUndo(()=>void this.history('undo'),()=>void this.history('redo'));
    // Photo edits that change a cell's height are redrawn from the shared document, exactly as teammates see it.
    // Redraw once the person pauses (not after every photo action): each redraw reloads the whole document.
-   this.studio.setRefreshRequest?.(()=>{this.dirty=true;clearTimeout(this.refreshTimer);this.refreshTimer=setTimeout(()=>{this.refreshTimer=null;void this.refreshLayout();},900);});
+   this.studio.setRefreshRequest?.(()=>{this.dirty=true;clearTimeout(this.refreshTimer);this.refreshTimer=setTimeout(()=>{this.refreshTimer=null;void this.refreshLayout();},350);});
    this.studio.setImageInsertionFactory?.(()=>{
      this.capture();const anchor=this.anchor();
      return async(...args)=>{
@@ -85,14 +88,15 @@ export class EditorBinding {
      const next=readHwpx(this.studio.exportHwpx());
      // Yjs transactions do not roll back exceptions. Stage + validate in an isolated clone,
      // then publish the complete delta; a failed table edit must never leak a partial update.
-     const candidate=cloneDoc(this.mirror);
+     const candidate=this.candidate;
+     Y.applyUpdate(candidate,Y.encodeStateAsUpdate(this.mirror,Y.encodeStateVector(candidate)),REMOTE);
      candidate.clientID=this.writerId;
-     try{
-       const {normalized}=reconcileParts(candidate,this.baseline,next,LOCAL);
-       if(normalized)this.scheduleRemote();
-       writeHwpx(candidate);
-       Y.applyUpdate(this.mirror,Y.encodeStateAsUpdate(candidate,Y.encodeStateVector(this.mirror)),LOCAL);
-     }finally{candidate.destroy();}
+     const {normalized}=reconcileParts(candidate,this.baseline,next,LOCAL);
+     const bytes=writeHwpx(candidate);
+     Y.applyUpdate(this.mirror,Y.encodeStateAsUpdate(candidate,Y.encodeStateVector(this.mirror)),LOCAL);
+     // The redraw can use this already validated archive until either contents OR deletions change.
+     this.projection={bytes,snapshot:Y.snapshot(this.mirror)};
+     if(normalized){this.needsProjection=true;this.scheduleRemote();}
      this.baseline=next;this.dirty=false;this.onChange();
    }catch(error){this.fail(error);}
  }
@@ -116,18 +120,24 @@ export class EditorBinding {
    if(this.remoteTimer||this.stopped)return;
    this.remoteTimer=setTimeout(()=>{this.remoteTimer=null;void this.applyRemote();},200);
  }
- async applyRemote(){
+ async applyRemote({force=false}={}){
+   if(force)this.needsProjection=true;
    if(this.stopped)return;
    if(this.applying||this.studio.composing()||this.studio.interacting?.()){this.scheduleRemote();return;}
    this.capture();if(this.stopped)return;
-   const anchor=this.anchor();this.applying=true;
+   this.applying=true;
    try{
      deduplicateMovedParagraphs(this.doc);
+     // Equal state vectors alone miss deletion-only edits (including undo/cut).
+     if(!this.needsProjection&&Y.equalSnapshots(Y.snapshot(this.doc),Y.snapshot(this.mirror)))return;
+     const anchor=this.anchor();
      const update=Y.encodeStateAsUpdate(this.doc,Y.encodeStateVector(this.mirror));
      Y.applyUpdate(this.mirror,update,REMOTE);
-     const bytes=writeHwpx(this.mirror),position=this.resolveAnchor(anchor,this.mirror);
+     const bytes=this.projection&&Y.equalSnapshots(this.projection.snapshot,Y.snapshot(this.mirror))?this.projection.bytes:writeHwpx(this.mirror);
+     const position=this.resolveAnchor(anchor,this.mirror);
+     this.needsProjection=false;
      await this.studio.replace(bytes,position);
-     this.adoptNativeBaseline();
+     this.adoptNativeBaseline();this.projection=null;
    }catch(error){this.fail(error);}finally{this.applying=false;if(!this.stopped)this.studio.flushInput?.();}
  }
  /**
@@ -142,7 +152,7 @@ export class EditorBinding {
        const deadline=Date.now()+10000;
        while((this.applying||this.studio.composing()||this.studio.interacting?.())&&Date.now()<deadline)await new Promise(r=>setTimeout(r,50));
        this.refreshAgain=false;
-       await this.applyRemote();
+       await this.applyRemote({force:true});
        if(this.stopped||!this.studio.fitCellPhotos?.())break;
        // The height fix belongs to the photo edit just made: merge it into that undo step instead of a new one.
        this.undo.lastChange=Date.now();
@@ -154,5 +164,5 @@ export class EditorBinding {
    if(this.stopped||this.applying||this.studio.composing()||this.studio.interacting?.())return;
    this.capture();this.undo.stopCapturing();this.undo[action]();await this.applyRemote();this.onChange();
  }
- dispose(){this.capture();clearTimeout(this.captureTimer);clearTimeout(this.refreshTimer);clearTimeout(this.remoteTimer);this.off?.();this.doc.off('update',this.liveUpdate);this.undo.destroy();this.mirror.destroy();}
+ dispose(){this.capture();clearTimeout(this.captureTimer);clearTimeout(this.refreshTimer);clearTimeout(this.remoteTimer);this.off?.();this.doc.off('update',this.liveUpdate);this.undo.destroy();this.candidate.destroy();this.mirror.destroy();this.projection=null;}
 }
