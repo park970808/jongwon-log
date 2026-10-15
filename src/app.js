@@ -85,7 +85,12 @@ async function refreshDocList(){
  show([option('','팀 문서 목록을 불러오는 중…')]);
  try{
    const c=await connect();
-   const member=await getDoc(firestoreDoc(c.db,'teams',team,'collaborationMembers',c.uid));
+   let member=await getDoc(firestoreDoc(c.db,'teams',team,'collaborationMembers',c.uid));
+   // Opened from an invite link: join right away so the team's documents are listed (not only after opening one).
+   if(member.data()?.role!=='editor'&&c.team===team&&$('#invite-code').value.trim()){
+     try{await ensureMembership(c);member=await getDoc(firestoreDoc(c.db,'teams',team,'collaborationMembers',c.uid));}
+     catch(e){console.warn('초대 코드로 참여하지 못했습니다.',e);}
+   }
    if(member.data()?.role!=='editor'){show([option('','초대 코드로 팀에 참여하면 문서 목록이 보입니다'),fresh()],'');return;}
    const snap=await getDocs(query(collection(c.db,'teams',team,'documents'),orderBy('createdAt','desc'),limit(100)));
    const docs=snap.docs.filter(d=>d.data().archived!==true).map(d=>{const t=d.data().title||d.id,o=option(d.id,`${t}${d.data().week&&!String(t).includes(d.data().week)?` · ${d.data().week}`:''}`,d.data().week||'');o.dataset.title=t;return o;});
