@@ -9,7 +9,8 @@ import {DemoBackend} from './demo-backend.js';
 import {SyncProvider,IndexedOutbox,encodeEnvelope,batchForPeers} from './sync-provider.js';
 import {importParts,readHwpx} from './document-model.js';
 import {EditorBinding} from './editor-binding.js';
-import {PRESENCE,shouldSendPresence,anchorParagraph,heartbeatFor,presenceStaleMs} from './presence-policy.js';
+import {PRESENCE,PRESENCE_REALTIME,shouldSendPresence,anchorParagraph,heartbeatFor,presenceStaleMs} from './presence-policy.js';
+import {RealtimePresence,PresenceChannel} from './realtime-presence.js';
 
 // 다시 열 때 이미 이 기기에 있는 내용은 Firestore에서 다시 읽지 않도록, 문서별 동기화 위치를 같은 IndexedDB에 둡니다.
 // (IndexedDB가 지워지면 이 값도 함께 사라지므로 전체를 다시 읽는 안전한 경로로 돌아갑니다.)
@@ -114,7 +115,7 @@ async function connect(){
  const auth=getAuth(app);
  if(emulator&&!app.__emulators){connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectFirestoreEmulator(db,'127.0.0.1',8080);app.__emulators=true;}
  await auth.authStateReady();const user=auth.currentUser||(await signInAnonymously(auth)).user;
- connection={db,uid:user.uid,team,id,backend:new FirestoreBackend(db,team,id)};
+ connection={db,app,uid:user.uid,team,id,databaseURL:emulator?null:config.databaseURL,backend:new FirestoreBackend(db,team,id)};
  return connection;
 }
 async function ensureMembership(c){
@@ -136,7 +137,7 @@ async function openFirestore(){
  if(!meta){$('#create-options').hidden=false;return;}
  const membership=await getDoc(firestoreDoc(c.db,'teams',c.team,'collaborationMembers',c.uid));
  if(membership.data()?.role!=='editor')throw new Error('이 문서는 편집 권한이 있는 팀원만 열 수 있습니다.');
- await launch({backend:c.backend,author:c.uid,meta,demo:false});
+ await launch({backend:c.backend,author:c.uid,meta,demo:false,connection:c});
 }
 async function createFirestore(){
  const c=await connect();if(!await ensureMembership(c))return;const who=identity(),studio=await getStudio();
@@ -146,7 +147,7 @@ async function createFirestore(){
  const document=new Y.Doc({gc:false});importParts(document,readHwpx(studio.exportHwpx()));
  const seed=encodeEnvelope(Y.encodeStateAsUpdate(document),c.uid,session);
  await c.backend.create({title:`${who.week} 활동일지`,week:who.week,seed,author:c.uid,session});
- document.destroy();await launch({backend:c.backend,author:c.uid,meta:{title:`${who.week} 활동일지`},demo:false});
+ document.destroy();await launch({backend:c.backend,author:c.uid,meta:{title:`${who.week} 활동일지`},demo:false,connection:c});
 }
 async function openDemo(){
  const who=identity();const room=params.get('room')||'activity-log-v1';const backend=new DemoBackend(room);
@@ -162,7 +163,7 @@ async function openDemo(){
  const url=new URL(location.href);url.searchParams.set('demo','1');url.searchParams.set('room',room);history.replaceState(null,'',url);
  await launch({backend,author:`demo-${session}`,meta:{title:'활동일지 · 기기 내 체험'},demo:true});
 }
-async function launch({backend,author,meta,demo}){
+async function launch({backend,author,meta,demo,connection:c=null}){
  const who=identity();if(active)throw new Error('다른 문서를 열려면 새 탭을 사용해 주세요.');
  $('#welcome').hidden=true;$('#workspace').hidden=false;$('#loading').hidden=false;
  $('#document-title').textContent=meta.title;$('#mode').textContent=demo?'기기 내 체험 · 같은 브라우저 탭끼리만 연결':'Firestore 공동 편집';
@@ -178,7 +179,10 @@ async function launch({backend,author,meta,demo}){
    $('#save-status').textContent=demo?(state==='saved'?'이 기기에 저장됨 · 다른 탭과 연결':state==='connecting'?'기기 내 문서 불러오는 중…':statusLabels[state]):statusLabels[state];
    if(state==='saved'){resolveReady();if(active?.binding&&!active.binding.stopped)$('#error').hidden=true;} // recovered after an outage
  },onError:e=>{error(e);if(isAccessError(e))rejectReady(e);}}); // other errors are retried; the open timeout still applies
- active={doc:document,provider,persistence,backend,studio,demo,who,author};
+ // Cursors: Realtime Database when the team project has one (fast), otherwise Firestore (slower, quota-friendly).
+ let realtime=null;
+ if(!demo&&c?.databaseURL){try{realtime=new RealtimePresence(c.app,c.databaseURL,who.team,who.id);}catch(e){console.warn('Realtime Database를 열지 못했습니다.',e);}}
+ active={doc:document,provider,persistence,backend,studio,demo,who,author,presence:new PresenceChannel(realtime,backend)};
  await provider.start();
  await Promise.race([initial,new Promise((_,reject)=>setTimeout(()=>reject(new Error('서버 응답이 없습니다. 연결 상태를 확인한 뒤 새로고침해 주세요.')),30000))]);
  if(!document.getMap('parts').size)throw new Error('문서 데이터가 없습니다.');
@@ -198,28 +202,30 @@ function startPresence(a){
  const parse=p=>{try{return JSON.parse(p.anchor||'null');}catch{return null;}};
  // Presence times are server timestamps; a shared PC's clock may be minutes off. Estimate the offset from our
  // own presence document (written moments ago) instead of trusting Date.now().
- const serverNow=()=>Date.now()+clockOffset;
+ const serverNow=()=>a.presence.serverNow()??Date.now()+clockOffset;
+ const policy=()=>a.presence.fast?PRESENCE_REALTIME:PRESENCE;
  const send=async(force=false)=>{
    if(inflight||a.binding.applying||a.binding.stopped)return;
    const hidden=document.hidden,now=Date.now(),anchor=hidden?null:a.binding.anchor(),key=JSON.stringify(anchor);
    if(key!==observed){observed=key;lastActivity=now;}
-   const idle=!hidden&&now-lastActivity>=PRESENCE.idleAfterMs,paragraph=anchorParagraph(anchor);
-   if(!shouldSendPresence({now,lastSent,paragraphChanged:paragraph!==lastParagraph,offsetChanged:key!==last,hidden,lastHidden,idle,lastIdle,force}))return;
+   const idle=!hidden&&now-lastActivity>=policy().idleAfterMs,paragraph=anchorParagraph(anchor);
+   if(!shouldSendPresence({now,lastSent,paragraphChanged:paragraph!==lastParagraph,offsetChanged:key!==last,hidden,lastHidden,idle,lastIdle,force},policy()))return;
    // v: client format, so teammates know whether every open tab can read inline records (old tabs ignore it).
    // hb: when our next presence will come at the latest, so teammates know how long to keep showing us.
-   const value=JSON.stringify({...anchor,v:CLIENT_FORMAT,hb:heartbeatFor(idle)});
+   const value=JSON.stringify({...anchor,v:CLIENT_FORMAT,hb:heartbeatFor(idle,policy())});
    inflight=true;sentLocalAt=now;
-   try{await a.backend.presence(session,{uid:a.author,name:a.who.name.slice(0,30),anchor:value,active:!hidden});last=key;lastParagraph=paragraph;lastSent=now;lastHidden=hidden;lastIdle=idle;}
+   try{await a.presence.presence(session,{uid:a.author,name:a.who.name.slice(0,30),anchor:value,active:!hidden});last=key;lastParagraph=paragraph;lastSent=now;lastHidden=hidden;lastIdle=idle;}
    catch(e){error(e);}finally{inflight=false;}
  };
  a.presenceSend=send;
- a.presenceInterval=setInterval(send,PRESENCE.checkMs);void send(true);
- a.presenceOff=a.backend.watchPresence(list=>{peers=list;calibrate();adapt();render();},error);
+ // Check often (cheap, local); the policy decides when something is actually sent.
+ a.presenceInterval=setInterval(send,PRESENCE_REALTIME.checkMs);void send(true);
+ a.presenceOff=a.presence.watchPresence(list=>{peers=list;calibrate();adapt();render();},error);
  function calibrate(){
    const own=peers.find(p=>p.id===session)?.updatedAt?.toMillis();
    if(own&&own!==ownUpdatedAt){ownUpdatedAt=own;if(sentLocalAt)clockOffset=own-sentLocalAt;}
  }
- const visible=p=>p.updatedAt?.toMillis()>serverNow()-presenceStaleMs(parse(p)?.hb);
+ const visible=p=>p.updatedAt?.toMillis()>serverNow()-presenceStaleMs(parse(p)?.hb,policy());
  function adapt(){
    const others=peers.filter(p=>p.id!==session);
    // Every open session reads every record, hidden tabs included (they stop sending presence but keep listening
@@ -241,7 +247,7 @@ function startPresence(a){
      }catch{ /* expired anchor during deletion: omit until next presence */ }
    });
  }
- a.renderInterval=setInterval(render,500);
+ a.renderInterval=setInterval(render,500); // also on every presence change (watch callback)
 }
 async function action(fn){if(busy)return;busy=true;$('#error').hidden=true;const controls=Array.from($('#open-form').querySelectorAll('button'));controls.forEach(b=>b.disabled=true);try{await fn();}catch(e){error(e);if(!active){$('#workspace').hidden=true;$('#welcome').hidden=false;}}finally{busy=false;controls.forEach(b=>b.disabled=false);}}
 $('#open-form').onsubmit=e=>{e.preventDefault();void action(openFirestore);};
@@ -256,11 +262,11 @@ document.addEventListener('visibilitychange',()=>{
  void active?.presenceSend?.(); // policy sends "away" once when hidden and resumes immediately when visible
 });
 window.addEventListener('pageshow',e=>{ // restored from the back/forward cache after pagehide stopped presence
- if(e.persisted&&active?.presenceSend){clearInterval(active.presenceInterval);active.presenceInterval=setInterval(active.presenceSend,PRESENCE.checkMs);void active.presenceSend(true);}
+ if(e.persisted&&active?.presenceSend){clearInterval(active.presenceInterval);active.presenceInterval=setInterval(active.presenceSend,PRESENCE_REALTIME.checkMs);void active.presenceSend(true);}
 });
 window.addEventListener('pagehide',()=>{
  saveCursor(active);
- if(active&&!active.demo){clearInterval(active.presenceInterval);void active.backend.leave(session).catch(()=>{});}
+ if(active&&!active.demo){clearInterval(active.presenceInterval);void active.presence.leave(session).catch(()=>{});}
 });
 window.addEventListener('online',()=>void active?.provider.flush());
 window.addEventListener('offline',()=>active?.provider.status('offline'));

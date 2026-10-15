@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "presence": {
+      "$team": {
+        "$document": {
+          ".read": "auth != null",
+          "$session": {
+            ".write": "auth != null && $session.length <= 100 && (!data.exists() || data.child('uid').val() === auth.uid) && (!newData.exists() || newData.child('uid').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['uid','name','anchor','active','t']) && newData.child('name').isString() && newData.child('name').val().length <= 30 && newData.child('anchor').isString() && newData.child('anchor').val().length <= 4096 && newData.child('active').isBoolean() && newData.child('t').val() === now",
+            "$field": {
+              ".validate": "$field === 'uid' || $field === 'name' || $field === 'anchor' || $field === 'active' || $field === 't'"
+            }
+          }
+        }
+      }
+    }
+  }
+}

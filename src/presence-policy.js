@@ -14,6 +14,12 @@ export const PRESENCE = Object.freeze({
   idleAfterMs: 5 * 60000, idleHeartbeatMs: 10 * 60000, staleFactor: 2.5,
 });
 
+/** With the Realtime Database (billed by data, not by operations) the caret follows within a quarter second. */
+export const PRESENCE_REALTIME = Object.freeze({
+  checkMs: 120, moveMs: 120, refineMs: 250, heartbeatMs: 30000,
+  idleAfterMs: 5 * 60000, idleHeartbeatMs: 10 * 60000, staleFactor: 2.5,
+});
+
 export function heartbeatFor(idle, policy = PRESENCE) { return idle ? policy.idleHeartbeatMs : policy.heartbeatMs; }
 
 export function shouldSendPresence({ now, lastSent, paragraphChanged = false, offsetChanged = false, hidden, lastHidden, idle = false, lastIdle = false, force = false }, policy = PRESENCE) {

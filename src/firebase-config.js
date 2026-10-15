@@ -15,7 +15,8 @@ export const FIREBASE_CONFIGS = {
     projectId: "jongwon-log-team-2",
     storageBucket: "jongwon-log-team-2.firebasestorage.app",
     messagingSenderId: "863440395387",
-    appId: "1:863440395387:web:a4e117002b1ac81e3cd6de"
+    appId: "1:863440395387:web:a4e117002b1ac81e3cd6de",
+    databaseURL: "https://jongwon-log-team-2-default-rtdb.asia-southeast1.firebasedatabase.app"
   },
 
   "team-3": {
@@ -25,6 +26,7 @@ export const FIREBASE_CONFIGS = {
     storageBucket: "hyundai-8966e.firebasestorage.app",
     messagingSenderId: "644939668093",
     appId: "1:644939668093:web:315a0f0a82f8cf76626f14",
-    measurementId: "G-HC1SS5VYR2"
+    measurementId: "G-HC1SS5VYR2",
+    databaseURL: "https://hyundai-8966e-default-rtdb.asia-southeast1.firebasedatabase.app"
   }
 };
