@@ -30,7 +30,38 @@ function paragraphs(parts){
 }
 // ── caret anchors: text context, to follow the caret's words across paragraph splits/joins ──
 const CONTEXT=16;
-function richText(text){return text?text.toDelta().map(op=>typeof op.insert==='string'?op.insert:'￼').join(''):'';}
+// A paragraph's Yjs text holds plain runs as characters but a run with a line break (Shift+Enter), tab or object
+// as ONE embedded item. The editor counts every character, line break and object, so map between the two.
+const INLINE={'hp:lineBreak':'\n','hp:tab':'\t','hp:nbSpace':' ','hp:fwSpace':' ','hp:hyphen':'-'};
+function nodeText(nodes,key,depth=0){
+ const n=nodes.get(key);if(!n||depth>40)return '';
+ const tag=n.get('tag');
+ if(n.has('text'))return n.get('text').toString();
+ if(tag==='hp:t')return n.get('children').toArray().map(k=>nodeText(nodes,k,depth+1)).join('');
+ if(tag in INLINE)return INLINE[tag];
+ return depth===0?'￼':''; // an object in the run (picture, table, field) counts as one character
+}
+/** Editor-visible text of a paragraph and, per Yjs item run, where it starts in Yjs and in the editor. */
+function flatten(text){
+ if(!text)return {plain:'',ops:[]};
+ const nodes=text.doc?.getMap('nodes');let y=0,r=0,plain='';const ops=[];
+ for(const op of text.toDelta()){
+   const embed=typeof op.insert!=='string',t=embed?(nodes?nodeText(nodes,op.insert.node):'￼'):op.insert;
+   ops.push({y,r,ylen:embed?1:op.insert.length,rlen:t.length,embed});plain+=t;y+=embed?1:op.insert.length;r+=t.length;
+ }
+ return {plain,ops};
+}
+function richText(text){return flatten(text).plain;}
+/** Editor offset → [Yjs index, offset inside an embedded run]. */
+function toYIndex(ops,offset){
+ for(const o of ops){if(offset<o.r+o.rlen||o===ops.at(-1)){if(offset<=o.r)return [o.y,0];return o.embed?[o.y,Math.min(offset-o.r,o.rlen)]:[o.y+Math.min(offset-o.r,o.ylen),0];}}
+ return [0,0];
+}
+/** Yjs index (+ offset inside the embedded run it starts) → editor offset. */
+function toEditorOffset(ops,index,inner=0){
+ for(const o of ops){if(index<o.y+o.ylen){return o.embed?o.r+Math.min(inner,o.rlen):o.r+(index-o.y);}}
+ const last=ops.at(-1);return last?last.r+last.rlen:0;
+}
 function paraIndex(position){return position.cellPath?.length?position.cellPath.at(-1).cellParaIndex:position.paragraphIndex;}
 function sameContainer(a,b){
  if(a.sectionIndex!==b.sectionIndex)return false;
@@ -144,11 +175,12 @@ export class EditorBinding {
    if(!p)return {fallback:position};
    const text=this.mirror.getMap('nodes').get(p.node.key)?.get('rich');
    if(!text)return {key:p.node.key,offset:position.charOffset,fallback:position};
-   const index=Math.min(position.charOffset,text.length),plain=richText(text);
+   const {plain,ops}=flatten(text),offset=Math.min(position.charOffset,plain.length),[index,inner]=toYIndex(ops,offset);
    // assoc -1: the caret sticks to the character before it, so a teammate typing at the very same spot does not
-   // push it. The text around the caret lets it follow its words when a teammate splits or joins its paragraph.
-   return {key:p.node.key,relative:Array.from(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text,index,-1))),
-     before:plain.slice(Math.max(0,index-CONTEXT),index),after:plain.slice(index,index+CONTEXT),fallback:position};
+   // push it. The text around the caret lets it follow its words when a teammate splits or joins its paragraph,
+   // and places it inside a run with line breaks (which Yjs holds as one item).
+   return {key:p.node.key,relative:Array.from(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text,index,inner?0:-1))),inner,
+     before:plain.slice(Math.max(0,offset-CONTEXT),offset),after:plain.slice(offset,offset+CONTEXT),fallback:position};
  }
  resolveAnchor(anchor,doc=this.doc){
    if(!anchor)return null;
@@ -156,9 +188,10 @@ export class EditorBinding {
    const p=anchor.key?list.find(x=>x.node.key===anchor.key):null;
    let found=null;
    if(p){
+     const text=nodes.get(p.node.key)?.get('rich'),{plain,ops}=flatten(text);
      let offset=anchor.offset||0;
-     if(anchor.relative){const abs=Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(new Uint8Array(anchor.relative)),doc);if(abs)offset=abs.index;}
-     found={position:{...p.position,charOffset:offset},score:contextScore(nodes.get(p.node.key)?.get('rich'),offset,anchor)};
+     if(anchor.relative){const abs=Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(new Uint8Array(anchor.relative)),doc);if(abs)offset=toEditorOffset(ops,abs.index,anchor.inner||0);}
+     found={position:{...p.position,charOffset:offset},score:contextScore(plain,offset,anchor)};
    }
    // The caret's words may now be in a neighbouring paragraph of the same cell (Enter or Backspace by a teammate):
    // follow them there when they match better than where the caret's own paragraph left it.
