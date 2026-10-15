@@ -3,6 +3,7 @@ import { deflateSync, inflateSync } from 'fflate';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { CHECKPOINT } from './checkpoint-policy.js';
+import { packUpdates, LARGE_UPDATE } from './update-split.js';
 export const REMOTE = Symbol('remote');
 export const LOCAL = Symbol('local');
 const digest = b => bytesToHex(sha256(b));
@@ -31,7 +32,7 @@ export const CURSOR_MARGIN_MS = 10 * 60 * 1000;
 export function encodeEnvelope(update, author, session) {
   if (update.byteLength > MAX_INFLATED) throw new Error('변경 데이터가 너무 큽니다. 복구본을 내려받아 주세요.');
   const payload = deflateSync(update);
-  if(payload.length > MAX_UPDATE) throw new Error('한 번에 저장할 수 있는 변경 크기를 넘었습니다. 큰 사진을 줄여 주세요.');
+  if(payload.length > MAX_UPDATE) throw Object.assign(new Error('사진 한 장이 너무 커서(압축 후 4MB 초과) 저장할 수 없습니다. 이 기기의 화면은 그대로 두고 "복구 데이터 받기"로 내용을 보관한 뒤 관리자에게 알려 주세요.'),{code:'too-large'});
   return { id: digest(update), schema: 1, author, session, hash: digest(update), rawSize: update.length, codec: 'deflate', payload };
 }
 export function decodeEnvelope(e) {
@@ -108,7 +109,13 @@ export class SyncProvider {
       catch(error){console.warn('Incremental reopen disabled; downloading the full history.',error);this.serverDoc.destroy();this.serverDoc=new Y.Doc({gc:false});}
     }
     this.scheduler=new FlushScheduler({...batch,clock,onFire:()=>void this.flush()});
-    this.onUpdate=(u,origin)=>{if(origin===REMOTE || this.disposed)return;this.buffer.push(u);this.status('saving');this.scheduler.touch();};
+    this.onUpdate=(u,origin)=>{
+      if(origin===REMOTE || this.disposed)return;
+      this.buffer.push(u);this.status('saving');
+      // A photo gains nothing from waiting for more edits (it is stored on its own anyway): send it now.
+      if(u.length>=LARGE_UPDATE){this.scheduler.cancel();void this.flush();}
+      else this.scheduler.touch();
+    };
     doc.on('update',this.onUpdate);
   }
   status(state){this.state=state;this.onStatus({state,pending:this.pending.size+Number(this.buffer.length>0)});}
@@ -232,9 +239,10 @@ export class SyncProvider {
     if(this.buffer.length){
       const count=this.buffer.length;this.scheduler.cancel(); // later edits re-arm the scheduler themselves
       try{
-        const e=encodeEnvelope(Y.mergeUpdates(this.buffer.slice(0,count)),this.author,this.session);
-        await this.outbox.put(e); // never acknowledge before durable local outbox
-        this.buffer.splice(0,count);this.pending.set(e.id,e);
+        // Several photos in one batch would exceed the per-record limit: store them as several records.
+        const envelopes=packUpdates(this.buffer.slice(0,count),this.doc).map(u=>encodeEnvelope(u,this.author,this.session));
+        for(const e of envelopes)await this.outbox.put(e); // never acknowledge before durable local outbox
+        this.buffer.splice(0,count);for(const e of envelopes)this.pending.set(e.id,e);
       }catch(error){this.status('error');this.onError(error);return;}
     }
     if(!this.ready){this.status('connecting');return;}

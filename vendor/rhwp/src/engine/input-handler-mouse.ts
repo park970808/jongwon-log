@@ -1,6 +1,7 @@
 /** input-handler mouse methods — extracted from InputHandler class */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { startCellPictureDrag } from '../jongwon/cell-picture';
 import type { ContextMenuItem } from '@/ui/context-menu';
 import { chartTargetFromSelection, matchChartRef } from '@/core/chart-data-target';
 import * as _connector from './input-handler-connector';
@@ -661,6 +662,8 @@ export function onClick(this: any, e: MouseEvent): void {
                 py >= picBbox.y && py <= picBbox.y + picBbox.h) {
               try {
                 const props = this.getObjectProperties(ref);
+                // Jongwon: a photo laid out as a character inside a table cell moves to where it is dropped.
+                if (props.treatAsChar && startCellPictureDrag(this, e, ref as any)) return;
                 if (!props.treatAsChar) {
                   e.preventDefault();
                   this.isPictureMoveDragging = true;

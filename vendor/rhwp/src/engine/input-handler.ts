@@ -1,3 +1,4 @@
+import { isCellInlinePicture, removeCellPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh } from '../jongwon/cell-picture';
 import { WasmBridge } from '@/core/wasm-bridge';
 import type { DeferredFocusedPagePatch } from '@/core/wasm-bridge';
 import { EventBus } from '@/core/event-bus';
@@ -5220,6 +5221,7 @@ export class InputHandler {
         try {
           const cellPathJson = _keyboard.pictureCellPathJson(ref);
           this.wasm.copyControl(ref.sec, ref.ppi, ref.ci, cellPathJson);
+          if (ref.type === 'image') notePictureCopied(this.wasm, ref); else noteOtherCopy();
           const text = this.wasm.getClipboardText() || '[그림]';
           let html = '';
           try { html = this.wasm.exportControlHtml(ref.sec, ref.ppi, ref.ci, cellPathJson) || ''; } catch { /* 무시 */ }
@@ -5245,6 +5247,7 @@ export class InputHandler {
           this.wasm.copyControl(
             ref.sec, ref.ppi, target.controlIndex, target.ownerCellPathJson,
           );
+          noteOtherCopy();
           const text = this.wasm.getClipboardText() || '[표]';
           let html = '';
           try {
@@ -5282,11 +5285,13 @@ export class InputHandler {
       if (ref) {
         // 클립보드에 복사
         this.performCopy();
+        const inlineCell = isCellInlinePicture(this, ref);
         // 삭제
         this.cursor.moveOutOfSelectedPicture();
         this.pictureObjectRenderer?.clear();
         this.eventBus.emit('picture-object-selection-changed', false);
         this.executeOperation({ kind: 'snapshot', operationType: 'cutObject', operation: (wasm: WasmBridge) => {
+          if (inlineCell) return removeCellPicture(wasm, ref).position; // Jongwon: also its line and added height
           if (ref.type === 'image' && ref.cellPath && ref.cellPath.length > 0) {
             wasm.deleteCellPictureControlByPath(ref.sec, ref.ppi, ref.cellPath, ref.ci);
           } else if (ref.type === 'image') {
@@ -5298,6 +5303,7 @@ export class InputHandler {
           }
           return this.cursor.getPosition();
         }});
+        if (inlineCell) requestLayoutRefresh(this);
       }
       return;
     }
@@ -5327,13 +5333,16 @@ export class InputHandler {
     if (this.cursor.isInPictureObjectSelection()) {
       const ref = this.cursor.getSelectedPictureRef();
       if (ref) {
+        const inlineCell = isCellInlinePicture(this, ref);
         this.cursor.moveOutOfSelectedPicture();
         this.pictureObjectRenderer?.clear();
         this.eventBus.emit('picture-object-selection-changed', false);
         this.executeOperation({ kind: 'snapshot', operationType: 'deleteObject', operation: (wasm: WasmBridge) => {
+          if (inlineCell) return removeCellPicture(wasm, ref).position; // Jongwon: also its line and added height
           this.deleteObjectControl(ref);
           return this.cursor.getPosition();
         }});
+        if (inlineCell) requestLayoutRefresh(this);
       }
       return;
     }

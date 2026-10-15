@@ -1,6 +1,7 @@
 /** input-handler picture/shape methods — extracted from InputHandler class */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { requestLayoutRefresh } from '../jongwon/cell-picture';
 import { MovePictureCommand, MoveShapeCommand, ResizeObjectCommand } from './command';
 import type { ObjectResizeTarget } from './command';
 import { computeArrowResize, MIN_SIZE_HWP, type ArrowKey } from './picture-resize';
@@ -1010,6 +1011,7 @@ export function finishPictureResizeDrag(this: any, e: MouseEvent): void {
         command: new ResizeObjectCommand([{ sec: state.ref.sec, ppi: state.ref.ppi, ci: state.ref.ci, type: state.ref.type, cellPath: state.ref.cellPath, before, after: updated }]),
       });
       this.eventBus.emit('document-changed');
+      if(state.ref.type==='image'&&hasCellPath(state.ref))requestLayoutRefresh(this); // Jongwon: cell height may have changed
     }
   } catch (err) {
     console.warn('[InputHandler] 개체 리사이즈 실패:', err);

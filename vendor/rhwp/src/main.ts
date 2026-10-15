@@ -388,6 +388,10 @@ let autosavePreviousMessage: string | null = null;
 
 function autosaveScheduleFromUserSettings(): AutosaveScheduleSettings {
   const settings = userSettings.getAutosaveSettings();
+  // Jongwon: the collaboration log already keeps every edit (and the outbox keeps unsent ones).
+  if (new URLSearchParams(window.location.search).has('collaboration')) {
+    return { recoveryEnabled: false, recoveryIntervalMs: settings.recoveryIntervalMinutes * 60_000, idleEnabled: false, idleDelayMs: settings.idleDelaySeconds * 1_000 };
+  }
   return {
     recoveryEnabled: settings.recoveryEnabled,
     recoveryIntervalMs: settings.recoveryIntervalMinutes * 60_000,
@@ -1670,7 +1674,8 @@ async function renderRecentSubmenu(): Promise<void> {
 
 function shouldSkipInitialAutosaveRecovery(): boolean {
   const params = new URLSearchParams(window.location.search);
-  return params.has('url');
+  // Jongwon: the shared document comes from the collaboration log; a local draft must never replace it.
+  return params.has('url') || params.has('collaboration');
 }
 
 async function offerAutosaveRecoveryIfIdle(): Promise<void> {
@@ -1936,6 +1941,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   let composing = false;
   const changes = new Set<() => void>();
   let imageInsertionFactory: (() => any) | null = null;
+  let refreshRequest: (() => void) | null = null;
   let undoCallback: (() => void) | null = null;
   let redoCallback: (() => void) | null = null;
   // Browser events can arrive while the asynchronous renderer replaces the document.
@@ -2006,6 +2012,30 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       finally { applying = false; }
     },
     setImageInsertionFactory(factory: () => any) { imageInsertionFactory=factory; },
+    // After a photo changes a cell's height, the in-place layout can paginate the table differently from a full
+    // layout (what teammates and a reload show), which looks like a moved or doubled photo. The host redraws.
+    setRefreshRequest(fn: () => void) { refreshRequest=fn; },
+    requestRefresh() { refreshRequest?.(); },
+    /**
+     * Grow cells whose photo is cut off in the current (full) layout. Returns true when a height changed; the
+     * change is reported like an edit so the host stores and shares it.
+     */
+    fitCellPhotos(): boolean {
+      if (applying || !inputHandler) return false;
+      const seen = new Set<string>(); let changed = false;
+      for (let page = 0; page < wasm.pageCount; page++) {
+        for (const c of wasm.getPageControlLayout(page).controls as any[]) {
+          if (c.type !== 'image' || c.cellPath?.length !== 1) continue;
+          const e = c.cellPath[0], key = `${c.secIdx}:${c.paraIdx}:${e.controlIndex}:${e.cellIndex}:${e.cellParaIndex}:${c.controlIdx}`;
+          if (seen.has(key)) continue; seen.add(key);
+          const before = wasm.getCellProperties(c.secIdx, c.paraIdx, e.controlIndex, e.cellIndex).height;
+          wasm.ensureCellPictureHeight(c.secIdx, c.paraIdx, c.cellPath, c.controlIdx);
+          if (wasm.getCellProperties(c.secIdx, c.paraIdx, e.controlIndex, e.cellIndex).height !== before) changed = true;
+        }
+      }
+      if (changed) eventBus.emit('document-changed');
+      return changed;
+    },
     prepareImageInsertion() { return imageInsertionFactory?.(); },
     insertImage(position: any, data: Uint8Array, ext: string, naturalWidth: number, naturalHeight: number, fileName: string) {
       if (applying || blocked || !inputHandler) throw new Error('편집기를 준비한 뒤 다시 그림을 넣어 주세요.');
@@ -2070,10 +2100,11 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         }catch(error){wasm.loadDocument(backup,wasm.fileName);throw error;}
       }});
       handler.active=true;handler.focus();
+      refreshRequest?.();
     },
     exportHwpx: () => wasm.exportHwpx(),
     composing: () => composing,
-    interacting: () => {const h=inputHandler as any;return !!(h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging);},
+    interacting: () => {const h=inputHandler as any;return !!(h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging||h?.isCellPictureDragging);},
     position: () => inputHandler?.getCursorPosition(),
     subscribe(fn: () => void) { changes.add(fn); return () => changes.delete(fn); },
     setUndo(undo: () => void, redo: () => void) { undoCallback=undo; redoCallback=redo; },
@@ -2091,6 +2122,11 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       const top=container.scrollTop,left=container.scrollLeft;
       const hadFocus=document.activeElement?.tagName==='TEXTAREA';
       try {
+        // A selected object refers to positions in the old document; after a teammate's change the same indexes can
+        // name a different photo, so Delete/drag must not act on it.
+        const selected=inputHandler as any;
+        if(selected?.cursor?.isInPictureObjectSelection?.()){selected.cursor.exitPictureObjectSelection();selected.pictureObjectRenderer?.clear?.();eventBus.emit('picture-object-selection-changed',false);}
+        if(selected?.cursor?.isInTableObjectSelection?.()){selected.cursor.exitTableObjectSelection?.();eventBus.emit('table-object-selection-changed',false);}
         inputHandler?.deactivate();
         wasm.loadDocument(bytes,wasm.fileName);
         prepareCanvasRendererDocument(); plugins.notifyDocumentSwap();
@@ -2119,10 +2155,12 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         if(position.cellPath?.length)rect=wasm.getCursorRectByPath(position.sectionIndex,position.parentParaIndex,JSON.stringify(position.cellPath),position.charOffset);
         else if(position.cellIndex!==undefined)rect=wasm.getCursorRectInCell(position.sectionIndex,position.parentParaIndex,position.controlIndex,position.cellIndex,position.cellParaIndex,position.charOffset);
         else rect=wasm.getCursorRect(position.sectionIndex,position.paragraphIndex,position.charOffset);
-        const zoom=handler.viewportManager.getZoom(),container=handler.container;
-        const bounds=container.getBoundingClientRect();
-        const pageLeft=handler.virtualScroll.getPageLeftResolved(rect.pageIndex,container.scrollWidth);
-        return {x:bounds.left+pageLeft+rect.x*zoom-container.scrollLeft,y:bounds.top+handler.virtualScroll.getPageOffset(rect.pageIndex)+rect.y*zoom-container.scrollTop,height:rect.height*zoom};
+        // Inverse of the input handler's client→page mapping (relative to #scroll-content, like hit testing).
+        const zoom=handler.viewportManager.getZoom(),content=handler.container.querySelector('#scroll-content');
+        if(!content)return null;
+        const bounds=content.getBoundingClientRect();
+        const pageLeft=handler.virtualScroll.getPageLeftResolved(rect.pageIndex,content.clientWidth);
+        return {x:bounds.left+pageLeft+rect.x*zoom,y:bounds.top+handler.virtualScroll.getPageOffset(rect.pageIndex)+rect.y*zoom,height:rect.height*zoom};
       }catch{return null;}
     },
   };
