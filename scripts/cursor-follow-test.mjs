@@ -21,6 +21,19 @@ try{
  await scenario('teammate joins my line to the previous one: I stay after my words',cell(23,1,4),'',async()=>{await put(b,cell(23,1,0));await b.keyboard.press('Backspace');},[23,0,6]);
  await scenario('teammate bolds my line: I stay',cell(24,0,0),'hello world',async()=>{await put(b,cell(24,0,0));await b.keyboard.press('Shift+End');await b.keyboard.press('Control+b');},[24,0,11]);
  await scenario('teammate inserts a photo elsewhere: I stay',cell(22,0,0),'photo test',async()=>{await b.evaluate(async q=>{const c=document.createElement('canvas');c.width=400;c.height=300;const png=Uint8Array.from(atob(c.toDataURL().split(',')[1]),ch=>ch.charCodeAt(0));await document.querySelector('#studio').contentWindow.jongwonStudio.insertImage(q,png,'png',400,300,'x.png');},cell(1,0,0));},[22,0,10]);
+ // A big cell written with Shift+Enter line breaks (one paragraph): I type at its end while a teammate types and
+ // adds a line break higher up in the same paragraph. My caret must stay at my text (it used to jump to the top).
+ await a.bringToFront();await put(a,cell(26,0,0));
+ for(const [i,l] of ['1주차 | 기획','- 팀명 선정','- 현장 비교','산출물: 일지'].entries()){await a.keyboard.insertText(l);if(i<3)await a.keyboard.press('Shift+Enter');}
+ await a.waitForTimeout(2000);
+ const end=await a.evaluate(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getCellParagraphLength(0,1,0,26,0));
+ await put(a,cell(26,0,end));
+ const mine=(async()=>{for(let i=0;i<20;i++){await a.keyboard.insertText('가');await a.waitForTimeout(150);}})();
+ await put(b,cell(26,0,9));for(let i=0;i<5;i++){await b.keyboard.insertText('비');await b.waitForTimeout(300);}await b.keyboard.press('Shift+Enter');await b.keyboard.insertText('새줄');
+ await mine;await a.bringToFront();await a.waitForTimeout(3000);
+ const big=await a.evaluate(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getTextInCell(0,1,0,26,0,0,2000));
+ assert.ok(big.endsWith('일지'+'가'.repeat(20)),JSON.stringify(big));assert.deepEqual(at(await pos(a)),[26,0,big.length]);
+ console.log('PASS line-break paragraph: my caret stays at my text while a teammate edits above');
  await a.bringToFront();await put(a,cell(21,0,0));
  const typing=(async()=>{for(let i=0;i<30;i++){await a.keyboard.insertText('가');await a.waitForTimeout(120);}})();
  await put(b,cell(25,0,0));for(let i=0;i<10;i++){await b.keyboard.insertText('b');await b.waitForTimeout(300);}
