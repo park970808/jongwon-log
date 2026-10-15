@@ -111,6 +111,13 @@ try{
   l=await check(a,1,'delete');assert.ok(l.height<two-15000,`delete shrinks the cell (${two} → ${l.height})`);await consistent(a,b,'delete');
   console.log('PASS copy/paste duplicates a photo; Delete removes it with the height it added');
 
+  // Paste immediately after cutting, while capture/redraw timers are still pending.
+  await selectPhoto(a);await a.keyboard.press('Control+x');
+  await restore(a,at(1,0));await paste(a);
+  await eventually(async()=>assert.deepEqual(await lines(a),['첫째','[사진]',' 줄','둘째 줄','셋째 줄']),'immediate cut/paste');
+  await consistent(a,b,'immediate cut/paste');await check(a,1,'immediate cut/paste');
+  console.log('PASS immediate cut/paste before redraw: one photo, correct line, same on both screens');
+
   // 5) Several photos in quick succession all arrive, each on its own line. (Record-size splitting for large
   //    photos is covered by tests/photo-sync.test.js; the in-browser demo stores records in localStorage.)
   //    The editor's preview cannot lay out a photo cell that continues on the next page (photos and text overlap

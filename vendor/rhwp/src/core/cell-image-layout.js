@@ -38,7 +38,7 @@ export function removeDuplicateCellImagePaint(tree,duplicates){
 
 // A split table row can have less space on its continuation page than its stored
 // cell height suggests. Measure content in the actual cell fragment, not the row.
-export function cellPictureOverflow(tree,control,padding=4){
+export function measureCellPictureOverflow(tree){
   const cells=[];
   function walk(node,cell=null){
     if(node.groupKind?.kind==='tableCell'){cell={bounds:node.bounds,ops:[]};cells.push(cell);}
@@ -47,8 +47,12 @@ export function cellPictureOverflow(tree,control,padding=4){
     if(node.child)walk(node.child,cell);
   }
   walk(tree.root);
-  const cell=cells.find(c=>c.ops.some(op=>op.type==='image'&&matches(op,control)));
-  if(!cell)return 0;
-  const bottom=Math.max(...cell.ops.map(op=>op.bbox.y+op.bbox.height));
-  return Math.max(0,bottom+padding-cell.bounds.y-cell.bounds.height);
+  for(const cell of cells)cell.bottom=Math.max(...cell.ops.map(op=>op.bbox.y+op.bbox.height));
+  return (control,padding=4)=>{
+    const cell=cells.find(c=>c.ops.some(op=>op.type==='image'&&matches(op,control)));
+    return cell?Math.max(0,cell.bottom+padding-cell.bounds.y-cell.bounds.height):0;
+  };
+}
+export function cellPictureOverflow(tree,control,padding=4){
+  return measureCellPictureOverflow(tree)(control,padding);
 }

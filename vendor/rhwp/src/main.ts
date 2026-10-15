@@ -2022,17 +2022,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
      */
     fitCellPhotos(): boolean {
       if (applying || !inputHandler) return false;
-      const seen = new Set<string>(); let changed = false;
-      for (let page = 0; page < wasm.pageCount; page++) {
-        for (const c of wasm.getPageControlLayout(page).controls as any[]) {
-          if (c.type !== 'image' || c.cellPath?.length !== 1) continue;
-          const e = c.cellPath[0], key = `${c.secIdx}:${c.paraIdx}:${e.controlIndex}:${e.cellIndex}:${e.cellParaIndex}:${c.controlIdx}`;
-          if (seen.has(key)) continue; seen.add(key);
-          const before = wasm.getCellProperties(c.secIdx, c.paraIdx, e.controlIndex, e.cellIndex).height;
-          wasm.ensureCellPictureHeight(c.secIdx, c.paraIdx, c.cellPath, c.controlIdx);
-          if (wasm.getCellProperties(c.secIdx, c.paraIdx, e.controlIndex, e.cellIndex).height !== before) changed = true;
-        }
-      }
+      const changed = wasm.fitCellPictureHeights();
       if (changed) eventBus.emit('document-changed');
       return changed;
     },
@@ -2058,9 +2048,8 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       const maxHeight=path.length ? Math.min(27000,(page.height-page.marginTop-page.marginBottom)*0.4) : page.height-page.marginTop-page.marginBottom;
       const scale=Math.min(1,Math.max(75,available)/(naturalWidth*75),Math.max(75,maxHeight)/(naturalHeight*75));
       const width=Math.max(75,Math.round(naturalWidth*75*scale)),height=Math.max(75,Math.round(naturalHeight*75*scale));
-      const backup=wasm.exportHwpx();
+      // SnapshotCommand restores the native snapshot atomically if any insertion step fails.
       handler.executeOperation({kind:'snapshot',operationType:'insertPicture',operation:()=>{
-        try {
           if(path.length && position.charOffset>0){
             const split=JSON.parse(wasm.splitParagraphInCellByPath(sec,parent,JSON.stringify(path),position.charOffset));
             if(!split.ok)throw new Error('그림 앞의 문단을 나누지 못했습니다.');
@@ -2097,7 +2086,6 @@ if (new URLSearchParams(location.search).has('collaboration')) {
             return {...position,cellPath:path,cellParaIndex:path[0].cellParaIndex,paragraphIndex:path.at(-1).cellParaIndex,charOffset:0};
           }
           return {...position,charOffset:position.charOffset+1};
-        }catch(error){wasm.loadDocument(backup,wasm.fileName);throw error;}
       }});
       handler.active=true;handler.focus();
       refreshRequest?.();

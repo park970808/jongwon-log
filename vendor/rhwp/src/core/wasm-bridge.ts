@@ -1,4 +1,4 @@
-import {normalizeCellImageLayout,removeDuplicateCellImagePaint,cellPictureOverflow} from './cell-image-layout.js';
+import {normalizeCellImageLayout,removeDuplicateCellImagePaint,measureCellPictureOverflow} from './cell-image-layout.js';
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
 import * as wasmExports from '@wasm/rhwp.js';
 import { blake3 } from '@noble/hashes/blake3.js';
@@ -1010,7 +1010,7 @@ export class WasmBridge {
     }
   }
 
-  getPageLayerTreeObject(pageNum: number, profile: LayerRenderProfile = 'screen'): PageLayerTree {
+  getPageLayerTreeObject(pageNum: number, profile: LayerRenderProfile = 'screen', omitImageBytes = false): PageLayerTree {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     const d = this.doc as unknown as {
       getPageLayerTreeWithProfile?: (
@@ -1030,7 +1030,7 @@ export class WasmBridge {
       ? d.getPageLayerTreeWithProfile!(
         pageNum,
         profile,
-        false,
+        omitImageBytes,
         typeof d.getSourceFontBytes === 'function',
       )
       : this.getPageLayerTree(pageNum);
@@ -2215,17 +2215,33 @@ export class WasmBridge {
   ensureCellPictureHeight(sec:number,parentPara:number,path:CellPathLike,ci:number):void {
     if(path.length!==1)return;
     const entry=path[0] as any,control=entry.controlIndex??entry.controlIdx,cell=entry.cellIndex??entry.cellIdx;
-    const para=entry.cellParaIndex??entry.cellParaIdx;
+    this.fitCellPictureHeights({sec,parentPara,control,cell});
+  }
+
+  /** Read each page once per round, and grow each affected cell once, even when it holds many photos. */
+  fitCellPictureHeights(target?:{sec:number;parentPara:number;control:number;cell:number}):boolean {
+    let changed=false;
     for(let attempt=0;attempt<4;attempt++){
-      const props=this.getCellProperties(sec,parentPara,control,cell);
-      let overflow=0;
+      const cells=new Map<string,{sec:number;parentPara:number;control:number;cell:number;height:number;padding:number;overflow:number}>();
       for(let page=0;page<this.pageCount;page++){
-        const picture=this.getPageControlLayout(page).controls.find(c=>c.type==='image'&&c.secIdx===sec&&c.paraIdx===parentPara&&c.controlIdx===ci&&c.cellPath?.length===1&&c.outerTableControlIdx===control&&c.cellIdx===cell&&c.cellParaIdx===para);
-        if(picture)overflow=Math.max(overflow,cellPictureOverflow(this.getPageLayerTreeObject(page),picture,props.paddingBottom/75+4));
+        const pictures=this.getPageControlLayout(page).controls.filter(c=>c.type==='image'&&c.cellPath?.length===1&&(!target||(c.secIdx===target.sec&&c.paraIdx===target.parentPara&&c.outerTableControlIdx===target.control&&c.cellIdx===target.cell)));
+        if(!pictures.length)continue;
+        // Geometry needs bounds and image identity, not megabytes of base64 pixels in every layout query.
+        const measure=measureCellPictureOverflow(this.getPageLayerTreeObject(page,'screen',true));
+        for(const picture of pictures){
+          const e=picture.cellPath![0] as any,sec=picture.secIdx,parentPara=picture.paraIdx,control=e.controlIndex??e.controlIdx,cell=e.cellIndex??e.cellIdx;
+          const key=`${sec}:${parentPara}:${control}:${cell}`;
+          let group=cells.get(key);
+          if(!group){const props=this.getCellProperties(sec,parentPara,control,cell);group={sec,parentPara,control,cell,height:props.height,padding:props.paddingBottom/75+4,overflow:0};cells.set(key,group);}
+          group.overflow=Math.max(group.overflow,measure(picture,group.padding));
+        }
       }
-      if(overflow<=0.2)return;
-      if(!this.setCellProperties(sec,parentPara,control,cell,{height:props.height+Math.ceil(overflow*75)+75}).ok)throw new Error('그림 셀의 높이를 조절하지 못했습니다.');
+      const grow=[...cells.values()].filter(c=>c.overflow>0.2);
+      if(!grow.length)break;
+      this.runInBatch(()=>{for(const c of grow){if(!this.setCellProperties(c.sec,c.parentPara,c.control,c.cell,{height:c.height+Math.ceil(c.overflow*75)+75}).ok)throw new Error('그림 셀의 높이를 조절하지 못했습니다.');}});
+      changed=true;
     }
+    return changed;
   }
 
   // ── 차트 데이터 API (#4694) ───────────────────────────
