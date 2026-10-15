@@ -18,7 +18,9 @@
 
 Firebase Console → 해당 프로젝트 → Firestore → Rules에서 현재 규칙을 먼저 보관합니다. `firestore.collaboration.rules`의 함수와 `teams/...` 경로를 기존 `match /databases/{database}/documents` 안에 병합합니다.
 
-**파일 전체로 기존 규칙을 덮어쓰면 기존 일지 접근이 끊길 수 있습니다.** 반대로 기존 규칙이 `match /{document=**}`에서 모든 쓰기를 허용하면 새 권한 제한도 무력화됩니다. 기존 규칙을 실제 기존 컬렉션에 한정하고 새 `teams/{team}/documents` 경로는 제공된 규칙으로 보호해야 합니다. `firestore.production.rules`는 기존 3팀 일지 경로 접근을 유지하면서 `documents`, `collaborationMembers`, `collaborationInvites`만 별도 보호하도록 병합한 운영 규칙입니다. 이 파일을 `firebase.production.json`으로 3팀 프로젝트에 배포했습니다. 다른 두 프로젝트는 관리자 연결이 없어 새 화면에서 선택을 막았습니다.
+**파일 전체로 기존 규칙을 덮어쓰면 기존 일지 접근이 끊길 수 있습니다.** 반대로 기존 규칙이 `match /{document=**}`에서 모든 쓰기를 허용하면 새 권한 제한도 무력화됩니다. 기존 규칙을 실제 기존 컬렉션에 한정하고 새 `teams/{team}/documents` 경로는 제공된 규칙으로 보호해야 합니다. `firestore.production.rules`는 기존 3팀 일지 경로 접근을 유지하면서 `documents`, `collaborationMembers`, `collaborationInvites`만 별도 보호하도록 병합한 운영 규칙입니다. 이 파일을 `firebase.production.json`으로 3팀 프로젝트에 배포했습니다.
+
+2팀(`jongwon-log-team-2`)은 `firestore.team2.rules`를 씁니다. 기존 2팀 일지 경로(`teams/team-2/...`, 로그인한 사용자 허용)는 그대로 두고 `documents`, `collaborationMembers`, `collaborationInvites`만 위와 같은 규칙으로 보호합니다. 콘솔 → Firestore → 규칙에 붙여 넣어 게시하고, Authentication에서 익명 로그인을 켭니다. 초대는 `teams/team-2/collaborationInvites/{초대 코드의 SHA-256}` 문서에 `enabled: true`(boolean)를 넣어 만듭니다. 장원급제 프로젝트는 관리자 연결이 없어 새 화면에서 선택을 막았습니다.
 
 새 구조:
 

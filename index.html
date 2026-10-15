@@ -15,9 +15,10 @@
 <section id="welcome" class="welcome">
 <div class="welcome-intro"><p class="eyebrow">팀 프로젝트 / 활동일지</p><h1>같은 문서에서<br>이어서 작성하세요.</h1><p>알한글 편집기에서 문서를 열고,<br>Firestore로 팀원들의 변경 사항을 공유합니다.</p></div>
 <form id="open-form">
-<label>팀<select id="team"><option value="team-3">3팀</option><option value="jangwon" disabled>장원급제 · 연결 준비 중</option><option value="team-2" disabled>2팀 · 연결 준비 중</option></select></label>
+<label>팀<select id="team"><option value="team-3">3팀</option><option value="jangwon" disabled>장원급제 · 연결 준비 중</option><option value="team-2">2팀</option></select></label>
 <div class="form-row"><label>작성자 이름<input id="name" required maxlength="30" autocomplete="name" placeholder="팀원에게 표시할 이름"></label><label>활동 주차<input id="week" type="week" required></label></div>
-<label>문서 ID<input id="doc-id" required pattern="[A-Za-z0-9_-]{1,100}" maxlength="100" placeholder="예: 2026-W42"></label>
+<label>문서<select id="doc-list"><option value="">팀 문서 목록을 불러오는 중…</option></select></label>
+<label id="doc-id-field" hidden>문서 ID<input id="doc-id" required pattern="[A-Za-z0-9_-]{1,100}" maxlength="100" placeholder="예: 2026-W42"></label>
 <button type="submit" class="primary">Firestore 문서 열기</button>
 <div id="join-options" hidden><p>팀 초대 링크로 접속하거나 초대 코드를 입력해 주세요.</p><label>팀 초대 코드<input id="invite-code" type="password" autocomplete="off" placeholder="관리자에게 받은 초대 코드"></label><button type="button" id="join-team">팀에 참여하기</button></div>
 <div id="create-options" hidden><p>아직 공동 문서가 없습니다. 기존 일지에서 내려받은 HWPX를 가져오거나 빈 활동일지 양식으로 시작하세요.</p><label class="file-label">가져올 HWPX<input id="import-file" type="file" accept=".hwpx"></label><button type="button" id="create">새 공동 문서 만들기</button></div>
