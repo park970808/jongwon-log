@@ -56,6 +56,8 @@ export class EditorBinding {
    this.adoptNativeBaseline();
    this.off=this.studio.subscribe(()=>{if(this.applying||this.stopped)return;this.dirty=true;clearTimeout(this.captureTimer);this.captureTimer=setTimeout(()=>this.capture(),100);});
    this.studio.setUndo(()=>void this.history('undo'),()=>void this.history('redo'));
+   // Photo edits that change a cell's height are redrawn from the shared document, exactly as teammates see it.
+   this.studio.setRefreshRequest?.(()=>{this.dirty=true;void this.refreshLayout();});
    this.studio.setImageInsertionFactory?.(()=>{
      this.capture();const anchor=this.anchor();
      return async(...args)=>{
@@ -126,6 +128,26 @@ export class EditorBinding {
      await this.studio.replace(bytes,position);
      this.adoptNativeBaseline();
    }catch(error){this.fail(error);}finally{this.applying=false;if(!this.stopped)this.studio.flushInput?.();}
+ }
+ /**
+  * Redraw from the shared document after a photo edit, then grow any cell whose photo the full layout cuts off
+  * (the in-place layout and a full layout can split a tall table row differently). At most a few rounds.
+  */
+ async refreshLayout(){
+   if(this.refreshing){this.refreshAgain=true;return;}
+   this.refreshing=true;
+   try{
+     for(let round=0;round<3&&!this.stopped;round++){
+       const deadline=Date.now()+10000;
+       while((this.applying||this.studio.composing()||this.studio.interacting?.())&&Date.now()<deadline)await new Promise(r=>setTimeout(r,50));
+       this.refreshAgain=false;
+       await this.applyRemote();
+       if(this.stopped||!this.studio.fitCellPhotos?.())break;
+       // The height fix belongs to the photo edit just made: merge it into that undo step instead of a new one.
+       this.undo.lastChange=Date.now();
+       this.dirty=true;this.capture();
+     }
+   }finally{this.refreshing=false;if(this.refreshAgain&&!this.stopped){this.refreshAgain=false;void this.refreshLayout();}}
  }
  async history(action){
    if(this.stopped||this.applying||this.studio.composing()||this.studio.interacting?.())return;

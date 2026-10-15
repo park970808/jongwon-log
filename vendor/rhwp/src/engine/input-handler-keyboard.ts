@@ -17,6 +17,9 @@ import {
 } from './navigation-keymap';
 import type { DocumentPosition, CursorRect, CellBbox, CellPathLike } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
+import { prepareImageFile } from '../jongwon/prepare-image';
+import { isCellInlinePicture, removeCellPicture, placeClipboardPictureInCell, clipboardHoldsCopiedPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh, hasKeptPicture, keptPictureText, insertKeptPictureInCell } from '../jongwon/cell-picture';
+import { showToast } from '@/ui/toast';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
 import { scrollByPageStep, type PageScrollDirection } from '@/view/page-scroll';
 import { emitHeaderFooterModeChanged } from './header-footer-mode';
@@ -1758,6 +1761,7 @@ export function onCopy(this: any, e: ClipboardEvent): void {
       try {
         const cellPathJson = pictureCellPathJson(ref);
         this.wasm.copyControl(ref.sec, ref.ppi, ref.ci, cellPathJson);
+        if (ref.type === 'image') notePictureCopied(this.wasm, ref); else noteOtherCopy();
         const text = this.wasm.getClipboardText() || '[그림]';
         let html = '';
         try { html = this.wasm.exportControlHtml(ref.sec, ref.ppi, ref.ci, cellPathJson) || ''; } catch { /* HTML 내보내기 실패는 fallback */ }
@@ -1784,6 +1788,7 @@ export function onCopy(this: any, e: ClipboardEvent): void {
   const sel = this.cursor.getSelectionOrdered();
   if (!sel) return;
   const { start, end } = sel;
+  noteOtherCopy();
 
   try {
     // WASM 내부 클립보드에 복사 (서식 보존)
@@ -1859,13 +1864,16 @@ export function onCut(this: any, e: ClipboardEvent): void {
     const ref = this.cursor.getSelectedPictureRef();
     if (ref) {
       this.onCopy(e); // 클립보드에 복사
+      const inlineCell = isCellInlinePicture(this, ref);
       this.cursor.moveOutOfSelectedPicture();
       this.pictureObjectRenderer?.clear();
       this.eventBus.emit('picture-object-selection-changed', false);
       this.executeOperation({ kind: 'snapshot', operationType: 'cutObject', operation: (wasm: WasmBridge) => {
+        if (inlineCell) return removeCellPicture(wasm, ref).position; // Jongwon: also its line and added height
         deleteSelectedObject(wasm, ref);
         return this.cursor.getPosition();
       }});
+      if (inlineCell) requestLayoutRefresh(this);
     }
     return;
   }
@@ -1924,6 +1932,25 @@ export function onPaste(this: any, e: ClipboardEvent): void {
   // 내부 복사 marker가 있으면 내부 클립보드를 사용한다.
   // 이미지 컨트롤은 브라우저가 marker 없는 plain text만 paste 이벤트에 넘기는 경우가 있어
   // 현재 내부 컨트롤의 표시 텍스트와 일치하면 같은 rhwp 복사로 판단한다.
+  // Jongwon: a photo copied in this editor and pasted into a table cell gets its own line and the cell grows to
+  // fit it. The editor's clipboard is used while it still holds the photo; after the shared document was reloaded
+  // (a teammate's change) the kept copy is used, recognised by this editor's clipboard marker or text.
+  const inPlainCell = pos.parentParaIndex !== undefined && (pos.cellPath?.length ?? 1) <= 1 && !this.cursor.isInTextBox?.();
+  const nativePicture = inPlainCell && useInternalClipboard && clipboardHoldsCopiedPicture(this.wasm);
+  const keptPicture = inPlainCell && !nativePicture && hasKeptPicture() && !this.wasm.hasInternalClipboard() &&
+    (!clipboardData || hasCurrentInternalMarker || (!!text && text === keptPictureText()));
+  if (nativePicture || keptPicture) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteCellPicture', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      const p = this.cursor.getPosition();
+      const path = p.cellPath?.length ? p.cellPath : [{ controlIndex: p.controlIndex!, cellIndex: p.cellIndex!, cellParaIndex: p.cellParaIndex! }];
+      const target = { sectionIndex: p.sectionIndex, parentParaIndex: p.parentParaIndex!, cellPath: path, charOffset: p.charOffset };
+      return nativePicture ? placeClipboardPictureInCell(wasm, target) : insertKeptPictureInCell(wasm, target);
+    }});
+    requestLayoutRefresh(this);
+    return;
+  }
+
   if (useInternalClipboard) {
     // 컨트롤(개체) 붙여넣기 — 본문에서만 허용
     if (this.wasm.clipboardHasControl() && pos.parentParaIndex === undefined) {
@@ -2023,6 +2050,20 @@ export function onPaste(this: any, e: ClipboardEvent): void {
 
 /** 클립보드의 이미지 파일을 커서 위치에 삽입한다. */
 async function pasteImageFile(this: any, file: File, hasSelection: boolean): Promise<void> {
+  // Jongwon: a pasted photo goes through the same path as the toolbar (shrunk, own line, cell height fitted).
+  // A selection is replaced: delete it first, then insert at the resulting caret.
+  const factory = (window as any).jongwonStudio?.prepareImageInsertion;
+  if (factory && hasSelection) { this.deleteSelection(); hasSelection = false; }
+  const insertAtCursor = factory ? factory() : null;
+  if (insertAtCursor) {
+    try {
+      const prepared = await prepareImageFile(file);
+      await insertAtCursor(prepared.data, prepared.ext, prepared.naturalWidth, prepared.naturalHeight, prepared.fileName);
+    } catch (err) {
+      showToast({ message: `그림을 붙여넣을 수 없습니다.\n${err instanceof Error ? err.message : String(err)}`, durationMs: 6000 });
+    }
+    return;
+  }
   try {
     const data = new Uint8Array(await file.arrayBuffer());
     const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');

@@ -6,7 +6,10 @@
   "wasmSHA256": "d9f5000578b82349289ee85c3f680c7050dfc9b6af1605707560c21ee988f9b4",
   "modifications": [
     "src/main.ts: same-origin collaboration runtime bridge",
-    "pkg/rhwp.js: matching bundled wasm-bindgen module exports restored, local WASM URL"
+    "pkg/rhwp.js: matching bundled wasm-bindgen module exports restored, local WASM URL",
+    "src/jongwon/: photo preparation (downscale, EXIF rotation) and table-cell photo move/cut/copy/paste/delete with cell height upkeep",
+    "src/engine/input-handler*.ts, src/command/commands/insert.ts: call the src/jongwon helpers for cell photos and image files",
+    "src/main.ts: no local autosave/recovery in collaboration mode; layout refresh and photo fitting hooks; object selection cleared on document swap; caret rectangle relative to #scroll-content"
   ],
   "license": "MIT",
   "bindingsSource": "Recovered matching wasm-bindgen module from provided DMG rhwp-studio/assets/index-DYLUfso_.js; standalone DMG rhwp.js has incompatible WASM imports."
