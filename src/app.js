@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import {IndexeddbPersistence} from 'y-indexeddb';
 import {initializeApp,getApps} from 'firebase/app';
 import {getAuth,signInAnonymously,connectAuthEmulator} from 'firebase/auth';
-import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp} from 'firebase/firestore';
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,connectFirestoreEmulator,doc as firestoreDoc,getDoc,setDoc,serverTimestamp,collection,query,orderBy,limit,getDocs} from 'firebase/firestore';
 import {FIREBASE_CONFIGS} from './firebase-config.js';
 import {FirestoreBackend,CLIENT_FORMAT} from './firestore-backend.js';
 import {DemoBackend} from './demo-backend.js';
@@ -38,7 +38,41 @@ function isoWeek(d){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.get
 $('#week').value=params.get('week')||isoWeek(new Date());$('#doc-id').value=params.get('doc')||$('#week').value;
 $('#team').value=FIREBASE_CONFIGS[params.get('team')]?params.get('team'):'team-3';
 $('#name').value=params.get('name')||localStorage.getItem('jongwon-collab-name')||'';
-$('#week').onchange=()=>$('#doc-id').value=$('#week').value;
+// 문서 선택: 팀의 기존 문서를 목록에서 고르거나, "새 문서"로 활동 주차를 정해 만듭니다(문서 ID = 주차).
+const NEW_DOC='__new';
+function chooseDocument(){
+ const sel=$('#doc-list'),opt=sel.selectedOptions[0];
+ if(!opt||!opt.value)return;
+ if(opt.value===NEW_DOC){$('#doc-id').value=$('#week').value;return;}
+ $('#doc-id').value=opt.value;if(opt.dataset.week)$('#week').value=opt.dataset.week;
+}
+$('#doc-list').onchange=chooseDocument;
+$('#week').onchange=()=>{
+ // A week that already has a document opens it; another week starts a new one.
+ const sel=$('#doc-list'),match=Array.from(sel.options).find(o=>o.dataset.week===$('#week').value&&o.value!==NEW_DOC);
+ if(match)sel.value=match.value;else if(Array.from(sel.options).some(o=>o.value===NEW_DOC))sel.value=NEW_DOC;
+ $('#doc-id').value=match?match.value:$('#week').value;
+};
+let listRequest=0;
+async function refreshDocList(){
+ const sel=$('#doc-list'),request=++listRequest,team=$('#team').value;
+ const show=(options,selected)=>{if(request!==listRequest)return;sel.replaceChildren(...options);if(selected!==undefined)sel.value=selected;chooseDocument();};
+ const option=(value,text,week)=>{const o=document.createElement('option');o.value=value;o.textContent=text;if(week)o.dataset.week=week;return o;};
+ const fresh=()=>option(NEW_DOC,'+ 새 문서 (위 활동 주차로 만들기)');
+ show([option('','팀 문서 목록을 불러오는 중…')]);
+ try{
+   const c=await connect();
+   const member=await getDoc(firestoreDoc(c.db,'teams',team,'collaborationMembers',c.uid));
+   if(member.data()?.role!=='editor'){show([option('','초대 코드로 팀에 참여하면 문서 목록이 보입니다'),fresh()],'');return;}
+   const snap=await getDocs(query(collection(c.db,'teams',team,'documents'),orderBy('createdAt','desc'),limit(100)));
+   const docs=snap.docs.map(d=>option(d.id,`${d.data().title||d.id}${d.data().week&&!String(d.data().title||'').includes(d.data().week)?` · ${d.data().week}`:''}`,d.data().week||''));
+   const wanted=params.get('doc')||$('#doc-id').value,thisWeek=docs.find(o=>o.dataset.week===$('#week').value);
+   const selected=docs.some(o=>o.value===wanted)?wanted:thisWeek?thisWeek.value:docs.length?docs[0].value:NEW_DOC;
+   show([...docs,fresh()],selected);
+ }catch(e){console.warn('문서 목록을 불러오지 못했습니다.',e);show([option('','문서 목록을 불러오지 못했습니다 · 새 문서로 만들 수 있습니다'),fresh()],NEW_DOC);}
+}
+$('#team').addEventListener('change',()=>void refreshDocList());
+if(params.get('demo')!=='1')void refreshDocList();
 function warn(e){
  $('#warning-text').textContent=e?.message||String(e);$('#warning').hidden=false;console.warn(e);
 }
@@ -96,7 +130,8 @@ async function ensureMembership(c){
  return true;
 }
 async function openFirestore(){
- const c=await connect();if(!await ensureMembership(c))return;const meta=await c.backend.metadata();
+ if(!$('#doc-list').value&&!params.get('doc'))$('#doc-list').value=NEW_DOC,chooseDocument();
+ const c=await connect();const wasMember=(await getDoc(firestoreDoc(c.db,'teams',c.team,'collaborationMembers',c.uid))).data()?.role==='editor';if(!await ensureMembership(c))return;if(!wasMember)void refreshDocList();const meta=await c.backend.metadata();
  $('#connection-info').textContent=`Firebase 연결됨 · 사용자 UID: ${c.uid}`;
  if(!meta){$('#create-options').hidden=false;return;}
  const membership=await getDoc(firestoreDoc(c.db,'teams',c.team,'collaborationMembers',c.uid));
