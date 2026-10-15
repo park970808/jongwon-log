@@ -1,8 +1,13 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 const root = import.meta.dirname;
+// The editor page is loaded in an iframe; GitHub Pages lets browsers reuse it for 10 minutes. A new address on
+// every build makes everyone get the new editor right after a deploy (with the new main page).
+const build = Date.now().toString(36);
+const studioVersion = { name: 'studio-version', transformIndexHtml: html => html.replaceAll('__STUDIO_BUILD__', build) };
 export default defineConfig({
   base: './',
+  plugins: [studioVersion],
   resolve: { alias: {
     '@': resolve(root, 'vendor/rhwp/src'),
     '@wasm': resolve(root, 'vendor/rhwp/pkg'),
