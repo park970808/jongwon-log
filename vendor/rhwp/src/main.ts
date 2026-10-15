@@ -2130,7 +2130,8 @@ if (new URLSearchParams(location.search).has('collaboration')) {
           const cursor=handler.cursor;
           try{
             // Both ends must still be in the same text flow (same body/cell); otherwise keep just the caret.
-            const flow=(p:any)=>JSON.stringify([p.sectionIndex,p.parentParaIndex,p.controlIndex,p.cellIndex,p.cellPath??null]);
+            // (several lines of the same cell, or several body paragraphs, are fine)
+            const flow=(p:any)=>JSON.stringify(p.cellPath?.length?[p.sectionIndex,p.parentParaIndex,p.cellPath.map((e:any,i:number)=>i===p.cellPath.length-1?[e.controlIndex,e.cellIndex]:[e.controlIndex,e.cellIndex,e.cellParaIndex])]:[p.sectionIndex,p.parentParaIndex??null,p.cellIndex??null]);
             if(selectionAnchor&&!cells&&flow(selectionAnchor)===flow(position)){cursor.moveTo(selectionAnchor);cursor.setAnchor();}
             cursor.moveTo(position);
           }catch{cursor.clearSelection();cursor.moveTo(position);}
