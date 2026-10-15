@@ -1875,6 +1875,10 @@ export class InputHandler {
         { type: 'separator' },
       );
     }
+    // 공동 활동일지: 그림 자르기
+    if (ref?.type === 'image' && isCellInlinePicture(this, ref as any)) {
+      items.push({ type: 'command', commandId: 'insert:picture-crop', label: '그림 자르기(C)...' });
+    }
     // 그림/도형 객체: 캡션 넣기
     if (ref?.type === 'image' || ref?.type === 'shape') {
       items.push(

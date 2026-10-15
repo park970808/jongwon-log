@@ -87,7 +87,7 @@ try{
  console.log('PASS oversize drag stops inside cell with no text overlap');
 
  await a.bringToFront();await a.reload();await a.waitForFunction(()=>!document.querySelector('#download').disabled,null,{timeout:45000});await waitPictures(a,1);console.log('PASS image remains inside cell after reload');
- const pending=a.waitForEvent('download');await a.locator('#download').click();const download=await pending;assert.ok((await fs.promises.stat(await download.path())).size>1000);
+ const pending=a.waitForEvent('download');await a.locator('#header-tab').hover();await a.waitForTimeout(300);await a.locator('#download').click();await a.mouse.move(700,600);await a.waitForTimeout(800);const download=await pending;assert.ok((await fs.promises.stat(await download.path())).size>1000);
  fs.mkdirSync('.test-output',{recursive:true});await a.evaluate(pos=>{const w=document.querySelector('#studio').contentWindow,r=w.jongwonStudio.caretRect(pos);if(r&&r.y>700)w.document.querySelector('#scroll-container').scrollTop+=r.y-350;},position);await a.waitForTimeout(300);await a.screenshot({path:'.test-output/image-button.png',fullPage:true});assert.deepEqual(errors,[]);
  console.log('PASS HWPX download and no browser errors');
  const bodyPosition={sectionIndex:0,paragraphIndex:0,charOffset:0};

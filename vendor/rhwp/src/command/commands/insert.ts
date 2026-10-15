@@ -1,4 +1,5 @@
 import { prepareImageFile } from '../../jongwon/prepare-image';
+import { canCropSelection, openPictureCrop } from '../../jongwon/picture-crop';
 import type { CommandDef } from '../types';
 import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { ChartDataDialog } from '@/ui/chart-data-dialog';
@@ -323,6 +324,17 @@ export const insertCommands: CommandDef[] = [
         bookmarkDialog = new BookmarkDialog(services);
       }
       bookmarkDialog.show();
+    },
+  },
+  {
+    id: 'insert:picture-crop',
+    opensDialog: true,
+    label: '그림 자르기',
+    canExecute: (ctx) => ctx.inPictureObjectSelection,
+    execute(services) {
+      const ih = services.getInputHandler() as any;
+      if (!ih || !canCropSelection(ih)) return;
+      openPictureCrop(services.wasm, ih);
     },
   },
   {

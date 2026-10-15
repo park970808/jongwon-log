@@ -314,3 +314,12 @@ window.addEventListener('online',()=>void active?.provider.flush());
 window.addEventListener('offline',()=>active?.provider.status('offline'));
 window.addEventListener('beforeunload',e=>{active?.binding?.capture();if(active&&(active.binding?.stopped||active.provider.state!=='saved')){e.preventDefault();e.returnValue='';}});
 if(params.get('demo')==='1')void action(openDemo);
+// Top bar while editing: the small tab shows the save state; tapping it (touch screens have no hover) toggles the bar.
+{
+ const zone=$('#header-zone'),tab=$('#header-tab'),status=$('#save-status'),mirror=()=>{$('#header-tab-status').textContent=status.textContent;};
+ new MutationObserver(mirror).observe(status,{childList:true,characterData:true,subtree:true});mirror();
+ tab.onclick=()=>zone.classList.toggle('open');
+ // Clicking into the document (focus moves into the editor frame) or anywhere else hides it again.
+ window.addEventListener('blur',()=>zone.classList.remove('open'));
+ document.addEventListener('pointerdown',e=>{if(!zone.contains(e.target)&&!e.target.closest?.('.app-header'))zone.classList.remove('open');});
+}

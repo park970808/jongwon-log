@@ -2,13 +2,13 @@
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>공동 활동일지 · 종원</title><link rel="stylesheet" href="./src/app.css"></head>
 <body>
+<div id="header-zone"><button type="button" id="header-tab" aria-label="상단 메뉴 열기"><span>▾ 메뉴</span><span id="header-tab-status"></span></button></div>
 <header class="app-header">
 <a class="wordmark" href="./">공동 활동일지<span>종원</span></a>
 <div class="document-heading"><strong id="document-title">팀의 기록을, 한 문서에서</strong><span id="save-status" role="status" aria-live="polite">문서를 선택해 주세요</span></div>
 <div id="peers" aria-label="함께 편집 중인 사람"></div>
 <nav class="actions" aria-label="문서 작업"><button id="share" disabled>링크 복사</button><button id="download" disabled>HWPX 내려받기</button><a id="legacy-link" href="./legacy/index.html">기존 일지</a></nav>
 </header>
-<div class="notice"><span>공동 편집 시험판</span> 같은 칸도 함께 작성할 수 있습니다. 문서를 정기적으로 HWPX로 내려받아 보관하세요.</div>
 <section id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">저장 재시도</button><button id="recovery">복구 데이터 받기</button></section>
 <section id="warning" class="warning" role="status" hidden><span id="warning-text"></span><button id="warning-close" type="button">닫기</button></section>
 <main>
@@ -27,7 +27,7 @@
 <p id="connection-info" class="hint">팀 초대 링크로 참여하면 팀원들과 같은 문서를 편집할 수 있습니다.</p>
 <div class="demo-entry"><button type="button" id="demo">기기 내 체험</button><p>같은 브라우저의 두 탭에서 확인합니다.<br>Firestore나 다른 컴퓨터에는 전송하지 않습니다.</p></div>
 </form></section>
-<section id="workspace" hidden aria-label="공동 문서 편집기"><iframe id="studio" title="알한글 문서 편집기" src="./studio.html?collaboration=1&amp;embed=1&amp;v=keep-selection-1"></iframe><div id="remote-cursors" aria-hidden="true"></div><div id="loading" role="status">편집기를 준비하고 있습니다…</div></section>
+<section id="workspace" hidden aria-label="공동 문서 편집기"><iframe id="studio" title="알한글 문서 편집기" src="./studio.html?collaboration=1&amp;embed=1&amp;v=crop-1"></iframe><div id="remote-cursors" aria-hidden="true"></div><div id="loading" role="status">편집기를 준비하고 있습니다…</div></section>
 </main>
 <footer id="app-footer"><span id="mode">Firestore 공동 편집</span><span>원본 일지 데이터는 자동으로 변경하지 않습니다.</span></footer>
 <script type="module" src="./src/app.js"></script>

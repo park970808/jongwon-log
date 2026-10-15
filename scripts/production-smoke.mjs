@@ -22,7 +22,7 @@ try{
  await page.goto(url+'?demo=1&room=production-'+Date.now());await page.locator('#download').waitFor({state:'visible',timeout:45000});await page.waitForFunction(()=>!document.querySelector('#download').disabled,null,{timeout:45000});
  await page.evaluate(()=>document.querySelector('#studio').contentWindow.jongwonStudio.restore({sectionIndex:0,paragraphIndex:0,parentParaIndex:1,controlIndex:0,cellIndex:1,cellParaIndex:0,cellPath:[{controlIndex:0,cellIndex:1,cellParaIndex:0}],charOffset:0},true));
  await page.keyboard.insertText('배포 빌드 확인');
- await page.waitForTimeout(1000);const pending=page.waitForEvent('download');await page.locator('#download').click();const download=await pending;assert.ok(download.suggestedFilename().endsWith('.hwpx'));assert.ok((await fsp.stat(await download.path())).size>1000);
+ await page.waitForTimeout(1000);const pending=page.waitForEvent('download');await page.locator('#header-tab').hover();await page.waitForTimeout(300);await page.locator('#download').click();const download=await pending;assert.ok(download.suggestedFilename().endsWith('.hwpx'));assert.ok((await fsp.stat(await download.path())).size>1000);
  fs.mkdirSync('.test-output',{recursive:true});await page.screenshot({path:'.test-output/production-desktop.png',fullPage:true});
  const mobile=await browser.newPage({viewport:{width:390,height:844}});await mobile.goto(url);await mobile.screenshot({path:'.test-output/welcome-mobile.png',fullPage:true});
  assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'welcome must not overflow on mobile');assert.deepEqual(errors,[]);
