@@ -96,6 +96,26 @@ const DOCUMENT_PAGINATION_IDLE_FLUSH_PAGE_LIMIT = 30;
  * 두 위치가 같은 셀 컨테이너에 있는지 전체 경로로 판정한다(#4272).
  * 마지막 cellParaIndex는 컨테이너 안의 현재 문단 축이므로 달라도 같은 셀이다.
  */
+/**
+ * 공동 활동일지: split a selection [startPara:startOffset, endPara:endOffset) at line-break characters so that no
+ * piece contains one (the native selection rects lose lines across a line break). Pieces may span paragraphs.
+ */
+function splitAtLineBreaks(sp: number, so: number, ep: number, eo: number, textOf: (para: number) => string): Array<[number, number, number, number]> {
+  const pieces: Array<[number, number, number, number]> = [];
+  let ps = sp, os = so;
+  for (let para = sp; para <= ep; para++) {
+    let text = '';
+    try { text = textOf(para) ?? ''; } catch { text = ''; }
+    const from = para === sp ? so : 0, to = para === ep ? eo : text.length;
+    for (let k = text.indexOf('\n', from); k >= 0 && k < to; k = text.indexOf('\n', k + 1)) {
+      if (ps !== para || os < k) pieces.push([ps, os, para, k]);
+      ps = para; os = k + 1;
+    }
+  }
+  if (ps !== ep || os < eo) pieces.push([ps, os, ep, eo]);
+  return pieces.length ? pieces : [[sp, so, ep, eo]];
+}
+
 function isSameSelectionCellContainer(a: DocumentPosition, b: DocumentPosition): boolean {
   if (a.sectionIndex !== b.sectionIndex || a.parentParaIndex !== b.parentParaIndex) return false;
   const left = cellAxisPath(a);
@@ -3872,32 +3892,20 @@ export class InputHandler {
           }
           : undefined;
         const cellPath = cellAxisPath(start);
-        if (cellPath.length > 1) {
-          rects = this.wasm.getSelectionRectsInCellByPath(
-            start.sectionIndex,
-            start.parentParaIndex!,
-            JSON.stringify(cellPath),
-            cellParaIndexOf(start),
-            start.charOffset,
-            cellParaIndexOf(end),
-            end.charOffset,
-            pageHints,
-          );
-        } else {
-          rects = this.wasm.getSelectionRectsInCell(
-            start.sectionIndex, start.parentParaIndex!, start.controlIndex!, start.cellIndex!,
-            start.cellParaIndex!, start.charOffset,
-            end.cellParaIndex!, end.charOffset,
-            pageHints,
-          );
-        }
+        // 공동 활동일지: the native rects drop lines when the range crosses a line break (Shift+Enter, common in
+        // documents made in Hancom), so ask per piece between line breaks.
+        const pathAt = (para: number) => JSON.stringify(cellPath.map((e, i) => i === cellPath.length - 1 ? { ...e, cellParaIndex: para } : e));
+        const textOf = (para: number) => cellPath.length > 1
+          ? this.wasm.getTextInCellByPath(start.sectionIndex, start.parentParaIndex!, pathAt(para), 0, this.wasm.getCellParagraphLengthByPath(start.sectionIndex, start.parentParaIndex!, pathAt(para)))
+          : this.wasm.getTextInCell(start.sectionIndex, start.parentParaIndex!, start.controlIndex!, start.cellIndex!, para, 0, this.wasm.getCellParagraphLength(start.sectionIndex, start.parentParaIndex!, start.controlIndex!, start.cellIndex!, para));
+        rects = splitAtLineBreaks(cellParaIndexOf(start), start.charOffset, cellParaIndexOf(end), end.charOffset, textOf).flatMap(([sp, so, ep, eo]) => cellPath.length > 1
+          ? this.wasm.getSelectionRectsInCellByPath(start.sectionIndex, start.parentParaIndex!, JSON.stringify(cellPath), sp, so, ep, eo, pageHints)
+          : this.wasm.getSelectionRectsInCell(start.sectionIndex, start.parentParaIndex!, start.controlIndex!, start.cellIndex!, sp, so, ep, eo, pageHints));
       } else if (!startInCell && !endInCell) {
         // 본문 선택
-        rects = this.wasm.getSelectionRects(
-          start.sectionIndex,
-          start.paragraphIndex, start.charOffset,
-          end.paragraphIndex, end.charOffset,
-        );
+        rects = splitAtLineBreaks(start.paragraphIndex, start.charOffset, end.paragraphIndex, end.charOffset,
+          para => this.wasm.getTextRange(start.sectionIndex, para, 0, this.wasm.getParagraphLength(start.sectionIndex, para)))
+          .flatMap(([sp, so, ep, eo]) => this.wasm.getSelectionRects(start.sectionIndex, sp, so, ep, eo));
       } else {
         // 셀↔본문 또는 셀↔다른 셀 혼합 선택: 렌더링 생략
         this.selectionRenderer.clear();
