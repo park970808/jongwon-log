@@ -2092,8 +2092,10 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     },
     exportHwpx: () => wasm.exportHwpx(),
     composing: () => composing,
-    interacting: () => {const h=inputHandler as any;return !!(h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging||h?.isCellPictureDragging);},
+    interacting: () => {const h=inputHandler as any;return !!(h?.isDragging||h?.isPictureResizeDragging||h?.isPictureMoveDragging||h?.isPictureRotateDragging||h?.isResizeDragging||h?.isCellPictureDragging);},
     position: () => inputHandler?.getCursorPosition(),
+    // The fixed end of a body/cell text selection (the caret is the moving end), or null.
+    selectionAnchor: () => {const c=(inputHandler as any)?.cursor;if(!c||c.isInCellSelectionMode?.())return null;const sel=c.getSelection?.();return sel?{...sel.anchor}:null;},
     subscribe(fn: () => void) { changes.add(fn); return () => changes.delete(fn); },
     setUndo(undo: () => void, redo: () => void) { undoCallback=undo; redoCallback=redo; },
     setBlocked(value: boolean) { blocked=value; document.getElementById('studio-root')!.style.pointerEvents=value?'none':''; },
@@ -2103,7 +2105,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       handler.cursor.clearSelection(); handler.cursor.moveTo(position); handler.active=true;
       handler.updateCaret(); if (focus) handler.focus();
     },
-    async replace(bytes: Uint8Array, position: any) {
+    async replace(bytes: Uint8Array, position: any, selectionAnchor: any = null) {
       if(composing) throw new Error('composition-active');
       applying=true;
       const container=document.getElementById('scroll-container')!;
@@ -2115,13 +2117,39 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         const selected=inputHandler as any;
         if(selected?.cursor?.isInPictureObjectSelection?.()){selected.cursor.exitPictureObjectSelection();selected.pictureObjectRenderer?.clear?.();eventBus.emit('picture-object-selection-changed',false);}
         if(selected?.cursor?.isInTableObjectSelection?.()){selected.cursor.exitTableObjectSelection?.();eventBus.emit('table-object-selection-changed',false);}
+        // A cell block (F5 / drag across cells) is kept by row/column; the caret anchor already follows the right table.
+        const c=selected?.cursor;
+        const cells=c?.isInCellSelectionMode?.()?{reason:c._cellSelectionReason,phase:c.getCellSelectionPhase(),anchor:c.cellAnchor&&{...c.cellAnchor},focus:c.cellFocus&&{...c.cellFocus},excluded:[...(c.getExcludedCells?.()||[])]}:null;
         inputHandler?.deactivate();
         wasm.loadDocument(bytes,wasm.fileName);
         prepareCanvasRendererDocument(); plugins.notifyDocumentSwap();
         applySavedTextMarkSettings();
         await canvasView?.loadDocument();
         const handler=inputHandler as any;
-        if(position){handler.cursor.moveTo(position);handler.active=true;handler.updateCaret();if(hadFocus)handler.focus();}
+        if(position){
+          const cursor=handler.cursor;
+          try{
+            // Both ends must still be in the same text flow (same body/cell); otherwise keep just the caret.
+            const flow=(p:any)=>JSON.stringify([p.sectionIndex,p.parentParaIndex,p.controlIndex,p.cellIndex,p.cellPath??null]);
+            if(selectionAnchor&&!cells&&flow(selectionAnchor)===flow(position)){cursor.moveTo(selectionAnchor);cursor.setAnchor();}
+            cursor.moveTo(position);
+          }catch{cursor.clearSelection();cursor.moveTo(position);}
+          handler.active=true;handler.updateCaret();
+          if(cells&&cells.anchor&&cells.focus){
+            try{
+              if(cursor.enterCellSelectionMode(cells.reason)){
+                cursor.setCellSelectionAnchor(cells.anchor.row,cells.anchor.col);
+                cursor.setCellSelectionFocus(cells.focus.row,cells.focus.col);
+                cursor._cellSelectionPhase=cells.phase;
+                for(const key of cells.excluded)cursor.excludedCells?.add(key);
+                handler.updateCellSelection?.();
+              }
+            }catch{cursor.exitCellSelectionMode?.();}
+          }else if(cursor.getSelection()){
+            try{handler.updateSelection?.();}catch{cursor.clearSelection();handler.updateCaret();}
+          }
+          if(hadFocus)handler.focus();
+        }
         container.scrollTop=top;container.scrollLeft=left;
       } finally { applying=false; }
     },
