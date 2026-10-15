@@ -26,6 +26,20 @@ try{
  await a.waitForFunction(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getTextInCell(0,1,0,3,0,0,10000).includes('다른칸'),null,{timeout:15000});
  await a.waitForTimeout(400);
  assert.deepEqual(await sel(a),[6,9,1,1]);console.log('PASS: selection kept while teammate types in another cell');
+ // A selection over several lines of a cell (Shift+Down) is kept too.
+ await a.bringToFront();
+ await a.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(pos,true),{...cell(23),charOffset:0});
+ await a.keyboard.insertText('first line');await a.keyboard.press('Enter');await a.keyboard.insertText('second line');await a.keyboard.press('Enter');await a.keyboard.insertText('third line');
+ await a.waitForTimeout(1500);
+ await a.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(pos,true),{...cell(23),charOffset:2});
+ await a.keyboard.press('Shift+ArrowDown');await a.keyboard.press('Shift+ArrowDown');
+ const lines=()=>a.evaluate(()=>{const s=document.querySelector('#studio').contentWindow.__inputHandler.cursor.getSelectionOrdered();return s&&[s.start.cellPath[0].cellParaIndex,s.start.charOffset,s.end.cellPath[0].cellParaIndex];});
+ const multi=await lines();assert.deepEqual([multi[0],multi[1],multi[2]],[0,2,2]);
+ await b.bringToFront();await b.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(pos,true),cell(3));await b.keyboard.insertText('또');
+ await a.bringToFront();await a.waitForFunction(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getTextInCell(0,1,0,3,0,0,10000).includes('또'),null,{timeout:15000});await a.waitForTimeout(800);
+ assert.deepEqual(await lines(),multi);console.log('PASS selection over three lines kept while a teammate types');
+ await a.evaluate(pos=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(pos,true),{...cell(1),charOffset:6});
+ for(let i=0;i<3;i++)await a.keyboard.press('Shift+ArrowRight');
  // Formatting the kept selection still applies to exactly 마바사.
  await a.keyboard.press('Control+b');await a.waitForTimeout(300);
  const bold=await a.evaluate(()=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;return [5,6,7,8].map(o=>w.getCellCharPropertiesAt(0,1,0,1,0,o).bold);});
