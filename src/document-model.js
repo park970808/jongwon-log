@@ -11,7 +11,20 @@ const MAX_ARCHIVE = 32 * 1024 * 1024;
 const MAX_EXPANDED = 96 * 1024 * 1024;
 const local = n => n.localName || n.nodeName.split(':').at(-1);
 const elements = n => Array.from(n.childNodes || []).filter(x => x.nodeType === 1);
-const hash = x => bytesToHex(sha256(typeof x === 'string' ? strToU8(x) : x));
+// Photos are hashed on every capture (content-based names and change checks). Hashing megabytes each time made
+// photo-heavy documents slow, so hashes of recent binaries are reused after a full byte comparison (cheap).
+const hashCache = []; // most recent last; at most HASH_CACHE entries (≈ the photos of one weekly log)
+const HASH_CACHE = 32;
+const sameBytes = (a, b) => { if (a === b) return true; if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+function binaryHash(bytes) {
+  if (bytes.length < 64 * 1024) return bytesToHex(sha256(bytes));
+  const i = hashCache.findIndex(entry => sameBytes(entry.bytes, bytes));
+  if (i >= 0) { const [entry] = hashCache.splice(i, 1); entry.bytes = bytes; hashCache.push(entry); return entry.digest; }
+  const digest = bytesToHex(sha256(bytes));
+  hashCache.push({ bytes, digest }); if (hashCache.length > HASH_CACHE) hashCache.shift();
+  return digest;
+}
+const hash = x => typeof x === 'string' ? bytesToHex(sha256(strToU8(x))) : binaryHash(x);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function attributes(n) {
   return Object.fromEntries(Array.from(n.attributes || []).map(a => [a.name, a.value]).sort(([a], [b]) => a.localeCompare(b)));
@@ -354,7 +367,8 @@ export function writeHwpx(doc) {
   for(const [name,doc] of docs) files[name]=strToU8('<?xml version="1.0" encoding="UTF-8"?>'+serializer.serializeToString(doc.documentElement));
   // mimetype must be the first, uncompressed ZIP entry.
   const ordered={mimetype:[files.mimetype || strToU8('application/hwp+zip'),{level:0}]};
-  for(const [name,data] of Object.entries(files))if(name!=='mimetype')ordered[name]=data;
+  // Pictures are already compressed (JPEG/PNG): store them as they are instead of deflating them again.
+  for(const [name,data] of Object.entries(files))if(name!=='mimetype')ordered[name]=name.startsWith('BinData/')?[data,{level:0}]:data;
   return zipSync(ordered,{level:1});
 }
 

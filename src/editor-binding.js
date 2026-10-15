@@ -57,7 +57,8 @@ export class EditorBinding {
    this.off=this.studio.subscribe(()=>{if(this.applying||this.stopped)return;this.dirty=true;clearTimeout(this.captureTimer);this.captureTimer=setTimeout(()=>this.capture(),100);});
    this.studio.setUndo(()=>void this.history('undo'),()=>void this.history('redo'));
    // Photo edits that change a cell's height are redrawn from the shared document, exactly as teammates see it.
-   this.studio.setRefreshRequest?.(()=>{this.dirty=true;void this.refreshLayout();});
+   // Redraw once the person pauses (not after every photo action): each redraw reloads the whole document.
+   this.studio.setRefreshRequest?.(()=>{this.dirty=true;clearTimeout(this.refreshTimer);this.refreshTimer=setTimeout(()=>{this.refreshTimer=null;void this.refreshLayout();},900);});
    this.studio.setImageInsertionFactory?.(()=>{
      this.capture();const anchor=this.anchor();
      return async(...args)=>{
@@ -153,5 +154,5 @@ export class EditorBinding {
    if(this.stopped||this.applying||this.studio.composing()||this.studio.interacting?.())return;
    this.capture();this.undo.stopCapturing();this.undo[action]();await this.applyRemote();this.onChange();
  }
- dispose(){this.capture();clearTimeout(this.captureTimer);clearTimeout(this.remoteTimer);this.off?.();this.doc.off('update',this.liveUpdate);this.undo.destroy();this.mirror.destroy();}
+ dispose(){this.capture();clearTimeout(this.captureTimer);clearTimeout(this.refreshTimer);clearTimeout(this.remoteTimer);this.off?.();this.doc.off('update',this.liveUpdate);this.undo.destroy();this.mirror.destroy();}
 }
