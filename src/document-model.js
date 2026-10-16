@@ -8,6 +8,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 const diff = new DiffMatchPatch();
 const serializer = new XMLSerializer();
 const MAX_ARCHIVE = 32 * 1024 * 1024;
+const LINESEG = 'jwLineseg';
 const MAX_EXPANDED = 96 * 1024 * 1024;
 const local = n => n.localName || n.nodeName.split(':').at(-1);
 const elements = n => Array.from(n.childNodes || []).filter(x => x.nodeType === 1);
@@ -43,7 +44,14 @@ function toAst(n, depth = 0) {
   if (depth > 96) throw new Error('문서 중첩 한도를 넘었습니다.');
   if (n.nodeType === 3 || n.nodeType === 4) return { tag: '#text', text: n.data, attrs: {}, children: [] };
   const ast = { tag: n.nodeName, attrs: attributes(n), children: [] };
-  // Layout caches are derived, never shared: two fonts/renderers must not fight over lineseg positions.
+  // A paragraph's line layout (linesegarray) is kept as one opaque attribute. It is what makes the shared copy look
+  // exactly like the original file: without it the editor re-wraps every line on its own (pages and line breaks
+  // shift). The editor drops it from paragraphs it re-lays out after an edit, so only untouched paragraphs carry it
+  // and every teammate's editor writes the same value (no tug-of-war).
+  if (local(n) === 'p') {
+    const segs = elements(n).filter(x => local(x) === 'linesegarray').flatMap(a => elements(a).filter(x => local(x) === 'lineseg').map(attributes));
+    if (segs.length) ast.attrs[LINESEG] = JSON.stringify(segs);
+  }
   if (plainRich(n)) {
     ast.rich = elements(n).filter(r => local(r) === 'run').flatMap(r => elements(r).flatMap(t => {
       if(local(t)==='t' && !elements(t).length) return t.textContent ? [{insert:t.textContent,attributes:attributes(r)}] : [];
@@ -151,7 +159,7 @@ function signature(ast) {
 const fingerprints=new WeakMap();
 function fingerprint(ast) {
   if(fingerprints.has(ast))return fingerprints.get(ast);
-  const attrs=Object.fromEntries(Object.entries(ast.attrs).filter(([k])=>!['id','rowAddr','colAddr','rowCnt','colCnt','itemCnt'].includes(k)));
+  const attrs=Object.fromEntries(Object.entries(ast.attrs).filter(([k])=>!['id','rowAddr','colAddr','rowCnt','colCnt','itemCnt',LINESEG].includes(k)));
   const value=hash(JSON.stringify([ast.tag,attrs,ast.text,ast.rich?.map(op=>[typeof op.insert==='string'?op.insert:fingerprint(op.insert.node),op.attributes]),ast.children.map(fingerprint)]));
   fingerprints.set(ast,value);return value;
 }
@@ -323,12 +331,17 @@ const escape = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function xmlNode(ast) {
   if (ast.tag === '#text') return escape(ast.text);
   if (!/^[A-Za-z_][\w.:-]*$/.test(ast.tag)) throw new Error('잘못된 XML 요소 이름');
-  const attrs = Object.entries(ast.attrs).map(([k,v]) => {
+  const attrs = Object.entries(ast.attrs).filter(([k]) => k !== LINESEG).map(([k,v]) => {
     if (!/^[A-Za-z_][\w.:-]*$/.test(k)) throw new Error('잘못된 XML 속성 이름');
     return ` ${k}="${escape(v)}"`;
   }).join('');
   const body = ast.rich ? (ast.rich.length ? ast.rich : [{insert:'',attributes:{charPrIDRef:'0'}}]).map(op => `<hp:run${Object.entries(op.attributes || {}).map(([k,v])=>` ${k}="${escape(v)}"`).join('')}>${typeof op.insert==='string'?`<hp:t>${escape(op.insert)}</hp:t>`:xmlNode(op.insert.node)}</hp:run>`).join('') : ast.children.map(xmlNode).join('');
-  return `<${ast.tag}${attrs}>${body}</${ast.tag}>`;
+  let layout = '';
+  if (ast.attrs[LINESEG]) {
+    const ns = ast.tag.includes(':') ? ast.tag.slice(0, ast.tag.indexOf(':') + 1) : '';
+    try { layout = `<${ns}linesegarray>${JSON.parse(ast.attrs[LINESEG]).map(a => `<${ns}lineseg${Object.entries(a).filter(([k]) => /^[A-Za-z_][\w.:-]*$/.test(k)).map(([k,v]) => ` ${k}="${escape(v)}"`).join('')}/>`).join('')}</${ns}linesegarray>`; } catch { layout = ''; }
+  }
+  return `<${ast.tag}${attrs}>${body}${layout}</${ast.tag}>`;
 }
 export function writeHwpx(doc) {
   const parts = snapshotParts(doc), files = {}, docs = new Map();

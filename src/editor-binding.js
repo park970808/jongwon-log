@@ -141,9 +141,20 @@ export class EditorBinding {
    });
  }
  adoptNativeBaseline(){
-   const current=readHwpx(this.studio.exportHwpx()),reference=snapshotParts(this.mirror);
-   for(const [name,part] of Object.entries(current))if(part.xml){if(!reference[name]?.xml)throw new Error('문서 구성 파일이 변경되었습니다.');bindKeys(reference[name].xml,part.xml);}
-   this.baseline=current;
+   const bind=()=>{
+     const current=readHwpx(this.studio.exportHwpx()),reference=snapshotParts(this.mirror);
+     for(const [name,part] of Object.entries(current))if(part.xml){if(!reference[name]?.xml)throw new Error('문서 구성 파일이 변경되었습니다.');bindKeys(reference[name].xml,part.xml);}
+     return current;
+   };
+   try{this.baseline=bind();}
+   catch(error){
+     // The editor tidies some documents while opening them (e.g. drops unused border/fill styles or empty image
+     // brushes), so its copy no longer has the shared structure. Record the tidy-up as an ordinary edit instead of
+     // refusing to edit: every teammate's editor makes the same change, so it merges to the same result.
+     console.warn('편집기가 문서를 정리했습니다. 공유 문서에 반영합니다.',error);
+     reconcileParts(this.mirror,snapshotParts(this.mirror),readHwpx(this.studio.exportHwpx()),LOCAL);
+     this.baseline=bind();
+   }
  }
  fail(error){this.stopped=true;this.studio.setBlocked(true);this.onError(error);}
  capture(){

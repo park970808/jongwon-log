@@ -23,7 +23,7 @@
 <label id="doc-id-field" hidden>문서 ID<input id="doc-id" required pattern="[A-Za-z0-9_-]{1,100}" maxlength="100" placeholder="예: 2026-W42"></label>
 <button type="submit" class="primary">Firestore 문서 열기</button>
 <div id="join-options" hidden><p>팀 초대 링크로 접속하거나 초대 코드를 입력해 주세요.</p><label>팀 초대 코드<input id="invite-code" type="password" autocomplete="off" placeholder="관리자에게 받은 초대 코드"></label><button type="button" id="join-team">팀에 참여하기</button></div>
-<div id="create-options" hidden><p>아직 공동 문서가 없습니다. 기존 일지에서 내려받은 HWPX를 가져오거나 빈 활동일지 양식으로 시작하세요.</p><label class="file-label">가져올 HWPX<input id="import-file" type="file" accept=".hwpx"></label><button type="button" id="create">새 공동 문서 만들기</button></div>
+<div id="create-options" hidden><p>아직 공동 문서가 없습니다. 기존 일지에서 내려받은 HWPX를 가져오거나 빈 활동일지 양식으로 시작하세요.</p><label class="file-label">가져올 한글 파일(HWPX·HWP)<input id="import-file" type="file" accept=".hwpx,.hwp"></label><button type="button" id="create">새 공동 문서 만들기</button></div>
 <p id="connection-info" class="hint">팀 초대 링크로 참여하면 팀원들과 같은 문서를 편집할 수 있습니다.</p>
 <div class="demo-entry"><button type="button" id="demo">기기 내 체험</button><p>같은 브라우저의 두 탭에서 확인합니다.<br>Firestore나 다른 컴퓨터에는 전송하지 않습니다.</p></div>
 </form></section>
