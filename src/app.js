@@ -172,7 +172,11 @@ async function createFirestore(){
  const c=await connect();if(!await ensureMembership(c))return;const who=identity(),studio=await getStudio();
  $('#workspace').hidden=false;$('#loading').hidden=false;$('#loading').textContent='문서 양식을 준비하고 있습니다…';
  const file=$('#import-file').files[0];const bytes=file?new Uint8Array(await file.arrayBuffer()):new Uint8Array(await (await fetch('./template.hwpx')).arrayBuffer());
- readHwpx(bytes);await studio.open(bytes,file?.name||'활동일지.hwpx');
+ const isHwp=!!file&&/\.hwp$/i.test(file.name);if(!isHwp)readHwpx(bytes); // .hwp (binary) is converted by the editor
+ await studio.open(bytes,file?.name||'활동일지.hwpx');
+ // The editor tidies a document on its first save (unused styles, legacy records); open its own copy once more
+ // so the shared document starts from the form every teammate's editor will keep.
+ await studio.open(studio.exportHwpx(),file?.name||'활동일지.hwpx');
  const document=new Y.Doc({gc:false});importParts(document,readHwpx(studio.exportHwpx()));
  const seed=encodeEnvelope(Y.encodeStateAsUpdate(document),c.uid,session);
  const suffix=who.id.startsWith(`${who.week}-`)?` (${who.id.slice(who.week.length+1)})`:'',title=($('#doc-title').value.trim()||`${who.week} 활동일지${suffix}`).slice(0,150);
