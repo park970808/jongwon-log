@@ -1993,13 +1993,40 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     }
     return changed;
   };
+  // A row whose fixed height is taller than a page can never fit: it runs off the page and stays that tall
+  // even after its text is deleted. Such heights come from accidental row resizing (for example Shift+arrow
+  // while several cells are selected). Give those rows back a normal minimum so they follow their text again.
+  const shrinkOversizedRows = (): boolean => {
+    const seen = new Set<string>();
+    let changed = false;
+    for (let p = 0; p < wasm.pageCount; p++) {
+      let controls: any[] = [];
+      try { controls = wasm.getPageControlLayout(p).controls; } catch { continue; }
+      for (const c of controls) {
+        if (c.type !== 'table' || c.stableIndex?.length !== 3) continue;
+        const key = `${c.secIdx}:${c.paraIdx}:${c.controlIdx}`;
+        if (seen.has(key)) continue; seen.add(key);
+        try {
+          const def: any = wasm.getPageDef(c.secIdx);
+          const body = def.height - def.marginTop - def.marginBottom - def.marginHeader - def.marginFooter;
+          const cells = wasm.getTableDimensions(c.secIdx, c.paraIdx, c.controlIdx).cellCount;
+          for (let i = 0; i < cells; i++) {
+            const props = wasm.getCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i);
+            if (props.height <= body) continue;
+            if (wasm.setCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i, { height: Math.round(body / 5) } as any).ok) changed = true;
+          }
+        } catch (error) { console.warn('[jongwon] 너무 높은 표 줄을 줄이지 못했습니다:', error); }
+      }
+    }
+    return changed;
+  };
   let tallTimer: any = null;
   const scheduleTallTables = () => {
     clearTimeout(tallTimer);
     tallTimer = setTimeout(() => {
       if (blocked || !inputHandler) return;
       if (applying || composing) { scheduleTallTables(); return; }
-      if (splitTallInlineTables()) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
+      if ([shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
     }, 800);
   };
   eventBus.on('document-changed', () => { if (!applying) scheduleTallTables(); });
