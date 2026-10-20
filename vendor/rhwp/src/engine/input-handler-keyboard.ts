@@ -1255,8 +1255,14 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
       return;
     }
     if (e.shiftKey && isArrow) {
+      // 공동 활동일지: Shift+방향키는 선택을 넓히는 키로 쓴다. 글자를 끌어 여러 칸이 잡힌 뒤 Shift+↓로
+      // 선택을 늘리던 사람이 모르게 줄 높이를 바꾸어(누를 때마다 커짐), 줄이 쪽보다 높아지는 일을 막는다.
       e.preventDefault();
-      this.resizeCellBoundaryByKeyboard(e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight');
+      this.cursor.expandCellSelection(
+        e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0,
+        e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0,
+      );
+      this.updateCellSelection();
       return;
     }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
