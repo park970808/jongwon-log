@@ -1958,6 +1958,51 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   }, true);
   const notify = () => { if (!applying && !composing) changes.forEach(fn => fn()); };
   eventBus.on('document-changed', notify);
+  /**
+   * A table set to "treat as a character" (common in Hancom forms) cannot be split across pages by this editor:
+   * once its content is taller than a page, the rest is cut off at the page bottom. Hancom splits such tables.
+   * Make only those tables ordinary (non-inline) tables at the same place, so their rows continue on the next
+   * page. Tables that fit a page are left exactly as they are.
+   */
+  const splitTallInlineTables = (): boolean => {
+    const seen = new Set<string>(), tall: any[] = [];
+    for (let p = 0; p < wasm.pageCount; p++) {
+      let controls: any[] = [];
+      try { controls = wasm.getPageControlLayout(p).controls; } catch { continue; }
+      for (const c of controls) {
+        if (c.type !== 'table' || c.stableIndex?.length !== 3) continue;
+        const key = `${c.secIdx}:${c.paraIdx}:${c.controlIdx}`;
+        if (seen.has(key)) continue; seen.add(key);
+        let def: any; try { def = wasm.getPageDef(c.secIdx); } catch { continue; }
+        const body = (def.height - def.marginTop - def.marginBottom - def.marginHeader - def.marginFooter) / 75;
+        if (c.h > body + 2) tall.push(c);
+      }
+    }
+    let changed = false;
+    for (const c of tall) {
+      try {
+        if (!wasm.getTableProperties(c.secIdx, c.paraIdx, c.controlIdx).treatAsChar) continue;
+        const base = { treatAsChar: false, textWrap: 'TopAndBottom', vertRelTo: 'Para', vertAlign: 'Top', vertOffset: 0, horzRelTo: 'Para', horzAlign: 'Left', horzOffset: 0 };
+        if (!wasm.setTableProperties(c.secIdx, c.paraIdx, c.controlIdx, base as any).ok) continue;
+        changed = true;
+        // keep the table where it was horizontally (an inline table follows its paragraph's alignment)
+        const now = wasm.getTableBBox(c.secIdx, c.paraIdx, c.controlIdx);
+        const shift = Math.round((c.x - now.x) * 75);
+        if (Math.abs(shift) > 75) wasm.setTableProperties(c.secIdx, c.paraIdx, c.controlIdx, { horzOffset: shift } as any);
+      } catch (error) { console.warn('[jongwon] 긴 표를 쪽 나눔 가능하게 바꾸지 못했습니다:', error); }
+    }
+    return changed;
+  };
+  let tallTimer: any = null;
+  const scheduleTallTables = () => {
+    clearTimeout(tallTimer);
+    tallTimer = setTimeout(() => {
+      if (blocked || !inputHandler) return;
+      if (applying || composing) { scheduleTallTables(); return; }
+      if (splitTallInlineTables()) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
+    }, 800);
+  };
+  eventBus.on('document-changed', () => { if (!applying) scheduleTallTables(); });
   eventBus.on('document-mutated', notify);
   document.addEventListener('beforeinput', event => {
     const e=event as InputEvent;
@@ -2010,6 +2055,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       await initPromise; applying = true;
       try { await loadBytes(bytes,name,null,undefined,{skipRecent:true,suppressDialogs:true}); }
       finally { applying = false; }
+      scheduleTallTables();
     },
     setImageInsertionFactory(factory: () => any) { imageInsertionFactory=factory; },
     // After a photo changes a cell's height, the in-place layout can paginate the table differently from a full
@@ -2153,6 +2199,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         }
         container.scrollTop=top;container.scrollLeft=left;
       } finally { applying=false; }
+      scheduleTallTables();
     },
     flushInput() {
       if (blocked || applying || !inputHandler) return;
