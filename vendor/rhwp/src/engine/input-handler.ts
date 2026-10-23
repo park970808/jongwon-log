@@ -47,6 +47,7 @@ import type { NavigationKeyInput } from './navigation-keymap';
 import { isPointNearBoxBorder } from './table-border-hit';
 import { DeferredPaginationRunner } from './deferred-pagination-runner';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
+import { noteTableCopied } from '../jongwon/cell-table';
 import { clearObjectEditingPage } from './object-selection-page';
 import { showInitialCaretAndPublishFocus } from './initial-caret-focus';
 import { CaretLayoutReveal } from './caret-layout-reveal';
@@ -5268,6 +5269,7 @@ export class InputHandler {
             ) || '';
           } catch { /* 무시 */ }
           const markedHtml = _keyboard.prepareRhwpInternalClipboardHtml(this, html, text);
+          noteTableCopied(this.wasm, ref, markedHtml, text);
           _keyboard.writeTextHtmlToClipboard(text, markedHtml)
             .catch(() => navigator.clipboard.writeText(text).catch(() => {}));
         } catch (err) {

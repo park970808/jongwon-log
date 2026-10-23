@@ -338,7 +338,7 @@ export const tableCommands: CommandDef[] = [
       if (!ih) return;
       const pos = ih.getCursorPosition();
       if (pos.parentParaIndex !== undefined) {
-        if (!canBuildTableInCell(ih, pos)) { alert('표 안의 표 칸이나 머리말·글상자 안에는 표를 만들 수 없습니다.'); return; }
+        if (!canBuildTableInCell(ih, pos)) { alert('머리말·꼬리말·각주·글상자 안에는 표를 만들 수 없습니다.'); return; }
         const dialog = new TableCreateDialog();
         dialog.onApply = (rows, cols) => {
           const ih2 = services.getInputHandler();
