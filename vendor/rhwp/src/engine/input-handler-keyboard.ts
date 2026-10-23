@@ -20,6 +20,7 @@ import type { WasmBridge } from '@/core/wasm-bridge';
 import { prepareImageFile } from '../jongwon/prepare-image';
 import { isCellInlinePicture, removeCellPicture, placeClipboardPictureInCell, clipboardHoldsCopiedPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh, hasKeptPicture, keptPictureText, insertKeptPictureInCell } from '../jongwon/cell-picture';
 import { showToast } from '@/ui/toast';
+import { buildTableInCell, canBuildTableInCell, tableSpecFromHtml, cellInnerWidth, copiedTableFor, pasteClipboardTableInCell, withCopiedSizes } from '../jongwon/cell-table';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
 import { scrollByPageStep, type PageScrollDirection } from '@/view/page-scroll';
 import { emitHeaderFooterModeChanged } from './header-footer-mode';
@@ -1957,6 +1958,20 @@ export function onPaste(this: any, e: ClipboardEvent): void {
     return;
   }
 
+  // Jongwon: a table copied in this editor and pasted into a table cell (any depth). If it fits the cell it goes in
+  // as copied (every format kept); otherwise it is rebuilt from its HTML copy, narrowed to the cell.
+  if (useInternalClipboard && this.wasm.clipboardHasControl() && canBuildTableInCell(this, pos) && /<table[\s>]/i.test(html)) {
+    const sizes = copiedTableFor(html);
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInCell', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      const p = this.cursor.getPosition();
+      if (sizes && sizes.width <= cellInnerWidth(wasm, p)) return pasteClipboardTableInCell(wasm, p);
+      return buildTableInCell(wasm, p, withCopiedSizes(tableSpecFromHtml(html, this.container?.ownerDocument)!, sizes));
+    }});
+    requestLayoutRefresh(this);
+    return;
+  }
+
   if (useInternalClipboard) {
     // 컨트롤(개체) 붙여넣기 — 본문에서만 허용
     if (this.wasm.clipboardHasControl() && pos.parentParaIndex === undefined) {
@@ -2021,6 +2036,18 @@ export function onPaste(this: any, e: ClipboardEvent): void {
         }
       }
     }
+  }
+
+  // Jongwon: a table (from 한글, Excel, the web, or copied here before a teammate's change reloaded the document)
+  // pasted into a table cell becomes a table inside the cell; the editor's own HTML paste drops it to plain text.
+  const cellTable = html && canBuildTableInCell(this, pos) ? withCopiedSizes(tableSpecFromHtml(html, this.container?.ownerDocument), copiedTableFor(html)) : null;
+  if (cellTable) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInCell', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      return buildTableInCell(wasm, this.cursor.getPosition(), cellTable);
+    }});
+    requestLayoutRefresh(this);
+    return;
   }
 
   // 외부 클립보드: HTML이 있으면 pasteHtml로 표/서식 보존 붙여넣기
