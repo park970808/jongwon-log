@@ -292,11 +292,16 @@ export function canUseDeferredCellTextDelete(pos: DocumentPosition, count: numbe
   return Number.isInteger(count) && count > 0 && count <= MAX_PAGE_LOCAL_TEXT_EDIT_CHARS;
 }
 
+const DISABLE_DEFERRED_CELL_REPLACE = true;
+
 export function canUseDeferredCellTextReplace(
   pos: DocumentPosition,
   deleteCount: number,
   text: string,
 ): boolean {
+  // 공동 활동일지: 한글 조합 중 글자 바꿔치기(replace)를 셀에서 빠른 경로로 처리하면, 둘째 줄부터 줄이
+  // 바뀌지 않고 글자가 한 줄에 눌려 들어가는 엔진 문제가 있다. 지우기+넣기 경로는 줄을 바르게 나눈다.
+  if (DISABLE_DEFERRED_CELL_REPLACE) return false;
   if (!isCell(pos) || isNestedCell(pos)) return false;
   if (
     !Number.isInteger(deleteCount) ||

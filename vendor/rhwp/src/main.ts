@@ -2034,13 +2034,44 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     }
     return changed;
   };
+  // Paragraphs saved while the old Korean-input path squeezed a line: their last line is empty and the text
+  // before it is crammed into one line. Re-lay them out (insert and remove a character at the end).
+  const fixSqueezedCellLines = (): boolean => {
+    const seen = new Set<string>();
+    let changed = false;
+    for (let p = 0; p < wasm.pageCount; p++) {
+      let controls: any[] = [];
+      try { controls = wasm.getPageControlLayout(p).controls; } catch { continue; }
+      for (const c of controls) {
+        if (c.type !== 'table' || c.stableIndex?.length !== 3) continue;
+        const key = `${c.secIdx}:${c.paraIdx}:${c.controlIdx}`;
+        if (seen.has(key)) continue; seen.add(key);
+        try {
+          const cells = wasm.getTableDimensions(c.secIdx, c.paraIdx, c.controlIdx).cellCount;
+          for (let i = 0; i < cells; i++) {
+            const paras = wasm.getCellParagraphCount(c.secIdx, c.paraIdx, c.controlIdx, i);
+            for (let q = 0; q < paras; q++) {
+              const len = wasm.getCellParagraphLength(c.secIdx, c.paraIdx, c.controlIdx, i, q);
+              if (!len) continue;
+              const line = wasm.getLineInfoInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len);
+              if (line.lineCount < 2 || line.charStart !== len) continue;
+              wasm.insertTextInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len, ' ');
+              wasm.deleteTextInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len, 1);
+              changed = true;
+            }
+          }
+        } catch (error) { console.warn('[jongwon] 눌린 줄을 다시 나누지 못했습니다:', error); }
+      }
+    }
+    return changed;
+  };
   let tallTimer: any = null;
   const scheduleTallTables = () => {
     clearTimeout(tallTimer);
     tallTimer = setTimeout(() => {
       if (blocked || !inputHandler) return;
       if (applying || composing) { scheduleTallTables(); return; }
-      if ([shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
+      if ([fixSqueezedCellLines(), shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
     }, 800);
   };
   eventBus.on('document-changed', () => { if (!applying) scheduleTallTables(); });
