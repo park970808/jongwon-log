@@ -1,6 +1,8 @@
 import type { CommandDef, CommandServices, EditorContext } from '../types';
 import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 import { TableCreateDialog } from '@/ui/table-create-dialog';
+import { buildTableInCell, canBuildTableInCell } from '@/jongwon/cell-table';
+import { requestLayoutRefresh } from '@/jongwon/cell-picture';
 import type { TableCreateOptions } from '@/ui/table-create-dialog';
 import { CellSplitDialog } from '@/ui/cell-split-dialog';
 import { CellBorderBgDialog } from '@/ui/cell-border-bg-dialog';
@@ -329,12 +331,29 @@ function applyTableDeleteRowColumn(
 export const tableCommands: CommandDef[] = [
   { id: 'table:create', label: '표 만들기', icon: 'icon-table',
     opensDialog: true,
-    canExecute: (ctx) => ctx.hasDocument && !ctx.inTable,
+    // 공동 활동일지: 표 칸 안에서도 표를 만든다(칸 안에 글자처럼 취급하는 표).
+    canExecute: (ctx) => ctx.hasDocument && (!ctx.inTable || !ctx.inCellSelectionMode),
     execute(services, params) {
       const ih = services.getInputHandler();
       if (!ih) return;
       const pos = ih.getCursorPosition();
-      if (pos.parentParaIndex !== undefined) return;
+      if (pos.parentParaIndex !== undefined) {
+        if (!canBuildTableInCell(ih, pos)) { alert('표 안의 표 칸이나 머리말·글상자 안에는 표를 만들 수 없습니다.'); return; }
+        const dialog = new TableCreateDialog();
+        dialog.onApply = (rows, cols) => {
+          const ih2 = services.getInputHandler();
+          if (!ih2) return;
+          safeTableOp(() => ih2.executeOperation({
+            kind: 'snapshot',
+            operationType: 'createTableInCell',
+            operation: (wasm) => buildTableInCell(wasm, pos, { rows, cols }),
+          }), '표 만들기');
+          requestLayoutRefresh(ih2);
+          (ih2 as any).textarea?.focus();
+        };
+        dialog.show(params?.anchorEl as HTMLElement | undefined);
+        return;
+      }
       const dialog = new TableCreateDialog();
       dialog.onApply = (rows, cols, options?: TableCreateOptions) => {
         const ih2 = services.getInputHandler();

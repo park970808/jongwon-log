@@ -20,6 +20,7 @@ import type { WasmBridge } from '@/core/wasm-bridge';
 import { prepareImageFile } from '../jongwon/prepare-image';
 import { isCellInlinePicture, removeCellPicture, placeClipboardPictureInCell, clipboardHoldsCopiedPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh, hasKeptPicture, keptPictureText, insertKeptPictureInCell } from '../jongwon/cell-picture';
 import { showToast } from '@/ui/toast';
+import { buildTableInCell, canBuildTableInCell, tableSpecFromHtml } from '../jongwon/cell-table';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
 import { scrollByPageStep, type PageScrollDirection } from '@/view/page-scroll';
 import { emitHeaderFooterModeChanged } from './header-footer-mode';
@@ -1957,6 +1958,19 @@ export function onPaste(this: any, e: ClipboardEvent): void {
     return;
   }
 
+  // Jongwon: a table copied in this editor and pasted into a table cell is rebuilt to the cell's width from its
+  // HTML copy (contents, merged cells, cell colours); pasted as is it would stick out of the cell.
+  const copiedTable = useInternalClipboard && this.wasm.clipboardHasControl() && html && canBuildTableInCell(this, pos)
+    ? tableSpecFromHtml(html, this.container?.ownerDocument) : null;
+  if (copiedTable) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInCell', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      return buildTableInCell(wasm, this.cursor.getPosition(), copiedTable);
+    }});
+    requestLayoutRefresh(this);
+    return;
+  }
+
   if (useInternalClipboard) {
     // 컨트롤(개체) 붙여넣기 — 본문에서만 허용
     if (this.wasm.clipboardHasControl() && pos.parentParaIndex === undefined) {
@@ -2021,6 +2035,18 @@ export function onPaste(this: any, e: ClipboardEvent): void {
         }
       }
     }
+  }
+
+  // Jongwon: a table (from 한글, Excel, the web, or copied here before a teammate's change reloaded the document)
+  // pasted into a table cell becomes a table inside the cell; the editor's own HTML paste drops it to plain text.
+  const cellTable = html && canBuildTableInCell(this, pos) ? tableSpecFromHtml(html, this.container?.ownerDocument) : null;
+  if (cellTable) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInCell', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      return buildTableInCell(wasm, this.cursor.getPosition(), cellTable);
+    }});
+    requestLayoutRefresh(this);
+    return;
   }
 
   // 외부 클립보드: HTML이 있으면 pasteHtml로 표/서식 보존 붙여넣기
