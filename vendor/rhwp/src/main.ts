@@ -2036,6 +2036,11 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   };
   // Paragraphs saved while the old Korean-input path squeezed a line: their last line is empty and the text
   // before it is crammed into one line. Re-lay them out (insert and remove a character at the end).
+  // Runs once after a document is loaded (open / teammate update), never after every edit. A paragraph that
+  // legitimately ends on an empty line (Shift+Enter at the end) looks the same; it is skipped, and anything that
+  // re-checks as unchanged is remembered so it is never touched again (otherwise the editor redraws forever).
+  let squeezeCheckPending = false;
+  const squeezeIgnored = new Set<string>();
   const fixSqueezedCellLines = (): boolean => {
     const seen = new Set<string>();
     let changed = false;
@@ -2055,8 +2060,13 @@ if (new URLSearchParams(location.search).has('collaboration')) {
               if (!len) continue;
               const line = wasm.getLineInfoInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len);
               if (line.lineCount < 2 || line.charStart !== len) continue;
+              const last = wasm.getTextInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len - 1, 1);
+              const id = `${c.secIdx}:${c.paraIdx}:${c.controlIdx}:${i}:${q}:${len}:${last}`;
+              if (!last || /\s/.test(last) || squeezeIgnored.has(id)) continue;
               wasm.insertTextInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len, ' ');
               wasm.deleteTextInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len, 1);
+              const after = wasm.getLineInfoInCell(c.secIdx, c.paraIdx, c.controlIdx, i, q, len);
+              if (after.lineCount >= 2 && after.charStart === len) { squeezeIgnored.add(id); continue; }
               changed = true;
             }
           }
@@ -2071,7 +2081,14 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     tallTimer = setTimeout(() => {
       if (blocked || !inputHandler) return;
       if (applying || composing) { scheduleTallTables(); return; }
-      if ([fixSqueezedCellLines(), shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) { (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed'); }
+      const squeezed = squeezeCheckPending && fixSqueezedCellLines();
+      squeezeCheckPending = false;
+      if ([squeezed, shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) {
+        // a clean-up is not the user's edit: keep the view where the user scrolled it
+        const view = document.getElementById('scroll-container'), top = view?.scrollTop, left = view?.scrollLeft;
+        (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed');
+        if (view && top !== undefined) { view.scrollTop = top; view.scrollLeft = left!; }
+      }
     }, 800);
   };
   eventBus.on('document-changed', () => { if (!applying) scheduleTallTables(); });
@@ -2127,7 +2144,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       await initPromise; applying = true;
       try { await loadBytes(bytes,name,null,undefined,{skipRecent:true,suppressDialogs:true}); }
       finally { applying = false; }
-      scheduleTallTables();
+      squeezeCheckPending = true; scheduleTallTables();
     },
     setImageInsertionFactory(factory: () => any) { imageInsertionFactory=factory; },
     // After a photo changes a cell's height, the in-place layout can paginate the table differently from a full
@@ -2271,7 +2288,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
         }
         container.scrollTop=top;container.scrollLeft=left;
       } finally { applying=false; }
-      scheduleTallTables();
+      squeezeCheckPending = true; scheduleTallTables();
     },
     flushInput() {
       if (blocked || applying || !inputHandler) return;
