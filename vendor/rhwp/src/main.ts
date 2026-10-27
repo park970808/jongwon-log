@@ -1999,17 +1999,17 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   const shrinkOversizedRows = (): boolean => {
     const seen = new Set<string>();
     let changed = false;
-    // Rows holding a photo get their height from the photo fitting (fitCellPhotos); a big photo plus text can
-    // legitimately need more than a page. Leave those rows alone, or the photo would stick out of the table.
-    const photoRows = new Set<string>();
+    // A cell holding a photo gets its height from the photo fitting (fitCellPhotos); a big photo plus text can
+    // legitimately need more than a page, so those cells are left alone. Other cells in the same row (the row's
+    // label, say) never need that: an oversized one would keep the whole row that tall once the text is deleted.
+    const photoCells = new Set<string>();
     for (let p = 0; p < wasm.pageCount; p++) {
       let controls: any[] = [];
       try { controls = wasm.getPageControlLayout(p).controls; } catch { continue; }
       for (const c of controls) {
         const entry = c.type === 'image' ? c.cellPath?.[0] : null;
         if (!entry) continue;
-        const control = entry.controlIndex ?? entry.controlIdx, cell = entry.cellIndex ?? entry.cellIdx;
-        try { photoRows.add(`${c.secIdx}:${c.paraIdx}:${control}:${wasm.getCellInfo(c.secIdx, c.paraIdx, control, cell).row}`); } catch { /* ignore */ }
+        photoCells.add(`${c.secIdx}:${c.paraIdx}:${entry.controlIndex ?? entry.controlIdx}:${entry.cellIndex ?? entry.cellIdx}`);
       }
     }
     for (let p = 0; p < wasm.pageCount; p++) {
@@ -2026,7 +2026,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
           for (let i = 0; i < cells; i++) {
             const props = wasm.getCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i);
             if (props.height <= body) continue;
-            if (photoRows.has(`${c.secIdx}:${c.paraIdx}:${c.controlIdx}:${wasm.getCellInfo(c.secIdx, c.paraIdx, c.controlIdx, i).row}`)) continue;
+            if (photoCells.has(`${c.secIdx}:${c.paraIdx}:${c.controlIdx}:${i}`)) continue;
             if (wasm.setCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i, { height: Math.round(body / 5) } as any).ok) changed = true;
           }
         } catch (error) { console.warn('[jongwon] 너무 높은 표 줄을 줄이지 못했습니다:', error); }
