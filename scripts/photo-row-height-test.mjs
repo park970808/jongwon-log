@@ -25,4 +25,17 @@ try{
  const height=await a.evaluate(ci=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm,d=w.getPageDef(0);return {h:w.getCellProperties(0,1,0,ci).height,body:d.height-d.marginTop-d.marginBottom-d.marginHeader-d.marginFooter};},ci);
  assert.ok(height.h>height.body,'the photo row keeps the height its photos need: '+JSON.stringify(height));
  console.log('PASS two big photos stay inside their cell (both screens)',JSON.stringify(height));
+ // the row's label cell stretched to ~8 pages (as in the team's document): it is reset, the photo cell is not,
+ // and deleting the text afterwards does not blow the table up
+ const label=ci-1;
+ await a.bringToFront();await a.evaluate(label=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;w.setCellProperties(0,1,0,label,{height:638994});},label);
+ await a.evaluate(q=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(q,true),at(1,0));await a.keyboard.insertText('y');await a.waitForTimeout(3500);
+ const fixed=await a.evaluate(([ci,label])=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;return {label:w.getCellProperties(0,1,0,label).height,photo:w.getCellProperties(0,1,0,ci).height};},[ci,label]);
+ assert.ok(fixed.label<20000,'label cell reset: '+JSON.stringify(fixed));assert.ok(fixed.photo>height.body,'photo cell kept');
+ await a.evaluate(q=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(q,true),at(ci,fill));
+ for(let i=0;i<120;i++)await a.keyboard.press('Backspace');await a.waitForTimeout(3500);
+ const tallest=await a.evaluate(()=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;let m=0;for(let i=0;i<w.pageCount;i++)for(const c of w.getPageControlLayout(i).controls)if(c.type==='table'&&c.stableIndex?.length===3)m=Math.max(m,c.h);return Math.round(m);});
+ assert.ok(tallest<1100,'no table part taller than a page after deleting: '+tallest);
+ const after=await check(a);assert.ok(after.every(x=>x.inside),'photos still inside: '+JSON.stringify(after));
+ console.log('PASS an oversized label cell next to photos is reset; deleting text keeps the table sane',JSON.stringify({fixed,tallest}));
 }finally{await browser.close();}
