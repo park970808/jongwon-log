@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 import {cloneDoc,deduplicateMovedParagraphs,snapshotParts,readHwpx,reconcileParts,writeHwpx} from './document-model.js';
 import {LOCAL,REMOTE} from './sync-provider.js';
+const CAPTURE_IDLE=300,CAPTURE_MAX=1500,REMOTE_QUIET=700,REMOTE_MAX=3000;
 const is=(n,name)=>n.tag?.split(':').at(-1)===name;
 const child=(n,name)=>n.children.filter(c=>is(c,name));
 function owned(n,name){const out=[];for(const c of [...n.children,...(n.rich||[]).filter(x=>typeof x.insert!=='string').map(x=>x.insert.node)]){if(is(c,name))out.push(c);else if(!is(c,'p'))out.push(...owned(c,name));}return out;}
@@ -121,7 +122,13 @@ export class EditorBinding {
  async start({alreadyOpen=false}={}){
    if(!alreadyOpen)await this.studio.open(writeHwpx(this.doc),'활동일지.hwpx');
    this.adoptNativeBaseline();
-   this.off=this.studio.subscribe(()=>{if(this.applying||this.stopped)return;this.dirty=true;clearTimeout(this.captureTimer);this.captureTimer=setTimeout(()=>this.capture(),100);});
+   // Recording an edit reads the whole document out of the editor (about a second with many photos), so do it
+   // once typing pauses rather than after every few letters — but at least every 1.5 s while typing goes on.
+   this.off=this.studio.subscribe(()=>{
+     if(this.applying||this.stopped)return;
+     const now=Date.now();this.lastLocalEdit=now;if(!this.dirty)this.dirtySince=now;this.dirty=true;
+     clearTimeout(this.captureTimer);this.captureTimer=setTimeout(()=>this.capture(),Math.max(0,Math.min(CAPTURE_IDLE,this.dirtySince+CAPTURE_MAX-now)));
+   });
    this.studio.setUndo(()=>void this.history('undo'),()=>void this.history('redo'));
    // Photo edits that change a cell's height are redrawn from the shared document, exactly as teammates see it.
    // Redraw once the person pauses (not after every photo action): each redraw reloads the whole document.
@@ -222,7 +229,12 @@ export class EditorBinding {
  }
  scheduleRemote(){
    if(this.remoteTimer||this.stopped)return;
-   this.remoteTimer=setTimeout(()=>{this.remoteTimer=null;void this.applyRemote();},200);
+   // Showing a teammate's change reloads the document and briefly holds typing; while this person is typing,
+   // wait for a pause (at most 3 s) so their typing is not interrupted again and again.
+   const first=this.remoteSince??=Date.now();
+   const wait=()=>{const quiet=Date.now()-(this.lastLocalEdit||0);return quiet<REMOTE_QUIET&&Date.now()-first<REMOTE_MAX?REMOTE_QUIET-quiet:0;};
+   const run=()=>{const more=wait();if(more>0){this.remoteTimer=setTimeout(run,more);return;}this.remoteTimer=null;this.remoteSince=null;void this.applyRemote();};
+   this.remoteTimer=setTimeout(run,200);
  }
  async applyRemote({force=false}={}){
    if(force)this.needsProjection=true;
