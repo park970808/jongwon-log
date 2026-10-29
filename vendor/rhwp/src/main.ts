@@ -45,6 +45,7 @@ import { CommandPalette } from '@/ui/command-palette';
 import { MODAL_DIALOG_CLOSED_EVENT } from '@/ui/dialog';
 import { showHmlImportWarning } from '@/ui/hml-import-warning';
 import { showToast } from '@/ui/toast';
+import { prepareImageFile } from './jongwon/prepare-image';
 import { addRecentDoc, listRecentDocs } from '@/recent/recent-store';
 import { showDropConfirmDialog } from '@/ui/drop-confirm-dialog';
 import { showHwpPasswordDialog } from '@/ui/hwp-password-dialog';
@@ -2115,7 +2116,48 @@ if (new URLSearchParams(location.search).has('collaboration')) {
     pendingInput.push({kind:'text',data:event.clipboardData?.getData('text/plain') || ''});
     event.preventDefault(); event.stopImmediatePropagation();
   }, true);
-  document.addEventListener('drop', e => { e.preventDefault(); e.stopImmediatePropagation(); }, true);
+  // 공동 활동일지: 폴더에서 사진을 끌어다 놓으면 놓은 자리에 넣는다(여러 장이면 차례로). 사진 넣기 버튼과
+  // 같은 길(크기 줄이기·혼자 한 줄·칸 높이 맞춤·팀원에게 전송)을 쓴다. 문서 파일이나 글자 끌어놓기는 막는다.
+  const imageFiles = (dt: DataTransfer | null) => [...(dt?.files ?? [])].filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|bmp|webp|heic|heif)$/i.test(f.name));
+  const dropPosition = (x: number, y: number): any => {
+    const handler = inputHandler as any;
+    const point = handler?.pagePointFromClientPoint?.(x, y);
+    if (!point) return null;
+    try { return wasm.hitTest(point.pageIdx, point.pageX, point.pageY); } catch { return null; }
+  };
+  const placeCaret = (position: any) => {
+    const handler = inputHandler as any;
+    if (!handler || !position) return false;
+    try { handler.cursor.clearSelection?.(); handler.cursor.moveTo(position); handler.active = true; handler.updateCaret(); return true; } catch { return false; }
+  };
+  let dragCaretAt = 0;
+  document.addEventListener('dragover', e => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    e.dataTransfer.dropEffect = blocked || applying ? 'none' : 'copy';
+    // show where the photo will go
+    if (!blocked && !applying && Date.now() - dragCaretAt > 120) { dragCaretAt = Date.now(); placeCaret(dropPosition(e.clientX, e.clientY)); }
+  }, true);
+  document.addEventListener('drop', e => {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const files = imageFiles(e.dataTransfer);
+    if (!files.length) return;
+    if (blocked || applying || !inputHandler) { showToast({ message: '문서를 갱신하는 중입니다. 잠시 뒤 다시 끌어다 놓아 주세요.', durationMs: 4000 }); return; }
+    if (!placeCaret(dropPosition(e.clientX, e.clientY))) { showToast({ message: '사진을 넣을 자리를 찾지 못했습니다. 글이 있는 곳에 놓아 주세요.', durationMs: 4000 }); return; }
+    void (async () => {
+      (inputHandler as any)?.focus?.();
+      for (const file of files) {
+        try {
+          const insert = (window as any).jongwonStudio?.prepareImageInsertion?.();
+          if (!insert) throw new Error('편집기를 준비하는 중입니다.');
+          const prepared = await prepareImageFile(file);
+          await insert(prepared.data, prepared.ext, prepared.naturalWidth, prepared.naturalHeight, prepared.fileName);
+        } catch (error) {
+          showToast({ message: `${file.name} 사진을 넣지 못했습니다.\n${error instanceof Error ? error.message : String(error)}`, durationMs: 6000 });
+        }
+      }
+    })();
+  }, true);
   document.addEventListener('keydown', e => {
     if (blocked) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (applying) {
