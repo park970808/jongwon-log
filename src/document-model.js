@@ -16,7 +16,18 @@ const elements = n => Array.from(n.childNodes || []).filter(x => x.nodeType === 
 // photo-heavy documents slow, so hashes of recent binaries are reused after a full byte comparison (cheap).
 const hashCache = []; // most recent last; at most HASH_CACHE entries (≈ the photos of one weekly log)
 const HASH_CACHE = 32;
-const sameBytes = (a, b) => { if (a === b) return true; if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+const sameBytes = (a, b) => {
+  if (a === b) return true; if (a.length !== b.length) return false;
+  // Compare 4 bytes at a time when both are word-aligned (unzipped files are): photos are megabytes.
+  let i = 0;
+  if (a.byteOffset % 4 === 0 && b.byteOffset % 4 === 0) {
+    const n = a.length >>> 2, x = new Int32Array(a.buffer, a.byteOffset, n), y = new Int32Array(b.buffer, b.byteOffset, n);
+    for (; i < n; i++) if (x[i] !== y[i]) return false;
+    i = n << 2;
+  }
+  for (; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
 function binaryHash(bytes) {
   if (bytes.length < 64 * 1024) return bytesToHex(sha256(bytes));
   const i = hashCache.findIndex(entry => sameBytes(entry.bytes, bytes));

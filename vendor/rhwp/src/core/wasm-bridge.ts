@@ -215,6 +215,24 @@ import type { FileSystemFileHandleLike } from '@/command/file-system-access';
  * 입력: 'bold 14.5px "안상수2006가는", sans-serif'
  * 출력: 'bold 14.5px "돋움", sans-serif'
  */
+/**
+ * Jongwon: the document identity the renderer caches are keyed by. blake3 in plain JS took about 1 s for a log
+ * with photos (≈13 MB) on every load — every teammate change reloads the document — so use two fast 32-bit
+ * hashes over all bytes (+ length) instead: still content-based (same bytes → same identity), ~100× faster.
+ */
+function documentDigestOf(data: Uint8Array): string {
+  let a = 0x811c9dc5, b = 0x9747b28c;
+  const n = data.length, words = n >>> 2;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  for (let i = 0; i < words; i++) {
+    const w = view.getUint32(i << 2, true);
+    a = Math.imul(a ^ w, 0x01000193);
+    b = Math.imul(b ^ (w >>> 16 | w << 16), 0x5bd1e995); b ^= b >>> 15;
+  }
+  for (let i = words << 2; i < n; i++) { a = Math.imul(a ^ data[i], 0x01000193); b = Math.imul(b ^ data[i], 0x5bd1e995); }
+  return `fast:${n}:${(a >>> 0).toString(16).padStart(8, '0')}${(b >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 function substituteCssFontFamily(cssFont: string): string {
   const pxIdx = cssFont.indexOf('px ');
   if (pxIdx < 0) return cssFont;
@@ -343,7 +361,7 @@ export class WasmBridge {
     createDocument: () => HwpDocument,
   ): DocumentInfo {
     const nextFileName = fileName ?? 'document.hwp';
-    const nextDocumentDigest = `blake3:${bytesToHex(blake3(data))}`;
+    const nextDocumentDigest = documentDigestOf(data);
     let nextDoc: HwpDocument | null = null;
 
     try {
