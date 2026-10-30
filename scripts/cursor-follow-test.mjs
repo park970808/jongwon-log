@@ -29,6 +29,8 @@ try{
  const end=await a.evaluate(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getCellParagraphLength(0,1,0,26,0));
  await put(a,cell(26,0,end));
  const mine=(async()=>{for(let i=0;i<20;i++){await a.keyboard.insertText('가');await a.waitForTimeout(150);}})();
+ // (the teammate starts typing once my lines reached their screen)
+ await b.waitForFunction(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getCellParagraphLength(0,1,0,26,0)>=32,null,{timeout:15000});
  await put(b,cell(26,0,9));for(let i=0;i<5;i++){await b.keyboard.insertText('비');await b.waitForTimeout(300);}await b.keyboard.press('Shift+Enter');await b.keyboard.insertText('새줄');
  await mine;await a.bringToFront();await a.waitForTimeout(3000);
  const big=await a.evaluate(()=>document.querySelector('#studio').contentWindow.__inputHandler.wasm.getTextInCell(0,1,0,26,0,0,2000));
