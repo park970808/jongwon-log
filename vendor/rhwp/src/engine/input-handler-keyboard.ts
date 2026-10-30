@@ -20,7 +20,7 @@ import type { WasmBridge } from '@/core/wasm-bridge';
 import { prepareImageFile } from '../jongwon/prepare-image';
 import { isCellInlinePicture, removeCellPicture, placeClipboardPictureInCell, clipboardHoldsCopiedPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh, hasKeptPicture, keptPictureText, insertKeptPictureInCell } from '../jongwon/cell-picture';
 import { showToast } from '@/ui/toast';
-import { buildTableInCell, canBuildTableInCell, tableSpecFromHtml, cellInnerWidth, copiedTableFor, pasteClipboardTableInCell, withCopiedSizes } from '../jongwon/cell-table';
+import { buildTableInCell, canBuildTableInCell, tableSpecFromHtml, cellInnerWidth, copiedTableFor, pasteClipboardTableInCell, withCopiedSizes, buildTableInBody, isJustATable } from '../jongwon/cell-table';
 import { caretAfterPastedTable } from '../jongwon/trailing-paragraph';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
 import { scrollByPageStep, type PageScrollDirection } from '@/view/page-scroll';
@@ -2046,6 +2046,19 @@ export function onPaste(this: any, e: ClipboardEvent): void {
     this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInCell', operation: (wasm: WasmBridge) => {
       if (hasSelection) this.deleteSelection({ deferRecord: true });
       return buildTableInCell(wasm, this.cursor.getPosition(), cellTable);
+    }});
+    requestLayoutRefresh(this);
+    return;
+  }
+
+  // Jongwon: a table copied from 한글/Excel/the web or another log, pasted into the body, is rebuilt from its HTML
+  // (merged cells, widths fitted to the page, contents, borders, colours) on its own line with the caret after it.
+  const bodyTable = html && pos.parentParaIndex === undefined && !this.cursor.isInTextBox?.() && !this.cursor.isInFootnote?.()
+    && isJustATable(html, this.container?.ownerDocument) ? withCopiedSizes(tableSpecFromHtml(html, this.container?.ownerDocument), copiedTableFor(html)) : null;
+  if (bodyTable) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'pasteTableInBody', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      return buildTableInBody(wasm, this.cursor.getPosition(), bodyTable);
     }});
     requestLayoutRefresh(this);
     return;
