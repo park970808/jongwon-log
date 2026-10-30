@@ -39,3 +39,22 @@ export function caretAfterPastedTable(wasm: WasmBridge, pos: any): any {
     return { sectionIndex: pos.sectionIndex, paragraphIndex: para + 1, charOffset: 0 };
   return { ...pos, paragraphIndex: para };
 }
+
+/**
+ * The activity-log form has a wider left margin (13 mm) than right (8 mm), so its page-wide tables sit to the
+ * right of the paper's centre. Make the left and right margins equal (same writing width), so the tables and the
+ * text are centred on the page, in this editor and in 한글. Returns true when a margin changed.
+ */
+export function centerBodyOnPage(wasm: WasmBridge): boolean {
+  let changed = false;
+  const sections = wasm.getSectionCount();
+  for (let sec = 0; sec < sections; sec++) {
+    try {
+      const def: any = wasm.getPageDef(sec);
+      if (Math.abs(def.marginLeft - def.marginRight) <= 30) continue;
+      const side = Math.round((def.marginLeft + def.marginRight) / 2);
+      if (wasm.setPageDef(sec, { ...def, marginLeft: side, marginRight: side }).ok) changed = true;
+    } catch (error) { console.warn('[jongwon] 쪽 여백을 맞추지 못했습니다:', error); }
+  }
+  return changed;
+}
