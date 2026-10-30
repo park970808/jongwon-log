@@ -26,3 +26,10 @@ test('continued cell height includes text after the picture and bottom padding',
  assert.equal(cellPictureOverflow(tree,control(390),6),36);
  tree.root.bounds.height+=36;assert.equal(cellPictureOverflow(tree,control(390),6),0);
 });
+
+test('a photo cut where its cell reaches the page end is a page split: growing the cell would not help',()=>{
+ // the photo (y 58.6, 474 tall) starts on this page fragment of its cell, which runs to the page end at 1066
+ const tree={root:{groupKind:{kind:'tableCell'},bounds:{x:180,y:20,width:600,height:300},ops:[paint(390)]}};
+ assert.ok(cellPictureOverflow(tree,control(390),6)>0,'cut inside the page');
+ assert.equal(cellPictureOverflow(tree,control(390),6,320),0,'cell runs to the page end: no growth');
+});

@@ -48,11 +48,14 @@ export function measureCellPictureOverflow(tree){
   }
   walk(tree.root);
   for(const cell of cells)cell.bottom=Math.max(...cell.ops.map(op=>op.bbox.y+op.bbox.height));
-  return (control,padding=4)=>{
+  // pageBottom: where the page body ends. A cell that reaches it continues on the next page; a photo cut there
+  // is cut by the page split, which a taller cell cannot fix (growing it then only added blank pages, endlessly).
+  return (control,padding=4,pageBottom=Infinity)=>{
     const cell=cells.find(c=>c.ops.some(op=>op.type==='image'&&matches(op,control)));
-    return cell?Math.max(0,cell.bottom+padding-cell.bounds.y-cell.bounds.height):0;
+    if(!cell||cell.bounds.y+cell.bounds.height>=pageBottom-2)return 0;
+    return Math.max(0,cell.bottom+padding-cell.bounds.y-cell.bounds.height);
   };
 }
-export function cellPictureOverflow(tree,control,padding=4){
-  return measureCellPictureOverflow(tree)(control,padding);
+export function cellPictureOverflow(tree,control,padding=4,pageBottom=Infinity){
+  return measureCellPictureOverflow(tree)(control,padding,pageBottom);
 }

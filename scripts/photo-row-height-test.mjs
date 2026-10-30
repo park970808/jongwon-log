@@ -1,5 +1,5 @@
-// A cell holding big photos may need to be taller than a page. The clean-up that resets accidentally oversized
-// rows must leave such rows alone, or the photos stick out of the table.
+// Big photos in a cell stay inside the table, without the cell's own height growing past a page (that became
+// dozens of blank pages in 한글). The clean-up that resets oversized rows keeps the photos inside.
 import {chromium} from '@playwright/test';import assert from 'node:assert/strict';
 const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
 try{
@@ -23,7 +23,7 @@ try{
  const mine=await check(a);assert.equal(mine.length,2,JSON.stringify(mine));assert.ok(mine.every(x=>x.inside),'photos stay inside the table: '+JSON.stringify(mine));
  await b.bringToFront();await b.waitForTimeout(4000);const peer=await check(b);assert.ok(peer.length===2&&peer.every(x=>x.inside),'teammate: '+JSON.stringify(peer));
  const height=await a.evaluate(ci=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm,d=w.getPageDef(0);return {h:w.getCellProperties(0,1,0,ci).height,body:d.height-d.marginTop-d.marginBottom-d.marginHeader-d.marginFooter};},ci);
- assert.ok(height.h>height.body,'the photo row keeps the height its photos need: '+JSON.stringify(height));
+ assert.ok(height.h<=height.body,'the photo cell is not set taller than a page: '+JSON.stringify(height));
  console.log('PASS two big photos stay inside their cell (both screens)',JSON.stringify(height));
  // the row's label cell stretched to ~8 pages (as in the team's document): it is reset, the photo cell is not,
  // and deleting the text afterwards does not blow the table up
@@ -31,7 +31,7 @@ try{
  await a.bringToFront();await a.evaluate(label=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;w.setCellProperties(0,1,0,label,{height:638994});},label);
  await a.evaluate(q=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(q,true),at(1,0));await a.keyboard.insertText('y');await a.waitForTimeout(3500);
  const fixed=await a.evaluate(([ci,label])=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;return {label:w.getCellProperties(0,1,0,label).height,photo:w.getCellProperties(0,1,0,ci).height};},[ci,label]);
- assert.ok(fixed.label<20000,'label cell reset: '+JSON.stringify(fixed));assert.ok(fixed.photo>height.body,'photo cell kept');
+ assert.ok(fixed.label<20000,'label cell reset: '+JSON.stringify(fixed));assert.ok((await check(a)).every(x=>x.inside),'photos still inside');
  await a.evaluate(q=>document.querySelector('#studio').contentWindow.jongwonStudio.restore(q,true),at(ci,fill));
  for(let i=0;i<120;i++)await a.keyboard.press('Backspace');await a.waitForTimeout(3500);
  const tallest=await a.evaluate(()=>{const w=document.querySelector('#studio').contentWindow.__inputHandler.wasm;let m=0;for(let i=0;i<w.pageCount;i++)for(const c of w.getPageControlLayout(i).controls)if(c.type==='table'&&c.stableIndex?.length===3)m=Math.max(m,c.h);return Math.round(m);});

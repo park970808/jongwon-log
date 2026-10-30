@@ -2251,12 +2251,15 @@ export class WasmBridge {
           const key=`${sec}:${parentPara}:${control}:${cell}`;
           let group=cells.get(key);
           if(!group){const props=this.getCellProperties(sec,parentPara,control,cell);group={sec,parentPara,control,cell,height:props.height,padding:props.paddingBottom/75+4,overflow:0};cells.set(key,group);}
-          group.overflow=Math.max(group.overflow,measure(picture,group.padding));
+          const def:any=this.getPageDef(sec),pageBottom=(def.height-def.marginBottom-def.marginFooter)/75;
+          group.overflow=Math.max(group.overflow,measure(picture,group.padding,pageBottom));
         }
       }
       const grow=[...cells.values()].filter(c=>c.overflow>0.2);
       if(!grow.length)break;
-      this.runInBatch(()=>{for(const c of grow){if(!this.setCellProperties(c.sec,c.parentPara,c.control,c.cell,{height:c.height+Math.ceil(c.overflow*75)+75}).ok)throw new Error('그림 셀의 높이를 조절하지 못했습니다.');}});
+      // never past a page: a taller minimum only leaves blank pages (in 한글 too)
+      this.runInBatch(()=>{for(const c of grow){const def:any=this.getPageDef(c.sec),body=def.height-def.marginTop-def.marginBottom-def.marginHeader-def.marginFooter;
+        if(!this.setCellProperties(c.sec,c.parentPara,c.control,c.cell,{height:Math.min(body,c.height+Math.ceil(c.overflow*75)+75)}).ok)throw new Error('그림 셀의 높이를 조절하지 못했습니다.');}});
       changed=true;
     }
     return changed;
