@@ -2001,9 +2001,9 @@ if (new URLSearchParams(location.search).has('collaboration')) {
   const shrinkOversizedRows = (): boolean => {
     const seen = new Set<string>();
     let changed = false;
-    // A cell holding a photo gets its height from the photo fitting (fitCellPhotos); a big photo plus text can
-    // legitimately need more than a page, so those cells are left alone. Other cells in the same row (the row's
-    // label, say) never need that: an oversized one would keep the whole row that tall once the text is deleted.
+    // A cell holding a photo gets its height from the photo fitting (fitCellPhotos), which never needs more than a
+    // page (photos plus text past that grow the row by themselves). Earlier versions kept growing photo cells cut
+    // at a page end, up to dozens of pages of blank space in 한글: those are fitted again from a normal height.
     const photoCells = new Set<string>();
     for (let p = 0; p < wasm.pageCount; p++) {
       let controls: any[] = [];
@@ -2028,8 +2028,10 @@ if (new URLSearchParams(location.search).has('collaboration')) {
           for (let i = 0; i < cells; i++) {
             const props = wasm.getCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i);
             if (props.height <= body) continue;
-            if (photoCells.has(`${c.secIdx}:${c.paraIdx}:${c.controlIdx}:${i}`)) continue;
-            if (wasm.setCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i, { height: Math.round(body / 5) } as any).ok) changed = true;
+            if (!wasm.setCellProperties(c.secIdx, c.paraIdx, c.controlIdx, i, { height: Math.round(body / 5) } as any).ok) continue;
+            changed = true;
+            // a photo cell grown past a page (by an earlier fitting loop): fit it again to its photos
+            if (photoCells.has(`${c.secIdx}:${c.paraIdx}:${c.controlIdx}:${i}`)) wasm.fitCellPictureHeights({ sec: c.secIdx, parentPara: c.paraIdx, control: c.controlIdx, cell: i });
           }
         } catch (error) { console.warn('[jongwon] 너무 높은 표 줄을 줄이지 못했습니다:', error); }
       }
