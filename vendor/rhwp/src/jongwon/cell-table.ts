@@ -171,6 +171,33 @@ function after(pos: any, path: CellEntry[], pasted: any): any {
   return { ...pos, ...(path.length === 1 ? { cellParaIndex: para, paragraphIndex: para } : {}), charOffset: pasted.charOffset ?? pos.charOffset, cellPath };
 }
 
+
+/** Fill a new table: contents (with their formatting), borders, backgrounds, then merged cells (row-major cell
+ *  numbers before merging; merged from the bottom right so earlier numbers stay valid). */
+function fillTable(wasm: WasmBridge, sec: number, para: number, control: number, spec: TableSpec, rows: number, cols: number, charShape?: number): void {
+  const doc = (wasm as any).doc;
+  const temp = { para, control };
+  for (const c of spec.cells ?? []) {
+    if (c.r >= rows || c.c >= cols) continue;
+    const idx = c.r * cols + c.c;
+    let filled = false;
+    if (c.html && /<(span|b|strong|i|em|u|font|p|div|br)\b/i.test(c.html)) {
+      try { filled = JSON.parse(doc.pasteHtmlInCell(sec, temp.para, temp.control, idx, 0, 0, c.html)).ok === true; } catch { filled = false; }
+    }
+    if (!filled && c.text) {
+      parse(wasm.insertTextInCell(sec, temp.para, temp.control, idx, 0, 0, c.text), '표 내용을 넣지 못했습니다.');
+      if (charShape !== undefined) { try { doc.setCharShapeIdInCell(sec, temp.para, temp.control, idx, 0, 0, c.text.length, charShape); } catch { /* keep */ } }
+    }
+    const props: Record<string, unknown> = { ...(c.borders ?? {}) };
+    if (c.fill) Object.assign(props, { fillType: 'solid', fillColor: c.fill });
+    if (Object.keys(props).length) { try { wasm.setCellProperties(sec, temp.para, temp.control, idx, props as any); } catch { /* keep plain */ } }
+  }
+  for (const c of [...(spec.cells ?? [])].filter(x => x.rs > 1 || x.cs > 1).sort((a, b) => b.r - a.r || b.c - a.c)) {
+    const endRow = Math.min(rows, c.r + c.rs) - 1, endCol = Math.min(cols, c.c + c.cs) - 1;
+    if (endRow > c.r || endCol > c.c) { try { parse(doc.mergeTableCells(sec, temp.para, temp.control, c.r, c.c, endRow, endCol), ''); } catch { /* keep unmerged */ } }
+  }
+}
+
 /**
  * Build a table (as a character) inside the cell at pos, at any depth. Returns the caret position just after it.
  */
@@ -200,29 +227,10 @@ export function buildTableInCell(wasm: WasmBridge, pos: any, spec: TableSpec): a
   });
   if (!made?.ok) throw new Error('표를 만들지 못했습니다.');
   const temp = { para: made.paraIdx, control: made.controlIdx };
-  const doc = (wasm as any).doc;
   let copied = false;
   try {
-    // 2) contents (with their formatting), borders, backgrounds; then merged cells (row-major numbers before merging)
-    for (const c of spec.cells ?? []) {
-      if (c.r >= rows || c.c >= cols) continue;
-      const idx = c.r * cols + c.c;
-      let filled = false;
-      if (c.html && /<(span|b|strong|i|em|u|font|p|div|br)\b/i.test(c.html)) {
-        try { filled = JSON.parse(doc.pasteHtmlInCell(sec, temp.para, temp.control, idx, 0, 0, c.html)).ok === true; } catch { filled = false; }
-      }
-      if (!filled && c.text) {
-        parse(wasm.insertTextInCell(sec, temp.para, temp.control, idx, 0, 0, c.text), '표 내용을 넣지 못했습니다.');
-        if (charShape !== undefined) { try { doc.setCharShapeIdInCell(sec, temp.para, temp.control, idx, 0, 0, c.text.length, charShape); } catch { /* keep */ } }
-      }
-      const props: Record<string, unknown> = { ...(c.borders ?? {}) };
-      if (c.fill) Object.assign(props, { fillType: 'solid', fillColor: c.fill });
-      if (Object.keys(props).length) { try { wasm.setCellProperties(sec, temp.para, temp.control, idx, props as any); } catch { /* keep plain */ } }
-    }
-    for (const c of [...(spec.cells ?? [])].filter(x => x.rs > 1 || x.cs > 1).sort((a, b) => b.r - a.r || b.c - a.c)) {
-      const endRow = Math.min(rows, c.r + c.rs) - 1, endCol = Math.min(cols, c.c + c.cs) - 1;
-      if (endRow > c.r || endCol > c.c) { try { parse(doc.mergeTableCells(sec, temp.para, temp.control, c.r, c.c, endRow, endCol), ''); } catch { /* keep unmerged */ } }
-    }
+    // 2) contents (with their formatting), borders, backgrounds; then merged cells
+    fillTable(wasm, sec, temp.para, temp.control, spec, rows, cols, charShape);
     parse(wasm.copyControl(sec, temp.para, temp.control), '표를 복사하지 못했습니다.');
     copied = true;
   } finally {
@@ -233,4 +241,51 @@ export function buildTableInCell(wasm: WasmBridge, pos: any, spec: TableSpec): a
   // 4) paste it into the cell
   const pasted = parse(wasm.pasteInternalInCellByPath(sec, outer, JSON.stringify(path), pos.charOffset), '칸에 표를 붙이지 못했습니다.');
   return after(pos, path, pasted);
+}
+
+/** Column widths for a table of the spec in the given width: the source widths, narrowed only when too wide. */
+function fitWidths(spec: TableSpec, cols: number, inner: number): number[] {
+  const wanted = spec.colWidths?.length === cols ? spec.colWidths : Array.from({ length: cols }, () => inner / cols);
+  const total = wanted.reduce((a, b) => a + b, 0), k = total > inner ? inner / total : 1;
+  return wanted.map(w => Math.max(800, Math.floor(w * k)));
+}
+
+/**
+ * A table pasted into the body (from 한글, Excel, the web, or another log): built from its HTML like a table
+ * pasted into a cell — grid with merged cells, widths fitted to the page, contents, borders and colours — on a
+ * paragraph of its own at the caret, with a paragraph after it for the caret. (The editor's own HTML paste could
+ * make tables whose cells overlap, which the shared document refuses, and placed them outside the page.)
+ */
+export function buildTableInBody(wasm: WasmBridge, pos: any, spec: TableSpec): any {
+  const sec = pos.sectionIndex;
+  const rows = Math.max(1, Math.min(spec.rows, MAX_ROWS)), cols = Math.max(1, Math.min(spec.cols, MAX_COLS));
+  const def: any = wasm.getPageDef(sec);
+  const inner = Math.max(cols * 1000, def.width - def.marginLeft - def.marginRight - (def.marginGutter ?? 0) - 300);
+  const colWidths = fitWidths(spec, cols, inner);
+  let charShape: number | undefined;
+  try { charShape = wasm.getCharPropertiesAt(sec, pos.paragraphIndex, pos.charOffset).charShapeId; } catch { /* default */ }
+  // an empty paragraph of its own at the caret (text before and after the caret stays on its own lines)
+  let para = pos.paragraphIndex;
+  if (pos.charOffset > 0) { parse(wasm.splitParagraph(sec, para, pos.charOffset), '표를 넣을 문단을 나누지 못했습니다.'); para += 1; }
+  if (wasm.getParagraphLength(sec, para) > 0) parse(wasm.splitParagraph(sec, para, 0), '표를 넣을 문단을 나누지 못했습니다.');
+  const made = wasm.createTableEx({
+    sectionIdx: sec, paraIdx: para, charOffset: 0, rowCount: rows, colCount: cols, treatAsChar: true, colWidths,
+    ...(spec.rowHeights?.length === rows ? { rowHeights: spec.rowHeights.map(h => Math.max(500, Math.round(h))) } : {}),
+  });
+  if (!made?.ok) throw new Error('표를 만들지 못했습니다.');
+  fillTable(wasm, sec, made.paraIdx, made.controlIdx, spec, rows, cols, charShape);
+  const next = made.paraIdx + 1;
+  if (next >= wasm.getParagraphCount(sec)) parse((wasm as any).doc.insertParagraph(sec, next), '표 뒤 문단을 만들지 못했습니다.');
+  return { sectionIndex: sec, paragraphIndex: next, charOffset: 0 };
+}
+
+/** Whether copied HTML is just one table (no text around it), so it can be rebuilt as a table on its own. */
+export function isJustATable(html: string, doc: Document = document): boolean {
+  if (!/<table[\s>]/i.test(html)) return false;
+  const view = doc.defaultView ?? window;
+  const parsed = new view.DOMParser().parseFromString(html, 'text/html');
+  const tables = Array.from(parsed.querySelectorAll('table')).filter(t => !t.parentElement?.closest('table'));
+  if (tables.length !== 1) return false;
+  tables[0].remove();
+  return !(parsed.body?.textContent ?? '').replace(/[\s\u00a0]+/g, '');
 }
