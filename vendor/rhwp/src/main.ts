@@ -46,6 +46,7 @@ import { MODAL_DIALOG_CLOSED_EVENT } from '@/ui/dialog';
 import { showHmlImportWarning } from '@/ui/hml-import-warning';
 import { showToast } from '@/ui/toast';
 import { prepareImageFile } from './jongwon/prepare-image';
+import { ensureParagraphAfterLastTable } from './jongwon/trailing-paragraph';
 import { addRecentDoc, listRecentDocs } from '@/recent/recent-store';
 import { showDropConfirmDialog } from '@/ui/drop-confirm-dialog';
 import { showHwpPasswordDialog } from '@/ui/hwp-password-dialog';
@@ -2084,7 +2085,7 @@ if (new URLSearchParams(location.search).has('collaboration')) {
       if (applying || composing) { scheduleTallTables(); return; }
       const squeezed = squeezeCheckPending && fixSqueezedCellLines();
       squeezeCheckPending = false;
-      if ([squeezed, shrinkOversizedRows(), splitTallInlineTables()].some(Boolean)) {
+      if ([squeezed, shrinkOversizedRows(), splitTallInlineTables(), ensureParagraphAfterLastTable(wasm)].some(Boolean)) {
         // a clean-up is not the user's edit: keep the view where the user scrolled it
         const view = document.getElementById('scroll-container'), top = view?.scrollTop, left = view?.scrollLeft;
         (inputHandler as any).afterEdit?.(); eventBus.emit('document-changed');

@@ -21,6 +21,7 @@ import { prepareImageFile } from '../jongwon/prepare-image';
 import { isCellInlinePicture, removeCellPicture, placeClipboardPictureInCell, clipboardHoldsCopiedPicture, notePictureCopied, noteOtherCopy, requestLayoutRefresh, hasKeptPicture, keptPictureText, insertKeptPictureInCell } from '../jongwon/cell-picture';
 import { showToast } from '@/ui/toast';
 import { buildTableInCell, canBuildTableInCell, tableSpecFromHtml, cellInnerWidth, copiedTableFor, pasteClipboardTableInCell, withCopiedSizes } from '../jongwon/cell-table';
+import { caretAfterPastedTable } from '../jongwon/trailing-paragraph';
 import { tableObjectClipboardTarget } from './table-object-clipboard-target';
 import { scrollByPageStep, type PageScrollDirection } from '@/view/page-scroll';
 import { emitHeaderFooterModeChanged } from './header-footer-mode';
@@ -1982,11 +1983,11 @@ export function onPaste(this: any, e: ClipboardEvent): void {
         const parsed = JSON.parse(result);
         if (parsed.ok) {
           const newParaIdx = (parsed.paraIdx ?? p.paragraphIndex) + 1;
-          return {
+          return caretAfterPastedTable(wasm, {
             sectionIndex: p.sectionIndex,
             paragraphIndex: newParaIdx,
             charOffset: 0,
-          } as DocumentPosition;
+          }) as DocumentPosition;
         }
         return p;
       }});
@@ -2070,7 +2071,8 @@ export function onPaste(this: any, e: ClipboardEvent): void {
       }
       const parsed = JSON.parse(result);
       if (parsed.ok) {
-        return positionAfterPasteResult(p, parsed);
+        const after = positionAfterPasteResult(p, parsed);
+        return p.parentParaIndex === undefined && /<table[\s>]/i.test(html) ? caretAfterPastedTable(wasm, after) : after;
       }
       return p;
     }});

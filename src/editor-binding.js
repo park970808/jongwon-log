@@ -79,8 +79,12 @@ function contextScore(text,offset,anchor){
  const plain=typeof text==='string'?text:richText(text),b=anchor.before,a=anchor.after;
  let s=0;while(s<b.length&&offset-s-1>=0&&plain[offset-s-1]===b[b.length-s-1])s++;
  let t=0;while(t<a.length&&offset+t<plain.length&&plain[offset+t]===a[t])t++;
- return s+t;
+ // A caret near the start or end of its paragraph (shorter context) must still be that near it: in a run of the
+ // same letters ("가가가…") every spot otherwise matches, and the caret slid back from the end of my typing.
+ const start=b.length<CONTEXT&&s===b.length&&offset===b.length?1:0,end=a.length<CONTEXT&&t===a.length&&offset+a.length===plain.length?1:0;
+ return s+t+start+end;
 }
+const fullScore=anchor=>anchor.before.length+anchor.after.length+(anchor.before.length<CONTEXT?1:0)+(anchor.after.length<CONTEXT?1:0);
 function bestContextOffset(text,anchor){
  const plain=richText(text),b=anchor.before,a=anchor.after;
  if(!plain||(!b&&!a))return null;
@@ -213,7 +217,7 @@ export class EditorBinding {
    }
    // The caret's words may now be in a neighbouring paragraph of the same cell (Enter or Backspace by a teammate):
    // follow them there when they match better than where the caret's own paragraph left it.
-   if(anchor.before!==undefined&&(!found||found.score<(anchor.before.length+anchor.after.length))){
+   if(anchor.before!==undefined&&(!found||found.score<fullScore(anchor))){
      const home=p?.position??anchor.fallback,near=list.filter(x=>sameContainer(x.position,home)&&Math.abs(paraIndex(x.position)-paraIndex(home))<=6);
      for(const x of near){
        const best=bestContextOffset(nodes.get(x.node.key)?.get('rich'),anchor);
