@@ -37,3 +37,16 @@ test('selective undo keeps another user’s concurrent text',()=>{
 test('invalid XML does not silently become a shared document',()=>{
  assert.throws(()=>readHwpx(new Uint8Array([1,2,3])));
 });
+test('pictures no part of the document refers to are dropped (deleted photos the editor still writes out)',async()=>{
+  const {unzipSync,zipSync,strFromU8,strToU8}=await import('fflate');
+  const files=unzipSync(input);
+  const hpf=strFromU8(files['Contents/content.hpf']);
+  files['Contents/content.hpf']=strToU8(hpf.replace(/(<opf:manifest[^>]*>)/,'$1<opf:item id="image9" href="BinData/image9.jpg" media-type="image/jpeg" isEmbeded="1"/><opf:item id="image10" href="BinData/image10.jpg" media-type="image/jpeg" isEmbeded="1"/>'));
+  files['BinData/image9.jpg']=new Uint8Array([1,2,3]);files['BinData/image10.jpg']=new Uint8Array([4,5,6]);
+  // image10 is used by a cell background (border/fill image), image9 by nothing
+  files['Contents/header.xml']=strToU8(strFromU8(files['Contents/header.xml']).replace('</hh:refList>','<hh:note binaryItemIDRef="image10"/></hh:refList>'));
+  const parts=readHwpx(zipSync(files));
+  const bins=Object.keys(parts).filter(k=>k.startsWith('BinData/'));
+  assert.equal(bins.length,1,'only the referenced picture stays: '+bins);
+  assert.equal(JSON.stringify(parts['Contents/content.hpf'].xml).match(/BinData\//g)?.length,1);
+});

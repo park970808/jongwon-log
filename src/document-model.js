@@ -121,6 +121,23 @@ function canonicalize(docs, files) {
   }
 }
 
+/**
+ * The editor keeps every picture it has ever held (deleted, replaced, cropped or cut-and-pasted photos) and
+ * writes them all out again. They are invisible but made the shared log grow with each photo action until it
+ * passed the 32 MB limit and no more photos could be added. Drop pictures no part of the document refers to.
+ */
+function pruneUnusedBinaries(docs, texts, files) {
+  const hpf = docs.get('Contents/content.hpf');
+  if (!hpf) return;
+  const others = [...texts].filter(([name]) => name !== 'Contents/content.hpf').map(([, text]) => text);
+  for (const item of Array.from(hpf.getElementsByTagName('*')).filter(n => local(n) === 'item')) {
+    const href = item.getAttribute('href') || '', id = item.getAttribute('id') || '';
+    if (!href.startsWith('BinData/') || !id) continue;
+    if (others.some(text => text.includes(`"${id}"`) || text.includes(href))) continue;
+    item.parentNode.removeChild(item); delete files[href];
+  }
+}
+
 export function readHwpx(bytes) {
   if (bytes.length > MAX_ARCHIVE) throw new Error('문서 파일은 32MB 이하로 열어주세요.');
   let total = 0;
@@ -130,8 +147,9 @@ export function readHwpx(bytes) {
     return !f.name.endsWith('/');
   } });
   if (!files['Contents/header.xml'] || !files['Contents/section0.xml']) throw new Error('유효한 HWPX 문서가 아닙니다.');
-  const docs = new Map();
-  for (const [name, data] of Object.entries(files)) if (/\.(xml|hpf|rdf)$/.test(name)) docs.set(name, parseXml(strFromU8(data)));
+  const docs = new Map(), texts = new Map();
+  for (const [name, data] of Object.entries(files)) if (/\.(xml|hpf|rdf)$/.test(name)) { const text = strFromU8(data); texts.set(name, text); docs.set(name, parseXml(text)); }
+  pruneUnusedBinaries(docs, texts, files);
   canonicalize(docs, files);
   const parts = {};
   for (const [name, data] of Object.entries(files)) {
